@@ -397,3 +397,146 @@ def test_audit_scores_risky_services_and_leaks(state):
     assert tel["ip"] == cam and tel["risk"] == "high"
     assert next(x for x in au["services"] if x["port"] == 443)["risk"] == "info"
     assert au["score"] < 80 and au["grade"] in "BCDF"
+
+
+# ---------------- pentest: σαρωτής, lab, endpoints ----------------
+import json  # noqa: E402
+import socket  # noqa: E402
+import threading  # noqa: E402
+import urllib.request  # noqa: E402
+
+import pentest  # noqa: E402
+
+
+@pytest.mark.parametrize("banner,expected", [
+    ("SSH-2.0-OpenSSH_7.4", ("OpenSSH", "7.4")),
+    ("SSH-2.0-dropbear_2017.75", ("Dropbear SSH", "2017.75")),
+    ("220 (vsFTPd 2.3.4)", ("vsftpd", "2.3.4")),
+    ("HTTP/1.1 200 OK\r\nServer: Apache/2.2.15 (CentOS)", ("Apache httpd", "2.2.15")),
+    ("HTTP/1.1 200 OK\r\nServer: AcmeCam", ("AcmeCam", None)),
+    ("", (None, None)),
+])
+def test_parse_banner(banner, expected):
+    assert pentest.parse_banner(banner) == expected
+
+
+@pytest.mark.parametrize("target", ["8.8.8.8", "1.1.1.0/24", "127.0.0.1", "10.0.0.0/8", "nonsense", "fe80::1"])
+def test_scanner_refuses_public_huge_or_invalid_targets(target):
+    with pytest.raises(ValueError):
+        pentest.check_target(target)
+
+
+def test_scanner_accepts_private_lan():
+    assert len(pentest.check_target("192.168.1.0/24")) == 254
+    assert pentest.check_target("10.0.0.7") == ["10.0.0.7"]
+
+
+def test_grab_reads_banner_from_open_port():
+    srv = socket.socket()
+    srv.bind(("127.0.0.1", 0))
+    srv.listen(1)
+    port = srv.getsockname()[1]
+
+    def serve():
+        c, _ = srv.accept()
+        c.sendall(b"SSH-2.0-OpenSSH_8.9p1 Ubuntu\r\n")
+        c.close()
+    threading.Thread(target=serve, daemon=True).start()
+    assert pentest.grab("127.0.0.1", port).startswith("SSH-2.0-OpenSSH_8.9p1")
+    srv.close()
+    assert pentest.grab("127.0.0.1", port, timeout=0.3) is None  # κλειστή θύρα
+
+
+class FakeTime:
+    def __init__(self):
+        self.t = 1_700_000_000.0
+
+    def time(self):
+        return self.t
+
+    def sleep(self, s):
+        self.t += s
+
+
+def run_lab(state, kind, variant, monkeypatch):
+    ft = FakeTime()
+    monkeypatch.setattr(pentest, "time", ft)
+    lab = pentest.Lab(state)
+    lab.run = {"status": "running", "kind": kind, "variant": variant, "started": ft.time(), "pkts": 0,
+               "first_alert": state.alert_seq, "rule": lab.rule(kind)}
+    lab._go(kind, variant)
+    return lab.status()
+
+
+@pytest.mark.parametrize("kind", list(pentest.LAB_SCENARIOS))
+def test_lab_loud_attacks_are_detected(state, kind, monkeypatch):
+    r = run_lab(state, kind, "loud", monkeypatch)
+    assert r["status"] == "done" and r["pkts"] > 0
+    assert r["detected"], f"{kind}: {[a['type'] for a in r['alerts']]}"
+    assert all(a["lab"] for a in r["alerts"])
+
+
+@pytest.mark.parametrize("kind", [k for k, s in pentest.LAB_SCENARIOS.items() if s["quiet"]])
+def test_lab_quiet_attacks_slip_under_thresholds(state, kind, monkeypatch):
+    r = run_lab(state, kind, "quiet", monkeypatch)
+    assert r["pkts"] > 0 and not r["detected"]
+
+
+def test_lab_alerts_stay_out_of_history_and_audit(state, monkeypatch):
+    run_lab(state, "xmas", "loud", monkeypatch)
+    assert any(a["lab"] for a in state.alerts)
+    assert state.history.query(hours=24 * 365 * 10, ref=2_000_000_000)["total_alerts"] == 0
+    assert next(c for c in state.audit()["checks"] if c["id"] == "attacks")["status"] == "ok"
+    assert not any(a["type"] == "Νέα συσκευή" for a in state.alerts)
+
+
+def test_demo_scan_feeds_audit(state, monkeypatch):
+    monkeypatch.setattr(nw.time, "sleep", lambda s: None)
+    state.scanner = pentest.LanScanner(sim=nw.demo_scan)
+    state.scanner.on_result = state.scan_result
+    state.scanner.start("192.168.1.0/24")
+    for _ in range(200):
+        if state.scanner.status()["status"] != "running":
+            break
+        threading.Event().wait(0.01)
+    v = state.scan_view()
+    assert v["status"] == "done"
+    by = {h["ip"]: h for h in v["hosts"]}
+    ftp = next(s for s in by["192.168.1.40"]["services"] if s["port"] == 21)
+    assert (ftp["product"], ftp["version"], ftp["risk"]) == ("vsftpd", "2.3.4", "high")
+    assert next(s for s in by["192.168.1.77"]["services"] if s["port"] == 4444)["risk"] == "high"
+    tls = next(s for s in by["192.168.1.1"]["services"] if s["port"] == 443)
+    assert tls["risk"] == "high" and "TLSv1" in tls["why"]
+    au = state.audit()
+    assert any(s["port"] == 23 and s["ip"] == "192.168.1.30" for s in au["services"])
+    assert next(c for c in au["checks"] if c["id"] == "services")["status"] == "bad"
+
+
+@pytest.fixture
+def server(state):
+    from http.server import ThreadingHTTPServer
+    state.lab = pentest.Lab(state)
+    state.scanner = pentest.LanScanner()
+    srv = ThreadingHTTPServer(("127.0.0.1", 0), nw.make_handler(state))
+    threading.Thread(target=srv.serve_forever, daemon=True).start()
+    yield f"http://127.0.0.1:{srv.server_address[1]}"
+    srv.shutdown()
+
+
+def _post(url, body, headers):
+    req = urllib.request.Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(req, timeout=5) as r:
+            return r.status, json.load(r)
+    except urllib.error.HTTPError as e:
+        return e.code, json.load(e)
+
+
+def test_post_endpoints_block_cross_site_requests(server):
+    ok = {"Content-Type": "application/json"}
+    assert _post(server + "/api/lab", {"kind": "xmas", "variant": "loud"}, {"Content-Type": "text/plain"})[0] == 403
+    assert _post(server + "/api/lab", {"kind": "xmas", "variant": "loud"},
+                 {**ok, "Origin": "https://evil.example"})[0] == 403
+    assert _post(server + "/api/scan", {"target": "8.8.8.0/24"}, ok)[0] == 400
+    assert _post(server + "/api/lab", {"kind": "nope", "variant": "loud"}, ok)[0] == 400
+    assert _post(server + "/api/lab", {"kind": "xmas", "variant": "loud"}, ok) == (200, {"ok": True})

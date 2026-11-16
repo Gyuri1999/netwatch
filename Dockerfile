@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tcpdump whois i
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY netwatch.py index.html edu.js config.example.yaml ./
+COPY netwatch.py pentest.py index.html edu.js config.example.yaml ./
 COPY samples ./samples
 COPY tools ./tools
 EXPOSE 8765

@@ -131,6 +131,7 @@ a.mitre:hover{border-color:#b388ff}
       <button data-t="hist">🕓 Ιστορικό</button>
       <button data-t="audit">🛡 Έλεγχος</button>
       <button data-t="quiz">🎓 Κουίζ</button>
+      <button data-t="pentest">🔴 Pentest</button>
     </nav>
     <div class="tab on" id="t-alerts"><div class="empty">Καμία επίθεση ακόμα. Παρακολουθώ… 👀</div></div>
     <div class="tab" id="t-hosts">
@@ -149,6 +150,7 @@ a.mitre:hover{border-color:#b388ff}
     <div class="tab" id="t-hist"></div>
     <div class="tab" id="t-audit"></div>
     <div class="tab" id="t-quiz"></div>
+    <div class="tab" id="t-pentest"></div>
   </aside>
 </main>
 <script>
@@ -321,13 +323,13 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.datas
 function showTab(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
   if(t==='alerts'){S.unread=0;$('ac').style.display='none'}renderTab()}
-function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz})[tab]()}
+function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest})[tab]()}
 function tabHover(){return document.querySelector('.tab.on:hover')}
 
 function eduHTML(type){const e=eduFor(type);if(!e)return'';
   return `<div class="edu"><b>${esc(e.t)}</b><span class="lvl">${esc(e.lvl)}</span><br><b>Τι είναι:</b> ${esc(e.what)}<br><b>Πώς γίνεται:</b> ${esc(e.how)}<br><b>Κίνδυνος:</b> ${esc(e.risk)}<br><b>Τι να κάνεις:</b><ul>${e.todo.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`}
 function alertHTML(a){const h=S.hosts.get(a.actor),g=h?.geo,open=S.openEdu.has(a.id);
-  return `<div class="al ${a.sev}"><div class="h"><span><span class="sev ${a.sev}">${a.sev.toUpperCase()}</span><span class="ty">${esc(a.type)}</span></span><span class="tm">${fmtT(a.t)}</span></div>
+  return `<div class="al ${a.sev}"><div class="h"><span><span class="sev ${a.sev}">${a.sev.toUpperCase()}</span><span class="ty">${esc(a.type)}</span>${a.lab?' <span class="tag y">🧪 LAB</span>':''}</span><span class="tm">${fmtT(a.t)}</span></div>
   <div style="margin:4px 0">${flag(g?.countryCode)} <b>${esc(a.actor)}</b> → ${esc(a.target)} ${g?`<span style="color:#6d7f99">· ${esc(g.country)} · ${esc(g.isp)}</span>`:''}</div>
   <div style="color:#9fb4d0">${esc(a.detail)}</div>
   ${a.mitre?`<div style="margin-top:4px"><a class="mitre" target="_blank" href="${esc(a.mitre.url)}" title="${esc(a.mitre.name)}">MITRE ATT&amp;CK ${esc(a.mitre.id)}</a> <span class="sm">${esc(a.mitre.tactic)} · ${esc(a.mitre.name)}</span></div>`:''}
@@ -591,12 +593,12 @@ function toastInfo(msg){const t=document.createElement('div');t.className='toast
 function addAlert(a,quiet){S.alerts.unshift(a);if(quiet)return;
   if(tab!=='alerts'){S.unread++;$('ac').textContent=S.unread;$('ac').style.display=''}
   if(a.sev!=='low'){const g=S.hosts.get(a.actor)?.geo,e=eduFor(a.type);const t=document.createElement('div');t.className='toast';
-    t.innerHTML=`<b style="color:#ff8da0">⚠ ${esc(a.type)}</b> — ${flag(g?.countryCode)} ${esc(a.actor)} → ${esc(a.target)}<div style="color:#cfe0f5;margin-top:3px">${esc(a.detail)}</div>${e?`<div class="sm" style="margin-top:3px">${esc(e.what)}</div>`:''}`;
+    t.innerHTML=`<b style="color:#ff8da0">${a.lab?'🧪 LAB · ':'⚠ '}${esc(a.type)}</b> — ${flag(g?.countryCode)} ${esc(a.actor)} → ${esc(a.target)}<div style="color:#cfe0f5;margin-top:3px">${esc(a.detail)}</div>${e?`<div class="sm" style="margin-top:3px">${esc(e.what)}</div>`:''}`;
     t.onclick=()=>{select(a.actor);t.remove()};$('toasts').prepend(t);setTimeout(()=>t.remove(),8000);
     while($('toasts').children.length>3)$('toasts').lastChild.remove();
     $('flash').style.boxShadow='inset 0 0 80px 10px #ff3b5c88';setTimeout(()=>$('flash').style.boxShadow='inset 0 0 0 0 #ff3b5c',600)}
   $('na').textContent=S.alerts.length;updStatus()}
-function updStatus(){const now=Date.now()/1000,rec=S.alerts.filter(a=>now-a.t<300),el=$('status');
+function updStatus(){const now=Date.now()/1000,rec=S.alerts.filter(a=>now-a.t<300&&!a.lab),el=$('status');
   if(rec.some(a=>a.sev==='high')){el.className='st-bad';el.textContent='⚠ ΕΝΕΡΓΗ ΑΠΕΙΛΗ'}
   else if(rec.length){el.className='st-warn';el.textContent='! Ύποπτη δραστηριότητα'}
   else{el.className='st-ok';el.textContent='✓ Όλα καλά'}}
@@ -669,6 +671,63 @@ function renderQuiz(){const el=$('t-quiz');if(!QZ.q)QZ.q=makeQuestion();const q=
     if(q.opts[QZ.ans]===q.ok){QZ.score++;QZ.streak++;QZ.best=Math.max(QZ.best,QZ.streak)}else QZ.streak=0;saveQZ();renderQuiz()});
   const n=$('qnext');if(n)n.onclick=()=>{QZ.q=null;QZ.ans=null;renderQuiz()};
   $('qreset').onclick=()=>{QZ.score=QZ.total=QZ.streak=QZ.best=0;QZ.q=null;QZ.ans=null;saveQZ();renderQuiz()}}
+
+// ================= 🔴 PENTEST =================
+let scanData=null,expo=null,labData=null,ptTarget=null;const cveCache={};
+const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})}).then(r=>r.json());
+const ptBusy=()=>document.activeElement&&document.activeElement.id==='pt-target';
+function loadScan(){return fetch('/api/scan').then(r=>r.json()).then(j=>{scanData=j;if(ptTarget==null)ptTarget=j.default_target;if(tab==='pentest'&&!ptBusy())drawPentest()})}
+function loadLab(){return fetch('/api/lab').then(r=>r.json()).then(j=>{labData=j;if(tab==='pentest'&&!ptBusy())drawPentest()})}
+function renderPentest(){if(!scanData||!labData){$('t-pentest').innerHTML='<div class="empty">φόρτωση…</div>';loadScan();loadLab();return}drawPentest()}
+const riskTag=r=>`<span class="tag ${RISK[r][0]}">${RISK[r][1]}</span>`;
+const sevCol=s=>s>=9?'#ff3b5c':s>=7?'#ff9f43':s>=4?'#ffd23f':'#6d7f99';
+function cveHTML(k){const c=cveCache[k];if(!c)return'';if(c.loading)return'<div class="sm">ψάχνω στο NVD…</div>';if(c.error)return`<div class="sm" style="color:#ff8da0">${esc(c.error)}</div>`;
+  if(!c.cves.length)return`<div class="sm">Δεν βρέθηκαν γνωστές ευπάθειες για «${esc(c.query)}».</div>`;
+  return `<div class="sm" style="margin:4px 0">${c.total} αποτελέσματα στο NVD για «${esc(c.query)}» — οι πιο σοβαρές (ενδεικτικά, έλεγξε ότι ταιριάζει η έκδοση):</div>`+c.cves.map(v=>`<div style="margin:3px 0;white-space:normal"><a class="mitre" style="background:#2a0910;border-color:${sevCol(v.score)};color:${sevCol(v.score)}" target="_blank" href="https://nvd.nist.gov/vuln/detail/${esc(v.id)}">${esc(v.id)} · ${v.score??'?'}</a> <span class="sm">${esc(v.summary)}</span></div>`).join('')}
+function drawPentest(){const el=$('t-pentest'),sd=scanData,run=sd.status==='running';
+  let h=`<div class="card" style="border-color:#5a2a2a;background:#1a0d10"><b style="color:#ff8da0">⚖️ Μόνο στο δικό σου δίκτυο.</b><div class="sm" style="margin-top:3px">Η σάρωση συσκευών που δεν σου ανήκουν χωρίς γραπτή άδεια είναι παράνομη. Ο σαρωτής δέχεται μόνο ιδιωτικές διευθύνσεις (192.168.x.x, 10.x.x.x).</div></div>`;
+  // --- σαρωτής
+  h+=`<h3>1 · Σάρωση του LAN σου ${sd.sim?'<span class="tag y">demo</span>':''}</h3><div class="sm" style="margin-bottom:6px">Βρίσκει συσκευές, ανοιχτές θύρες, τι λογισμικό και ποια έκδοση τρέχουν (banner grabbing) και ελέγχει το TLS — όπως το <code>nmap -sV</code>.</div>
+  <div style="display:flex;gap:6px"><input class="f" id="pt-target" style="margin:0" value="${esc(ptTarget||'')}" placeholder="192.168.1.0/24"><button class="b" id="pt-scan" ${run?'disabled':''}>${run?'σαρώνω…':'▶ Σάρωσε'}</button></div>`;
+  if(run)h+=`<div class="sm" style="margin-top:6px">${esc(sd.phase||'')} — ${sd.progress||0}%</div><div class="bar"><i style="width:${sd.progress||0}%;background:#ff3b5c"></i></div>`;
+  if(sd.status==='error')h+=`<div class="sm" style="color:#ff8da0;margin-top:6px">${esc(sd.error)}</div>`;
+  if(sd.status==='done'){const hs=sd.hosts||[],nOpen=hs.reduce((n,x)=>n+x.services.length,0),bad=hs.filter(x=>x.risk==='high').length;
+    h+=`<div class="sm" style="margin:8px 0">✔ ${hs.length} συσκευές, ${nOpen} ανοιχτές θύρες, ${bad} συσκευές με υψηλό κίνδυνο · ${Math.round(sd.finished-sd.started)} s</div>`;
+    h+=hs.map(x=>`<div class="card"><div class="brow"><span><b style="color:#fff">${esc(x.ip)}</b> ${esc(x.name||'')} ${x.gw?'<span class="tag">router</span>':''}${x.me?'<span class="tag">εσύ</span>':''}</span>${riskTag(x.risk)}</div>
+      <div class="sm">${x.mac?'MAC '+esc(x.mac):''}</div>
+      ${x.services.length?`<table style="margin-top:4px"><tbody>${x.services.map(sv=>{const k=sv.product+' '+(sv.version||'');return `<tr><td style="width:92px">${sv.port} ${esc(sv.svc)}</td><td style="max-width:200px" title="${esc(sv.banner||'')}">${sv.product?`<b style="color:#fff">${esc(sv.product)}</b> ${esc(sv.version||'')}`:'<span class="sm">χωρίς banner</span>'}${sv.tls?` <span class="tag">${esc(sv.tls.version||'TLS ?')}</span>`:''}</td><td>${riskTag(sv.risk)}</td><td>${sv.product&&sv.version?`<button class="b" data-cve="${esc(sv.product)}" data-ver="${esc(sv.version)}">CVE</button>`:''}</td></tr>
+        ${sv.why?`<tr class="ex"><td colspan="4" class="sm">${esc(sv.why)}</td></tr>`:''}${cveCache[k]?`<tr class="ex"><td colspan="4">${cveHTML(k)}</td></tr>`:''}`}).join('')}</tbody></table>`:'<div class="sm">καμία ανοιχτή θύρα από τις συνηθισμένες</div>'}</div>`).join('');
+    h+=`<div class="sm">Τα αποτελέσματα μπήκαν και στην καρτέλα 🛡 Έλεγχος.</div>`}
+  // --- shodan
+  h+=`<h3>2 · Τι βλέπει το Internet για σένα</h3><div class="sm" style="margin-bottom:6px">Το Shodan σαρώνει συνεχώς όλο το Internet. Δες τι έχει καταγράψει για τη δημόσια IP σου${S.home?.query?' ('+esc(S.home.query)+')':''} — αυτό βλέπει πρώτα ένας επιτιθέμενος. <i>Το κουμπί στέλνει τη δημόσια IP σου στο internetdb.shodan.io.</i></div>
+  <button class="b" id="pt-expo">${expo&&expo.loading?'ρωτάω το Shodan…':'🌐 Έλεγχος έκθεσης'}</button>`;
+  if(expo&&!expo.loading){if(expo.error)h+=`<div class="sm" style="color:#ff8da0;margin-top:6px">${esc(expo.error)}</div>`;
+    else{h+=`<div class="card" style="margin-top:8px">${expo.demo?'<span class="tag y">demo</span> ':''}<b style="color:#fff">${esc(expo.ip)}</b>
+      <div style="margin-top:4px">${expo.ports.length?`❗ Ανοιχτές θύρες προς το Internet: ${expo.ports.map(p=>`<span class="tag r">${p} ${esc((portInfo(p)||[''])[0])}</span>`).join('')}`:'✅ Το Shodan δεν βλέπει καμία ανοιχτή θύρα — ο router σου δεν εκθέτει τίποτα.'}</div>
+      ${expo.vulns?.length?`<div style="margin-top:4px">⚠ Πιθανές ευπάθειες: ${expo.vulns.map(v=>`<a class="mitre" target="_blank" href="https://nvd.nist.gov/vuln/detail/${esc(v)}">${esc(v)}</a>`).join(' ')}</div>`:''}
+      ${expo.tags?.length?`<div class="sm" style="margin-top:4px">tags: ${expo.tags.map(esc).join(', ')}</div>`:''}${expo.hostnames?.length?`<div class="sm">hostnames: ${expo.hostnames.map(esc).join(', ')}</div>`:''}${expo.cpes?.length?`<div class="sm">λογισμικό: ${expo.cpes.map(esc).join(', ')}</div>`:''}
+      ${expo.ports.length?`<div class="sm" style="margin-top:6px">👉 Κλείσε στο router το port forwarding / UPnP / απομακρυσμένη διαχείριση που δεν χρειάζεσαι και κάνε ενημέρωση firmware.</div>`:''}</div>`}}
+  // --- lab
+  const L=labData,sc=L.scenarios||{},lr=L.status!=='idle'?L:null;
+  h+=`<h3>3 · Purple-team lab</h3><div class="sm" style="margin-bottom:6px">Κάνε μια επίθεση (🔴 red team) και δες αν την πιάνει η άμυνα (🔵 blue team). Τα πακέτα είναι <b>προσομοίωση</b>: περνούν από την ίδια μηχανή ανίχνευσης αλλά δεν στέλνεται τίποτα στο δίκτυο. Δοκίμασε και την αθόρυβη εκδοχή — έτσι μαθαίνεις πώς ξεφεύγουν οι επιτιθέμενοι.</div>`;
+  if(lr){const s=sc[lr.kind]||{},running=lr.status==='running';
+    h+=`<div class="card" style="border-color:${running?'#2d3b55':lr.detected?'#3ddc97':'#ff3b5c'}"><div class="brow"><b style="color:#fff">${esc(s.title)} · ${lr.variant==='loud'?'📢 θορυβώδες':'🤫 αθόρυβο'}</b><span class="sm">${lr.pkts} πακέτα</span></div>
+      <div class="sm">Εργαλείο επιτιθέμενου: <code>${esc(s.tool)}</code> — ${esc(s[lr.variant])}</div>
+      ${running?'<div style="margin-top:6px">⏳ εκτελείται…</div>':`<div style="margin-top:6px;font-size:13px">${lr.detected?'✅ <b style="color:#3ddc97">Ανιχνεύτηκε!</b>':'❌ <b style="color:#ff8da0">Δεν ανιχνεύτηκε</b> — ο «επιτιθέμενος» πέρασε απαρατήρητος.'}</div>`}
+      <div class="sm" style="margin-top:4px">📏 Κανόνας ανίχνευσης: ${esc(lr.rule)}</div>
+      ${(lr.alerts||[]).map(a=>`<div class="sm" style="margin-top:3px">⚠ <b style="color:#fff">${esc(a.type)}</b> ${a.mitre?esc(a.mitre.id):''} — ${esc(a.detail)}</div>`).join('')}
+      ${running?'':`<div class="edu" style="margin-top:6px"><b>Μάθημα:</b> ${esc(s.lesson)}</div>`}</div>`}
+  h+=Object.entries(sc).map(([k,s])=>`<div class="card"><div class="brow"><b style="color:#fff">${esc(s.title)}</b><code class="sm">${esc(s.tool)}</code></div>
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button class="b" data-lab="${k}" data-v="loud" title="${esc(s.loud)}" ${lr&&lr.status==='running'?'disabled':''}>📢 Θορυβώδες</button>${s.quiet?`<button class="b" data-lab="${k}" data-v="quiet" title="${esc(s.quiet)}" ${lr&&lr.status==='running'?'disabled':''}>🤫 Αθόρυβο</button>`:''}</div>
+    <div class="sm" style="margin-top:4px">📢 ${esc(s.loud)}${s.quiet?'<br>🤫 '+esc(s.quiet):''}</div></div>`).join('');
+  el.innerHTML=h;
+  $('pt-target').oninput=e=>ptTarget=e.target.value;
+  $('pt-scan').onclick=()=>post('/api/scan',{target:ptTarget}).then(r=>{if(r.error){scanData={...scanData,status:'error',error:r.error};drawPentest()}else loadScan()});
+  $('pt-expo').onclick=()=>{expo={loading:true};drawPentest();post('/api/exposure').then(r=>{expo=r;drawPentest()}).catch(e=>{expo={error:String(e)};drawPentest()})};
+  el.querySelectorAll('[data-cve]').forEach(b=>b.onclick=()=>{const p=b.dataset.cve,v=b.dataset.ver,k=p+' '+v;if(cveCache[k]&&!cveCache[k].error){delete cveCache[k];drawPentest();return}
+    cveCache[k]={loading:true};drawPentest();fetch('/api/cve?product='+encodeURIComponent(p)+'&version='+encodeURIComponent(v)).then(r=>r.json()).then(j=>{cveCache[k]=j;drawPentest()}).catch(e=>{cveCache[k]={error:String(e)};drawPentest()})});
+  el.querySelectorAll('[data-lab]').forEach(b=>b.onclick=()=>post('/api/lab',{kind:b.dataset.lab,variant:b.dataset.v}).then(r=>{if(r.error)alert(r.error);loadLab()}))}
+setInterval(()=>{if(tab!=='pentest')return;if(scanData?.status==='running')loadScan();if(labData?.status==='running')loadLab()},1000);
 setInterval(()=>{if(tab==='feed'&&!$('fpause').checked)renderFeed()},700);
 setInterval(()=>{if(tab==='audit')loadAudit()},3000);
 setInterval(()=>{if(tab==='hist')loadHist()},10000);

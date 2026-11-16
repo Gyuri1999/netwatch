@@ -512,6 +512,9 @@ class NetState:
         self.beacons = {}
         self.services = collections.defaultdict(dict)  # ip → {θύρα που «ακούει": t}
         self.creds, self.cred_users = {}, {}
+        self.lab_ips = set()  # «επιτιθέμενοι» του purple-team lab (δεν πάνε σε ιστορικό/ειδοποιήσεις)
+        self.scan_info = collections.defaultdict(dict)  # ip → {θύρα: banner/έκδοση/TLS από τον σαρωτή}
+        self.scanner = self.lab = None
         self.plain = collections.Counter()  # (client, πρωτόκολλο) → πακέτα χωρίς κρυπτογράφηση
         self.first_t, self.last_t = None, 0.0
         self.min_pkts = self.min_bytes = 0
@@ -677,8 +680,9 @@ class NetState:
             return
         self.cooldown[k] = t
         self.alert_seq += 1
+        lab = actor in self.lab_ips
         a = dict(id=self.alert_seq, t=t, type=typ, sev=sev, actor=actor,
-                 target=target, detail=detail, mitre=mitre_for(typ))
+                 target=target, detail=detail, mitre=mitre_for(typ), lab=lab)
         self.alerts.appendleft(a)
         h = self.host(actor, t)
         if h:
@@ -687,6 +691,9 @@ class NetState:
             h["alerts"].append(a["id"])
             self.dirty.add(actor)
         self.publish({"type": "alert", "alert": a})
+        if lab:
+            log(f"🧪 LAB {typ}: {actor} → {target}")
+            return
         try:
             self.history.add_alert(a, self.mode)
         except Exception as e:
@@ -945,7 +952,9 @@ class NetState:
                 h = self.hosts.get(ip) or {}
                 for p in sorted(ports):
                     risk, why = RISKY_SERVICES.get(p, ("info", SERVICES.get(p, "")))
+                    si = self.scan_info.get(ip, {}).get(p, {})
                     services.append({"ip": ip, "name": name(ip), "mac": h.get("mac"), "port": p,
+                                     "product": si.get("product"), "version": si.get("version"),
                                      "svc": SERVICES.get(p, ""), "risk": risk, "why": why,
                                      "gw": ip == self.gateway, "me": ip in self.me})
             services.sort(key=lambda s: (-SEV.get(s["risk"], 0), s["ip"], s["port"]))
@@ -962,7 +971,7 @@ class NetState:
                     f"Δεν είδα επικίνδυνες υπηρεσίες ({len(services)} υπηρεσίες συνολικά).",
                     "Το NetWatch βλέπει μόνο υπηρεσίες που χρησιμοποιήθηκαν· για πλήρη εικόνα κάνε σάρωση με nmap.")
 
-            recent = [a for a in self.alerts if now - a["t"] < 3600]
+            recent = [a for a in self.alerts if now - a["t"] < 3600 and not a.get("lab")]
             attacks = [a for a in recent if not a["type"].startswith(("Κωδικός σε καθαρό", "Νέα συσκευή"))]
             hi = [a for a in attacks if a["sev"] == "high"]
             if attacks:
@@ -1009,6 +1018,49 @@ class NetState:
             grade = "A" if score >= 90 else "B" if score >= 75 else "C" if score >= 60 else "D" if score >= 40 else "F"
             return {"score": score, "grade": grade, "checks": checks, "services": services[:100],
                     "creds": creds[:50], "plain": plain, "t": now}
+
+    # --- αποτελέσματα του σαρωτή (καρτέλα 🔴 Pentest) ---
+    def scan_result(self, hosts):
+        t = self.last_t or time.time()
+        with self.lock:
+            for h in hosts:
+                for sv in h["services"]:
+                    self.services[h["ip"]][sv["port"]] = t
+                    self.scan_info[h["ip"]][sv["port"]] = {k: sv.get(k) for k in ("product", "version", "banner")}
+
+    def scan_view(self):
+        st = self.scanner.status() if self.scanner else {"status": "off"}
+        with self.lock:
+            for h in st.get("hosts") or ():
+                hh = self.hosts.get(h["ip"]) or {}
+                h["name"] = hh.get("rdns") or (sorted(hh.get("names") or ()) or [None])[0]
+                h["gw"], h["me"] = h["ip"] == self.gateway, h["ip"] in self.me
+                h["mac"] = h.get("mac") or hh.get("mac")
+                worst = 0
+                for sv in h["services"]:
+                    p = sv["port"]
+                    sv["svc"] = SERVICES.get(p, "")
+                    if p in SUSPECT_PORTS:
+                        sv["risk"], sv["why"] = "high", f"Θύρα {SUSPECT_PORTS[p]} — συχνά backdoor/κακόβουλο λογισμικό"
+                    else:
+                        sv["risk"], sv["why"] = RISKY_SERVICES.get(p, ("info", ""))
+                    for sev, msg in (sv.get("tls") or {}).get("findings", []):
+                        if SEV[sev] > SEV.get(sv["risk"], 0):
+                            sv["risk"] = sev
+                        sv["why"] = (sv["why"] + " · " if sv["why"] else "") + msg
+                    worst = max(worst, SEV.get(sv["risk"], 0))
+                h["risk"] = {3: "high", 2: "med", 1: "low"}.get(worst, "info")
+        return st
+
+    def default_scan_target(self):
+        if self.mode == "demo":
+            return "192.168.1.0/24"
+        ips = [i for i in self.me if ":" not in i] if self.mode == "live" else []
+        if not ips:
+            if not hasattr(self, "_real_me"):
+                self._real_me = sorted(i for i in detect_net()[2] if ":" not in i and not i.startswith("127."))
+            ips = self._real_me
+        return (ips[0].rsplit(".", 1)[0] + ".0/24") if ips else "192.168.1.0/24"
 
     # --- C2 beaconing: συνδέσεις με «ρολόι» ---
     def _beacon(self, src, dst, dp, t):
@@ -1093,6 +1145,8 @@ class NetState:
 
     # --- νέες συσκευές ---
     def _mac_seen(self, ip, mac, t):
+        if ip in self.lab_ips:
+            return
         if not mac or mac in self.seen_macs or mac == "ff:ff:ff:ff:ff:ff":
             return
         self.seen_macs.add(mac)
@@ -1609,6 +1663,49 @@ def demo_attackers():
     ]
 
 
+DEMO_SCAN = {  # «αποτελέσματα» σάρωσης για το demo (ρεαλιστικά banners γνωστών συσκευών)
+    "192.168.1.1": ("a4:2b:b0:11:22:01", [
+        (22, "SSH-2.0-dropbear_2017.75"), (53, ""), (80, "HTTP/1.0 200 OK\r\nServer: mini_httpd/1.19 19dec2003"),
+        (443, ""), (7547, "HTTP/1.1 401 Unauthorized\r\nServer: RomPager/4.07 UPnP/1.0")]),
+    "192.168.1.23": ("3c:22:fb:aa:bb:23", [(22, "SSH-2.0-OpenSSH_9.6"), (5000, "HTTP/1.1 403 Forbidden\r\nServer: AirTunes/775.3.1")]),
+    "192.168.1.10": ("f0:de:f1:10:10:10", [(8008, "HTTP/1.1 404 Not Found"), (8009, ""), (9000, "")]),
+    "192.168.1.15": ("ac:1f:74:15:15:15", [(62078, "")]),
+    "192.168.1.30": ("c0:56:e3:30:30:30", [(23, "\xff\xfd\x01BusyBox v1.19.4 built-in shell\r\nipcam login:"),
+                                           (80, "HTTP/1.0 200 OK\r\nServer: GoAhead-Webs"), (554, "RTSP/1.0 200 OK")]),
+    "192.168.1.40": ("00:1e:0b:40:40:40", [(21, "220 (vsFTPd 2.3.4)"), (80, "HTTP/1.1 200 OK\r\nServer: Apache/2.2.15"),
+                                           (631, ""), (9100, "")]),
+    "192.168.1.77": ("de:ad:be:ef:77:77", [(22, "SSH-2.0-OpenSSH_7.4"), (4444, "")]),
+}
+DEMO_TLS = {("192.168.1.1", 443): {"version": "TLSv1", "subject": "CN=router.home", "issuer": "CN=router.home",
+                                   "not_after": "Jan  1 00:00:00 2021 GMT", "days_left": -2100,
+                                   "findings": [("high", "Παλιό πρωτόκολλο TLSv1 — σπασμένο, πρέπει TLS 1.2+"),
+                                                ("med", "Το πιστοποιητικό έληξε πριν 2100 μέρες"),
+                                                ("low", "Self-signed πιστοποιητικό — ο browser δεν μπορεί να ελέγξει "
+                                                        "ότι μιλάς με τη σωστή συσκευή (κίνδυνος MITM)")]}}
+DEMO_SHODAN = {"ip": "79.130.12.34", "ports": [80, 443, 7547], "hostnames": ["ppp079130012034.access.demo-isp.example"],
+               "tags": ["router"], "cpes": ["cpe:/a:allegrosoft:rompager:4.07"],
+               "vulns": ["CVE-2014-9222", "CVE-2014-9223"], "demo": True}
+
+
+def demo_scan(set_state):
+    import pentest
+    hosts = []
+    ips = sorted(DEMO_SCAN, key=ipaddress.ip_address)
+    for i, ip in enumerate(ips):
+        set_state(phase=f"σάρωση {ip}", progress=int(100 * i / len(ips)))
+        time.sleep(0.6)
+        mac, ports = DEMO_SCAN[ip]
+        svcs = []
+        for p, banner in ports:
+            prod, ver = pentest.parse_banner(banner)
+            sv = {"port": p, "banner": banner, "product": prod, "version": ver}
+            if (ip, p) in DEMO_TLS:
+                sv["tls"] = DEMO_TLS[(ip, p)]
+            svcs.append(sv)
+        hosts.append({"ip": ip, "mac": mac, "services": svcs})
+    return hosts
+
+
 def demo_run(state):
     me, gw = "192.168.1.23", "192.168.1.1"
     lan = {"192.168.1.10": "smart-tv.local", "192.168.1.15": "iphone.local",
@@ -1810,6 +1907,51 @@ def make_handler(state):
             self.end_headers()
             self.wfile.write(body)
 
+        def _json(self, obj, code=200):
+            return self._send(code, json.dumps(obj).encode(), "application/json")
+
+        def _local_request(self):
+            """Προστασία από CSRF / DNS rebinding: μόνο JSON από την ίδια τη σελίδα του NetWatch."""
+            host = (self.headers.get("Host") or "").rsplit(":", 1)[0]
+            origin = self.headers.get("Origin")
+            ok_host = host in ("127.0.0.1", "localhost", "[::1]")
+            ok_origin = origin is None or urlparse(origin).hostname in ("127.0.0.1", "localhost", "::1")
+            return ok_host and ok_origin and self.headers.get("Content-Type", "").startswith("application/json")
+
+        def do_POST(self):
+            import pentest
+            u = urlparse(self.path)
+            if not self._local_request():
+                return self._json({"error": "forbidden"}, 403)
+            try:
+                n = min(int(self.headers.get("Content-Length") or 0), 10000)
+                body = json.loads(self.rfile.read(n) or b"{}")
+            except (ValueError, json.JSONDecodeError):
+                return self._json({"error": "bad json"}, 400)
+            try:
+                if u.path == "/api/scan":
+                    target = str(body.get("target") or state.default_scan_target())
+                    with state.lock:
+                        known = {ip: h["mac"] for ip, h in state.hosts.items() if h.get("mac") and h["kind"] == "local"}
+                    state.scanner.start(target, known)
+                    log(f"🔴 σάρωση LAN: {target}")
+                    return self._json({"ok": True})
+                if u.path == "/api/lab":
+                    state.lab.start(str(body.get("kind")), str(body.get("variant")))
+                    return self._json({"ok": True})
+                if u.path == "/api/exposure":
+                    if state.mode == "demo":
+                        return self._json(DEMO_SHODAN)
+                    ip = (state.home or {}).get("query")
+                    if not ip:
+                        return self._json({"error": "Δεν ξέρω ακόμα τη δημόσια IP σου"}, 400)
+                    return self._json(pentest.internetdb(ip))
+            except ValueError as e:
+                return self._json({"error": str(e)}, 400)
+            except Exception as e:
+                return self._json({"error": str(e)[:200]}, 502)
+            return self._json({"error": "not found"}, 404)
+
         def do_GET(self):
             u = urlparse(self.path)
             if u.path in ("/", "/index.html"):
@@ -1828,6 +1970,22 @@ def make_handler(state):
                     hours = 24
                 ref = state.last_t if state.mode == "pcap" and state.last_t else None
                 return self._send(200, json.dumps(state.history.query(hours, ref)).encode(), "application/json")
+            if u.path == "/api/scan":
+                st = state.scan_view()
+                st["default_target"] = state.default_scan_target()
+                return self._json(st)
+            if u.path == "/api/lab":
+                return self._json(state.lab.status() if state.lab else {"status": "off"})
+            if u.path == "/api/cve":
+                import pentest
+                q = parse_qs(u.query)
+                prod, ver = q.get("product", [""])[0][:60], q.get("version", [""])[0][:30]
+                if not prod:
+                    return self._json({"error": "product required"}, 400)
+                try:
+                    return self._json(pentest.cve_lookup(prod, ver))
+                except Exception as e:
+                    return self._json({"error": f"NVD: {str(e)[:150]}"}, 502)
             if u.path == "/api/audit":
                 return self._send(200, json.dumps(state.audit()).encode(), "application/json")
             if u.path == "/api/abuseipdb":
@@ -1936,6 +2094,10 @@ def main():
             threading.Thread(target=fetch_home, args=(state,), daemon=True).start()
         threading.Thread(target=live_capture, args=(state, iface, args.filter), daemon=True).start()
 
+    import pentest
+    state.scanner = pentest.LanScanner(sim=demo_scan if mode == "demo" else None)
+    state.scanner.on_result = state.scan_result
+    state.lab = pentest.Lab(state)
     if mode == "live" or args.notify:
         state.notifier = Notifier(cfg["notify"])
     if cfg["intel"].get("enabled", True) and cfg["detectors"].get("threat_intel", True) \
