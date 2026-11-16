@@ -82,12 +82,22 @@ final class Backend {
             if mode == .live {
                 // Η καταγραφή πακέτων θέλει root: το macOS ρωτά τον κωδικό στο δικό του παράθυρο.
                 let env = "SUDO_USER=\(sh(NSUserName())) SUDO_UID=\(getuid()) SUDO_GID=\(getgid())"
-                let cmd = "cd \(sh(appDir.path)) && \(env) \(sh(venvPython.path)) " + args.map(sh).joined(separator: " ")
-                    + " >> \(sh(logFile.path)) 2>&1 &"
+                // Μόνο η python πάει στο παρασκήνιο, με ΟΛΑ τα fd της αλλού: αλλιώς το «do shell script»
+                // περιμένει για πάντα να κλείσει η έξοδος και η εφαρμογή «κολλάει».
+                let cmd = "cd \(sh(appDir.path)) || exit 1; \(env) \(sh(venvPython.path)) " + args.map(sh).joined(separator: " ")
+                    + " </dev/null >>\(sh(logFile.path)) 2>&1 &"
                 let script = "do shell script \"\(cmd.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\" with administrator privileges with prompt \"Το NetWatch χρειάζεται δικαιώματα διαχειριστή για να «ακούει» την κίνηση του δικτύου.\""
-                var err: NSDictionary?
+                // osascript σε ξεχωριστή διεργασία: το παράθυρο κωδικού δεν «παγώνει» ποτέ την εφαρμογή
+                let osa = Process()
+                osa.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+                osa.arguments = ["-e", script]
+                osa.standardOutput = FileHandle.nullDevice
+                osa.standardError = FileHandle.nullDevice
                 var ok = false
-                DispatchQueue.main.sync { ok = NSAppleScript(source: script)?.executeAndReturnError(&err) != nil }
+                if (try? osa.run()) != nil {
+                    osa.waitUntilExit()
+                    ok = osa.terminationStatus == 0
+                }
                 if !ok {
                     DispatchQueue.main.async { self.onFail?("Δεν δόθηκαν δικαιώματα διαχειριστή — ξεκίνα σε Demo ή άνοιξε ένα pcap.") }
                     return

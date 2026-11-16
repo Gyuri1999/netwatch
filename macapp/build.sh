@@ -26,7 +26,7 @@ iconutil -c icns "$ICONSET" -o "$OUT/Contents/Resources/NetWatch.icns"
 
 echo "▸ αρχεία NetWatch"
 cp macapp/Info.plist "$OUT/Contents/Info.plist"
-rsync -a --exclude '__pycache__' netwatch.py pentest.py rules.py ctf.py wifiguard.py index.html edu.js \
+rsync -a --exclude '__pycache__' netwatch.py pentest.py rules.py ctf.py wifiguard.py privacy.py index.html edu.js \
   config.example.yaml requirements.txt rules ctf samples "$OUT/Contents/Resources/netwatch/"
 rm -f "$OUT/Contents/Resources/netwatch/rules/local.yaml"
 

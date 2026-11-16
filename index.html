@@ -131,6 +131,7 @@ a.mitre:hover{border-color:#b388ff}
       <button data-t="hist">🕓 Ιστορικό</button>
       <button data-t="audit">🛡 Έλεγχος</button>
       <button data-t="wifi">☕ Wi‑Fi</button>
+      <button data-t="priv">🕵 Ανωνυμία</button>
       <button data-t="quiz">🎓 Κουίζ</button>
       <button data-t="pentest">🔴 Pentest</button>
       <button data-t="rules">🧩 Κανόνες</button>
@@ -157,6 +158,7 @@ a.mitre:hover{border-color:#b388ff}
     <div class="tab" id="t-rules"></div>
     <div class="tab" id="t-ctf"></div>
     <div class="tab" id="t-wifi"></div>
+    <div class="tab" id="t-priv"></div>
   </aside>
 </main>
 <script>
@@ -224,18 +226,41 @@ $('zatk').onclick=()=>{const l=[...S.hosts.values()].filter(h=>h.threat>=2&&h.ge
   const g=S.home||{lat:37.98,lon:23.73};l.push([g.lon,g.lat]);zoomTo(l,10)};
 function focusHost(ip){const h=S.hosts.get(ip);if(h?.geo)zoomTo([[h.geo.lon,h.geo.lat]],12)}
 
-const LAN={w:290,h:230};
+const LAN={w:330,h:270,max:12};
 function lanBox(){return{x:16,y:H-LAN.h-16,w:LAN.w,h:LAN.h}}
 function homePt(){const g=S.home||{lat:37.98,lon:23.73};return P(g.lon,g.lat)}
+const isV6=ip=>ip.includes(':'),octet=ip=>isV6(ip)?'IPv6':'.'+ip.split('.').pop();
+// Μία κουκκίδα ανά ΣΥΣΚΕΥΗ: οι IPv6 διευθύνσεις (fe80::…) «κολλάνε» στη συσκευή με την ίδια MAC,
+// όλα τα broadcast/multicast γίνονται ένας κόμβος «όλοι», οι συσκευές μπαίνουν σε σταθερό κύκλο.
+let LP={alias:new Map(),pos:new Map(),devs:[],more:0,v6:new Map()};
+function lanPlan(){
+  const b=lanBox(),cx=b.x+b.w/2,cy=b.y+b.h/2+2,me=[...S.me].find(i=>!isV6(i))||[...S.me][0];
+  const v4=new Map();for(const h of S.hosts.values())if(h.kind==='local'&&!isV6(h.ip)&&h.mac&&!v4.has(h.mac))v4.set(h.mac,h.ip);
+  const gwMac=S.hosts.get(S.gw)?.mac,alias=new Map(),v6=new Map(),devs=[];
+  for(const h of S.hosts.values()){
+    if(h.kind==='bcast'){alias.set(h.ip,'@bcast');continue}
+    if(h.kind!=='local')continue;
+    let a=h.ip;
+    if(h.me)a=me;else if(h.gw)a=S.gw;else if(isV6(h.ip)&&h.mac)a=v4.get(h.mac)||(h.mac===gwMac?S.gw:h.ip);
+    alias.set(h.ip,a);
+    if(a!==h.ip){if(!v6.has(a))v6.set(a,[]);v6.get(a).push(h.ip)}
+    else if(!h.me&&!h.gw)devs.push(h)}
+  devs.sort((x,y)=>(y.threat-x.threat)||((y.bytes_in+y.bytes_out)-(x.bytes_in+x.bytes_out)));
+  const shown=devs.slice(0,LAN.max).sort((x,y)=>ipNum(x.ip)-ipNum(y.ip)),n=shown.length,pos=new Map();
+  shown.forEach((h,i)=>{const ang=-Math.PI/2+(i+.5)*2*Math.PI/n;pos.set(h.ip,[cx+Math.cos(ang)*92,cy+Math.sin(ang)*76,Math.cos(ang)])});
+  LP={alias,pos,devs:shown,more:devs.length-n,v6,me,cx,cy,b}}
+function ipNum(ip){return isV6(ip)?1e10:ip.split('.').reduce((a,x)=>a*256+(+x),0)}
+function lanPt(ip){if(!LP.b)lanPlan();const b=LP.b;
+  if(ip==='@bcast')return[b.x+b.w-22,b.y+b.h-44];
+  const h=S.hosts.get(ip);if(!h)return null;
+  if(h.me)return[LP.cx,LP.cy];if(h.gw)return[LP.cx,b.y+40];
+  const p=LP.pos.get(ip);return p?[p[0],p[1]]:[b.x+b.w-22,b.y+b.h-44]}
 function pos(ip){
   const h=S.hosts.get(ip);if(!h)return null;
   if(h.kind==='public'){if(!h.geo)return null;const p=P(h.geo.lon,h.geo.lat);if(!p)return null;const k=hash(ip),s=.9*Math.sqrt(ZT.k);
     return[p[0]+((k&15)-7.5)*s,p[1]+(((k>>4)&15)-7.5)*s]}
   if(!S.showLan)return homePt();
-  const b=lanBox(),cx=b.x+b.w/2,cy=b.y+b.h/2+12;
-  if(h.me)return[cx,cy];if(h.gw)return[cx,b.y+34];
-  if(h.kind==='bcast'){const k=hash(ip);return[b.x+b.w-22,b.y+50+(k%5)*30]}
-  const a=(hash(ip)%360)*Math.PI/180;return[cx+Math.cos(a)*92,cy+Math.sin(a)*70];
+  return lanPt(LP.alias.get(ip)||ip);
 }
 function ends(sip,dip){const hs=S.hosts.get(sip),hd=S.hosts.get(dip);if(!hs||!hd)return[null,null];
   if(hs.kind==='public'&&hd.kind!=='public')return[pos(sip),homePt()];
@@ -262,8 +287,14 @@ function frame(){requestAnimationFrame(frame);
 function draw(){
   const now=performance.now();ctx.setTransform(DPR,0,0,DPR,0,0);ctx.drawImage(mapImg,0,0,W,H);
   const hp=homePt(),b=lanBox(),sel=S.sel;
-  if(S.showLan){ctx.fillStyle='#08101ddd';ctx.strokeStyle='#1f3352';ctx.lineWidth=1;roundRect(b.x,b.y,b.w,b.h,10);ctx.fill();ctx.stroke();
-    ctx.fillStyle='#6d7f99';ctx.font='10px ui-monospace,monospace';ctx.fillText('ΤΟΠΙΚΟ ΔΙΚΤΥΟ (LAN)',b.x+10,b.y+16);
+  if(S.showLan){lanPlan();ctx.fillStyle='#08101de8';ctx.strokeStyle='#1f3352';ctx.lineWidth=1;roundRect(b.x,b.y,b.w,b.h,10);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#8aa0bd';ctx.font='bold 10px ui-monospace,monospace';ctx.fillText('🏠 ΤΟ ΔΙΚΤΥΟ ΣΟΥ',b.x+10,b.y+16);
+    ctx.font='10px ui-monospace,monospace';ctx.fillStyle='#6d7f99';const nd=LP.devs.length+LP.more;
+    ctx.fillText(`${nd} συσκευ${nd===1?'ή':'ές'} + εσύ + router`,b.x+10,b.y+29);
+    let lx=b.x+10;const ly=b.y+b.h-10;ctx.font='9px ui-monospace,monospace';
+    for(const[c,t]of[['#fff','εσύ'],['#3ec5ff','router'],['#3ddc97','συσκευή'],['#ffd23f','νέα'],['#ff3b5c','επίθεση']]){
+      ctx.fillStyle=c;ctx.beginPath();ctx.arc(lx+3,ly-3,3,0,7);ctx.fill();ctx.fillStyle='#8aa0bd';ctx.fillText(t,lx+9,ly);lx+=ctx.measureText(t).width+20}
+    ctx.fillStyle='#6d7f99';ctx.textAlign='right';ctx.fillText('γραμμές = κίνηση',b.x+b.w-10,b.y+16);ctx.textAlign='start';
     const gwp=S.gw&&S.hosts.has(S.gw)?pos(S.gw):[b.x+b.w/2,b.y+34];
     ctx.setLineDash([3,4]);ctx.strokeStyle='#3ec5ff44';ctx.beginPath();ctx.moveTo(gwp[0],gwp[1]);ctx.lineTo(hp[0],hp[1]);ctx.stroke();ctx.setLineDash([])}
   for(const[k,L]of S.links){const age=(now-L.last)/1000;if(age>25){S.links.delete(k);continue}
@@ -273,7 +304,7 @@ function draw(){
     ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.quadraticCurveTo(q[0],q[1],c[0],c[1]);ctx.stroke()}
   ctx.globalAlpha=1;nodesDrawn=[];const top=[];
   for(const h of S.hosts.values()){
-    if(!S.showLan&&h.kind!=='public')continue;
+    if(h.kind!=='public')continue;
     const p=pos(h.ip);if(!p||p[0]<-20||p[1]<-20||p[0]>W+20||p[1]>H+20)continue;const tot=h.bytes_in+h.bytes_out;
     const r=h.me?7:h.gw?6:Math.min(7,1.5+Math.log10(tot+10)*.6);
     const col=h.threat>=2?'#ff3b5c':h.threat===1?'#ffd23f':h.me?'#ffffff':h.gw?'#ffd23f':h.kind==='public'?'#3ec5ff':h.kind==='bcast'?'#6d7f99':'#3ddc97';
@@ -283,10 +314,9 @@ function draw(){
     ctx.beginPath();ctx.arc(p[0],p[1],r*.65,0,7);ctx.fill();
     if(sel===h.ip){ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(p[0],p[1],r+6+Math.sin(now/200)*2,0,7);ctx.stroke()}
     nodesDrawn.push({ip:h.ip,x:p[0],y:p[1],r:Math.max(r,6)});
-    if(h.kind==='public')top.push([tot+(h.threat?1e12:0)+(sel===h.ip?1e13:0),h,p]);
-    else if(h.kind!=='bcast'){ctx.fillStyle=h.me?'#fff':'#9fb4d0';ctx.font='10px ui-monospace,monospace';
-      ctx.fillText(h.me?'ΕΣΥ '+h.ip.split('.').pop():h.gw?'ROUTER':(hname(h).split('.')[0]||'.'+h.ip.split('.').pop()),p[0]+9,p[1]+3)}
+    top.push([tot+(h.threat?1e12:0)+(sel===h.ip?1e13:0),h,p]);
   }
+  if(S.showLan)drawLan(now,sel);
   top.sort((x,y)=>y[0]-x[0]);ctx.font='11px ui-monospace,monospace';
   const nl=Math.round(9*Math.min(4,Math.sqrt(ZT.k)));
   for(const[,h,p]of top.slice(0,nl)){const t=`${flag(h.geo?.countryCode)} ${hname(h)||h.ip}${ZT.k>3&&h.geo?.city?' · '+h.geo.city:''}`.slice(0,44);
@@ -307,15 +337,45 @@ function draw(){
     ctx.globalAlpha=1-t;ctx.strokeStyle='#ff3b5c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p[0],p[1],4+t*26,0,7);ctx.stroke()}
   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
 }
+function lanName(h){const n=hname(h).split('.')[0];if(n)return n.length>12?n.slice(0,11)+'…':n;return randMac(h.mac)?'📱 κινητό;':'συσκευή'}
+function drawLan(now,sel){
+  const list=[];const meH=S.hosts.get(LP.me),gwH=S.hosts.get(S.gw);
+  const bc=[...S.hosts.values()].filter(h=>h.kind==='bcast');
+  if(bc.length)list.push({ip:'@bcast',p:lanPt('@bcast'),col:'#6d7f99',r:4,l1:'📢 όλοι',l2:'broadcast',side:-1});
+  if(gwH)list.push({ip:gwH.ip,h:gwH,p:lanPt(gwH.ip),col:'#3ec5ff',r:6.5,l1:'ROUTER',l2:octet(gwH.ip),side:1});
+  for(const h of LP.devs){const q=LP.pos.get(h.ip);list.push({ip:h.ip,h,p:[q[0],q[1]],col:'#3ddc97',r:4.5,l1:lanName(h),l2:octet(h.ip),side:q[2]>=-.05?1:-1})}
+  if(meH)list.push({ip:meH.ip,h:meH,p:[LP.cx,LP.cy],col:'#fff',r:7,l1:'ΕΣΥ',l2:octet(meH.ip),side:1,me:1});
+  for(const n of list){const h=n.h,[x,y]=n.p;let col=n.col;
+    if(h&&h.threat>=2)col='#ff3b5c';else if(h&&h.threat===1)col='#ffd23f';
+    if(h&&h.threat>=2){const ph=(now/900)%1;ctx.strokeStyle=`rgba(255,59,92,${1-ph})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,n.r+ph*18,0,7);ctx.stroke()}
+    const fl=h&&h._flash?Math.max(0,1-(now-h._flash)/400):0;
+    ctx.fillStyle=col;ctx.globalAlpha=(sel&&sel!==n.ip?.1:.2)+fl*.4;ctx.beginPath();ctx.arc(x,y,n.r*1.8+fl*4,0,7);ctx.fill();ctx.globalAlpha=1;
+    ctx.beginPath();ctx.arc(x,y,n.r*.75,0,7);ctx.fill();
+    if(n.me){ctx.strokeStyle='#fff';ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(x,y,n.r+3,0,7);ctx.stroke()}
+    if(sel===n.ip){ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y,n.r+7+Math.sin(now/200)*2,0,7);ctx.stroke()}
+    const tx=x+n.side*(n.r+6);ctx.textAlign=n.side>0?'left':'right';
+    ctx.font=(n.me?'bold ':'')+'10px ui-monospace,monospace';ctx.fillStyle=n.me?'#fff':h&&h.threat>=2?'#ff8da0':'#cfe0f5';ctx.fillText(n.l1,tx,y);
+    ctx.font='9px ui-monospace,monospace';ctx.fillStyle='#6d7f99';ctx.fillText(n.l2,tx,y+10);ctx.textAlign='start';
+    nodesDrawn.push({ip:n.ip,x,y,r:Math.max(n.r,7)})}
+  if(LP.more>0){const b=LP.b;ctx.font='9px ui-monospace,monospace';ctx.fillStyle='#8aa0bd';ctx.textAlign='right';
+    ctx.fillText(`+${LP.more} ακόμα (📟 Συσκευές)`,b.x+b.w-10,b.y+31);ctx.textAlign='start'}
+}
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 requestAnimationFrame(frame);
 
 function pick(e){const r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bd=1e9;
   for(const n of nodesDrawn){const d=Math.hypot(n.x-x,n.y-y);if(d<n.r+5&&d<bd){bd=d;best=n}}return[best,x,y]}
 cv.addEventListener('mousemove',e=>{const[n,x,y]=pick(e);const tip=$('tip');
-  if(!n){tip.style.display='none';return}const h=S.hosts.get(n.ip),g=h.geo;
+  if(!n){tip.style.display='none';return}
+  if(n.ip==='@bcast'){const bc=[...S.hosts.values()].filter(h=>h.kind==='bcast').map(h=>h.ip);
+    tip.innerHTML=`<b style="color:#fff">📢 Broadcast / multicast</b><br>Μηνύματα προς <b>όλες</b> τις συσκευές του δικτύου μαζί (π.χ. «ποιος έχει αυτή την IP;» του ARP, εκτυπωτές και AirPlay που «φωνάζουν» ότι υπάρχουν).<br><span style="color:#6d7f99">${esc(bc.slice(0,6).join(', '))}${bc.length>6?' …':''}</span>`;
+    tip.style.display='block';tip.style.left=Math.min(x+14,W-350)+'px';tip.style.top=Math.min(y+14,H-160)+'px';return}
+  const h=S.hosts.get(n.ip),g=h.geo;
+  const role=h.me?'💻 <b>Εσύ</b> — αυτός ο υπολογιστής':h.gw?'🌐 <b>Router</b> — η «πόρτα» του σπιτιού προς το Internet. Όλη η κίνηση προς τα έξω περνά από εδώ.':h.kind==='local'?'📟 Συσκευή στο τοπικό σου δίκτυο'+(randMac(h.mac)?' (τυχαία MAC — συνήθως κινητό ή tablet)':''):'';
+  const st=h.threat>=2?'<span style="color:#ff8da0">🔴 εμπλέκεται σε επίθεση — δες ⚠ Επιθέσεις</span>':h.threat===1&&h.kind==='local'?'<span style="color:#ffd23f">🟡 νέα/άγνωστη συσκευή ή χαμηλή ειδοποίηση</span>':'';
+  const v6=(LP.v6.get(n.ip)||[]);
   const hits=(h.hits||[]).slice(0,3).map(([p,c,s])=>`${p}${s?' '+s:''}`).join(', ');
-  tip.innerHTML=`<b style="color:#fff">${esc(h.ip)}</b> ${h.threat>=2?'<span class="tag r">ΕΠΙΤΙΘΕΤΑΙ</span>':''}<br>${esc(hname(h))}<br>`+
+  tip.innerHTML=`<b style="color:#fff">${esc(h.ip)}</b> ${h.threat>=2?'<span class="tag r">ΕΠΙΤΙΘΕΤΑΙ</span>':''}<br>${role?role+'<br>':''}${st?st+'<br>':''}${hname(h)?esc(hname(h))+'<br>':''}`+(v6.length?`<span style="color:#6d7f99">και IPv6: ${esc(v6.slice(0,2).join(', '))}</span><br>`:'')+
    (g?`${flag(g.countryCode)} ${esc(g.city)}, ${esc(g.country)}<br><span style="color:#6d7f99">${esc(g.isp)} · ${esc(g.as||'')}</span><br>`:'')+
    (h.mac?`<span style="color:#6d7f99">MAC ${esc(h.mac)}</span><br>`:'')+
    `↑ ${fmtB(h.bytes_out)} &nbsp; ↓ ${fmtB(h.bytes_in)}`+(hits?`<br>🎯 ${esc(hits)}`:'')+'<br><span style="color:#6d7f99">κλικ για λεπτομέρειες</span>';
@@ -329,7 +389,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.datas
 function showTab(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
   if(t==='alerts'){S.unread=0;$('ac').style.display='none'}renderTab()}
-function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,rules:renderRules,ctf:renderCtf,wifi:renderWifi})[tab]()}
+function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,rules:renderRules,ctf:renderCtf,wifi:renderWifi,priv:renderPriv})[tab]()}
 function tabHover(){return document.querySelector('.tab.on:hover')}
 
 function eduHTML(type){const e=eduFor(type);if(!e)return'';
@@ -620,6 +680,7 @@ function handle(m){
     $('mode').textContent=m.feed==='ctf'?'🚩 CTF':{demo:'DEMO',pcap:'▶ PCAP'}[m.mode]||'● LIVE';$('mode').className='badge '+(m.mode==='live'?'live':'demo');
     $('iface').textContent=`${m.iface} · ${m.me.filter(i=>!i.includes(':'))[0]||m.me[0]||'?'}`;setStats(m.stats);renderTab();return}
   if(m.type==='home'){S.home=m.home;return}
+  if(m.type==='privacy'){if(privData){privData.result=m.result;privData.running=false}if(tab==='priv')renderPriv();return}
   if(m.type==='wifi'){if(wifiData){wifiData.result=m.result;wifiData.running=false}if(tab==='wifi')renderWifi();return}
   if(m.type==='features'){S.features=m.features;if(tab==='stats')renderStats();return}
   if(m.type==='alert'){addAlert(m.alert);if(tab==='alerts')renderAlerts();return}
@@ -855,6 +916,55 @@ function drawWifi(){const d=wifiData,r=d.result,el=$('t-wifi');const icon={ok:'�
   el.innerHTML=h;
   $('wf-run').onclick=()=>{wifiData.running=true;drawWifi();post('/api/wifi').then(j=>{if(j.error){wifiData.error=j.error;wifiData.running=false;drawWifi()}else setTimeout(loadWifi,1200)})};
   const tb=$('wf-trust');if(tb)tb.onclick=()=>post('/api/wifi',{ssid:w.ssid,trusted:r.public}).then(j=>{if(!j.error)wifiData=j;drawWifi()})}
+
+// ================= 🕵 ΑΝΩΝΥΜΙΑ & ΔΙΑΡΡΟΕΣ =================
+let privData=null,privBrowser=null;
+function loadPriv(){return fetch('/api/privacy').then(r=>r.json()).then(j=>{privData=j;if(tab==='priv')drawPriv();if(j.running)setTimeout(loadPriv,1500)})}
+function renderPriv(){if(!privData){$('t-priv').innerHTML='<div class="empty">φόρτωση…</div>';loadPriv();return}drawPriv()}
+// WebRTC: ο browser μπορεί να αποκαλύψει IP ακόμα και πίσω από VPN (μέσω STUN)
+async function browserLeaks(){const o={tz:Intl.DateTimeFormat().resolvedOptions().timeZone,langs:[...(navigator.languages||[navigator.language])],rtc:null};
+  try{const c=new Set(),pc=new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});pc.createDataChannel('nw');
+    pc.onicecandidate=e=>{if(e.candidate&&e.candidate.candidate){const f=e.candidate.candidate.split(' ');if(f.length>7)c.add(f[4]+'|'+f[7])}};
+    await pc.setLocalDescription(await pc.createOffer());await new Promise(r=>setTimeout(r,2500));pc.close();
+    o.rtc=[...c].map(x=>{const[ip,type]=x.split('|');return{ip,type}})}catch(e){o.rtcErr=String(e).slice(0,80)}
+  return o}
+const LVL=[['#ff3b5c','Καμία'],['#ff9f43','Χαμηλή'],['#ffd23f','Μέτρια'],['#3ddc97','Υψηλή']];
+function drawPriv(){const d=privData,r=d.result,el=$('t-priv'),icon={ok:'✅',warn:'⚠️',bad:'❌',info:'ℹ️'};
+  const lv=r?LVL[r.level]:['#6d7f99','?'];
+  let h=`<div class="card" style="display:flex;align-items:center;gap:14px">
+    <div style="flex:none;display:flex;gap:3px;align-items:flex-end;height:60px">${[0,1,2,3].map(i=>`<div style="width:12px;height:${15+i*15}px;border-radius:3px;background:${r&&i<=r.level?lv[0]:'#1f3352'}"></div>`).join('')}</div>
+    <div style="flex:1;min-width:0"><b style="color:#fff">Ανωνυμία: <span style="color:${lv[0]}">${r?esc(r.label):'δεν έχει ελεγχθεί'}</span></b>
+    <div class="sm" style="margin-top:3px;white-space:normal">Τι βλέπουν τα sites για σένα, αν περνάς από VPN ή Tor, και αν κάτι «στάζει» έξω από αυτά (DNS, IPv6, WebRTC, ζώνη ώρας).${r?`<br>τελευταίος έλεγχος ${new Date(r.t*1000).toLocaleTimeString('el-GR')}${r.demo?' · <span class="tag">προσομοίωση</span>':''}`:''}</div>
+    <div style="margin-top:6px"><button class="b" id="pv-run" ${d.running?'disabled':''}>${d.running?'⏳ ελέγχω… (~10″)':'▶ Έλεγχος διαρροών'}</button>
+    ${d.tor_port?` <span class="tag g">🧅 Tor ενεργό (θύρα ${d.tor_port})</span>`:''}</div></div></div>`;
+  if(d.error)h+=`<div class="card" style="color:#ff8da0">${esc(d.error)}</div>`;
+  if(r){h+='<h3>Αποτελέσματα</h3>'+r.checks.map(c=>`<div class="card"><div><span>${icon[c.status]} <b style="color:#fff">${esc(c.title)}</b></span></div><div style="color:#9fb4d0;margin-top:3px;white-space:normal">${esc(c.detail)}</div>${c.fix&&c.status!=='ok'?`<div class="sm" style="margin-top:4px;white-space:normal">👉 ${esc(c.fix)}</div>`:''}</div>`).join('');
+    if(r.dns&&r.dns.length)h+=`<table><thead><tr><th>DNS resolver που σε «ακούει»</th><th>Πάροχος</th><th>Χώρα</th></tr></thead><tbody>${r.dns.map(x=>`<tr><td>${esc(x.ip)}</td><td>${esc(x.org||x.asn)}</td><td>${flag(x.cc)} ${esc(x.country)}</td></tr>`).join('')}</tbody></table>`}
+  if(privBrowser){const b=privBrowser,ip=r&&r.info&&r.info.query,exitIps=new Set([ip,r&&r.ipv6,r&&r.tor&&r.tor.ip].filter(Boolean));
+    const pub=(b.rtc||[]).filter(c=>c.type==='srflx'),loc=(b.rtc||[]).filter(c=>c.type==='host');
+    const leak=!r||r.demo?[]:pub.filter(c=>!exitIps.has(c.ip));
+    h+='<h3>Από τον browser</h3>';
+    h+=`<div class="card"><div>${b.rtc==null?'ℹ️':leak.length?'❌':'✅'} <b style="color:#fff">WebRTC</b></div><div style="color:#9fb4d0;margin-top:3px;white-space:normal">${b.rtc==null?'Το WebRTC είναι κλειστό σε αυτόν τον browser — δεν μπορεί να διαρρεύσει IP.':
+      `Ο browser δίνει σε κάθε site που το ζητήσει: ${pub.length?'δημόσια IP '+pub.map(c=>'<b>'+esc(c.ip)+'</b>').join(', '):'καμία δημόσια IP'}${loc.length?' και τοπικές '+loc.map(c=>esc(c.ip)).join(', ')+(loc.every(c=>c.ip.endsWith('.local'))?' (κρυμμένες ως .local ✓)':' (η πραγματική σου τοπική IP!)'):''}.`}
+      ${leak.length?'<br><b style="color:#ff8da0">Διαρροή: η IP μέσω WebRTC είναι διαφορετική από αυτή του VPN/Tor — ένα site μπορεί να μάθει την πραγματική σου σύνδεση.</b>':''}</div>
+      ${leak.length?'<div class="sm" style="margin-top:4px">👉 Firefox: about:config → media.peerconnection.enabled = false · Chrome: επέκταση «WebRTC Leak Prevent» · ή χρησιμοποίησε Tor Browser.</div>':''}</div>`;
+    const ipTz=r&&r.info&&r.info.timezone,tzBad=ipTz&&ipTz!==b.tz;
+    h+=`<div class="card"><div>${!ipTz?'ℹ️':tzBad?'⚠️':'✅'} <b style="color:#fff">Ζώνη ώρας & γλώσσα</b></div><div style="color:#9fb4d0;margin-top:3px;white-space:normal">Ο browser λέει: ζώνη <b>${esc(b.tz)}</b>, γλώσσες <b>${esc(b.langs.join(', '))}</b>.${ipTz?` Η IP σου δείχνει ζώνη <b>${esc(ipTz)}</b>.`:''}
+      ${tzBad?' Δεν ταιριάζουν: ένα site καταλαβαίνει ότι χρησιμοποιείς VPN και περίπου πού βρίσκεσαι πραγματικά.':''} Η γλώσσα (π.χ. el-GR) από μόνη της «μαρτυρά» ότι είσαι Έλληνας.</div>
+      ${tzBad?'<div class="sm" style="margin-top:4px">👉 Το Tor Browser δείχνει σε όλους UTC και αγγλικά, ώστε να μοιάζουν όλοι οι χρήστες ίδιοι.</div>':''}</div>`}
+  h+=`<h3>Ποιος βλέπει τι;</h3><table><thead><tr><th></th><th>Wi‑Fi / πάροχος</th><th>VPN</th><th>Site</th></tr></thead><tbody>
+    <tr><td>Χωρίς τίποτα</td><td><span class="tag y">ποια sites</span></td><td>—</td><td><span class="tag r">την IP σου</span></td></tr>
+    <tr><td>VPN</td><td><span class="tag g">μόνο «VPN»</span></td><td><span class="tag y">ποια sites + IP σου</span></td><td><span class="tag g">IP του VPN</span></td></tr>
+    <tr><td>Tor</td><td><span class="tag g">μόνο «Tor»</span></td><td>—</td><td><span class="tag g">IP εξόδου Tor</span></td></tr></tbody></table>
+  <div class="sm" style="margin-top:4px;white-space:normal">Στο Tor καμία ενδιάμεση θέση δεν ξέρει ταυτόχρονα <b>ποιος</b> είσαι και <b>πού</b> πας (3 κόμβοι, κρυπτογράφηση σε στρώσεις — «κρεμμύδι»). Το VPN απλώς μεταφέρει την εμπιστοσύνη από τον πάροχο Internet στον πάροχο VPN. Κανένα από τα δύο δεν σε κρύβει αν συνδεθείς στον λογαριασμό σου (Google, Instagram…).</div>
+  <h3>🧅 Tor στο Mac</h3><div class="card" style="white-space:normal;line-height:1.7">
+    <b>Tor Browser</b>: ανώνυμο web — άνοιξέ το και πάτα ξανά «Έλεγχος»· το NetWatch το βλέπει στη θύρα 9150 και δείχνει την IP εξόδου.<br>
+    <b>Όλες οι εφαρμογές</b>: <code>brew install tor && brew services start tor</code> → SOCKS proxy στη θύρα 9050 (π.χ. <code>curl --socks5-hostname 127.0.0.1:9050 https://check.torproject.org/api/ip</code>).<br>
+    <span class="sm">Στο ⚠ Επιθέσεις, σε live με VPN, το NetWatch ειδοποιεί όταν DNS ή IPv6 βγαίνουν έξω από το τούνελ.</span></div>
+  <div class="sm" style="margin-top:8px;white-space:normal">🔎 Ο έλεγχος τρέχει μόνο όταν πατήσεις το κουμπί και επικοινωνεί με: api.ipify.org / api64.ipify.org (IP), ip-api.com (τοποθεσία/πάροχος), check.torproject.org, bash.ws (DNS leak test) και stun.l.google.com (WebRTC, από τον browser).</div>`;
+  el.innerHTML=h;
+  $('pv-run').onclick=()=>{privData.running=true;privBrowser=null;drawPriv();browserLeaks().then(b=>{privBrowser=b;if(tab==='priv')drawPriv()});
+    post('/api/privacy').then(j=>{if(j.error){privData.error=j.error;privData.running=false;drawPriv()}else setTimeout(loadPriv,1500)})}}
 </script>
 </body>
 </html>

@@ -125,6 +125,8 @@ def mitre_for(typ):
 def detector_for(typ):
     if typ.startswith("Κανόνας:"):
         return "custom_rules"
+    if typ.startswith("Διαρροή"):
+        return "privacy_leaks"
     for prefix, *_rest, det in MITRE:
         if typ.startswith(prefix):
             return det
@@ -152,7 +154,7 @@ DEFAULT_CONFIG = {
     "detectors": {d: True for d in (
         "port_scan", "stealth_scan", "network_sweep", "brute_force", "syn_flood", "icmp_flood",
         "arp_spoofing", "arp_flood", "rogue_dhcp", "dns_spoofing", "inbound", "suspicious_port",
-        "beaconing", "dns_tunnel", "dga", "new_device", "threat_intel", "cleartext_creds", "custom_rules", "wifi_guard")},
+        "beaconing", "dns_tunnel", "dga", "new_device", "threat_intel", "cleartext_creds", "custom_rules", "wifi_guard", "privacy_leaks")},
     "allowlist": {"ips": [], "macs": [], "domains": []},
     "intel": {
         "enabled": True,
@@ -536,7 +538,9 @@ class NetState:
         self.creds, self.cred_users = {}, {}
         self.lab_ips = set()  # «επιτιθέμενοι» του purple-team lab (δεν πάνε σε ιστορικό/ειδοποιήσεις)
         self.scan_info = collections.defaultdict(dict)  # ip → {θύρα: banner/έκδοση/TLS από τον σαρωτή}
-        self.scanner = self.lab = self.wifi = None
+        self.scanner = self.lab = self.wifi = self.privacy = None
+        self.vpn_iface = None  # live: η διεπαφή του VPN όταν περνά όλη την κίνηση (utun…)
+        self.leak_dns = collections.deque(maxlen=50)
         self.recent = collections.deque(maxlen=5000)  # τελευταία πακέτα για δοκιμή κανόνων
         import rules as _rules
         self.rules = _rules.RuleEngine(alert=self._rule_alert, ctx=self._rule_ctx)
@@ -833,6 +837,23 @@ class NetState:
                                      "f": P.get("flags") or {1: "who-has", 2: "is-at"}.get((P.get("arp") or {}).get("op"), ""),
                                      "t": round(t, 3)})
 
+    def _vpn_leak(self, P, t):
+        """Το VPN είναι ενεργό, άρα στη φυσική κάρτα (en0) θα έπρεπε να βλέπουμε ΜΟΝΟ το κρυπτογραφημένο τούνελ."""
+        src, dst, dp = P["src"], P["dst"], P.get("dp")
+        if dp == 53 and P["proto"] in ("UDP", "TCP"):
+            self.leak_dns.append(t)
+            if sum(1 for x in self.leak_dns if t - x < 60) >= 3:
+                q = (P.get("dns_q") or ("",))[0]
+                self.alert("Διαρροή DNS εκτός VPN", "med", src, dst,
+                           f"Το VPN ({self.vpn_iface}) είναι ενεργό, αλλά ερωτήματα DNS"
+                           + (f" (π.χ. {q})" if q else "") + f" βγαίνουν ανοιχτά από το {self.iface} προς {dst}: "
+                           "το Wi‑Fi και ο πάροχος βλέπουν ποια sites επισκέπτεσαι.",
+                           t, key="dns-leak", cooldown=600, mark=False)
+        elif ":" in src and not src.lower().startswith("fe80") and ip_kind(dst) == "public":
+            self.alert("Διαρροή IPv6 εκτός VPN", "med", src, dst,
+                       f"Το VPN ({self.vpn_iface}) είναι ενεργό, αλλά κίνηση IPv6 προς {dst} βγαίνει απευθείας από το "
+                       f"{self.iface} — το site βλέπει την πραγματική σου σύνδεση.", t, key="v6-leak", cooldown=600, mark=False)
+
     # ---------- detection ----------
     def _th(self, name):
         return self.cfg["thresholds"][name]
@@ -850,6 +871,8 @@ class NetState:
             self._dns_query(src, P["dns_q"][0], t)
         if P.get("nx"):
             self._nxdomain(dst, P["nx"], t)
+        if from_me and self.vpn_iface and self.mode == "live" and self.vpn_iface != self.iface:
+            self._vpn_leak(P, t)
 
         if proto == "TCP" and not from_me:
             if fl in ("", "F", "FPU") or ("F" in fl and "P" in fl and "U" in fl and "A" not in fl):
@@ -928,7 +951,7 @@ class NetState:
                        f"Σύνδεση προς θύρα {dp} ({SUSPECT_PORTS[dp]})", t)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
-    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "geo_q", "rdns_pool", "demo_geo", "home",
+    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "vpn_iface", "geo_q", "rdns_pool", "demo_geo", "home",
             "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors")
 
     def reset(self, mode, iface, me_ips, gateway, history, feed, notifier=None):
@@ -2207,6 +2230,9 @@ def make_handler(state):
                     else:
                         state.wifi.start("manual")
                     return self._json(state.wifi.status())
+                if u.path == "/api/privacy":
+                    state.privacy.start(on_done=lambda r: state.publish({"type": "privacy", "result": r}))
+                    return self._json(state.privacy.status())
                 if u.path == "/api/exposure":
                     if state.mode == "demo":
                         return self._json(DEMO_SHODAN)
@@ -2248,6 +2274,8 @@ def make_handler(state):
                 return self._json(state.rules_view())
             if u.path == "/api/wifi":
                 return self._json(state.wifi.status() if state.wifi else {"error": "off"})
+            if u.path == "/api/privacy":
+                return self._json(state.privacy.status() if state.privacy else {"error": "off"})
             if u.path == "/api/status":
                 return self._json(state.status())
             if u.path == "/api/ctf":
@@ -2303,6 +2331,23 @@ def make_handler(state):
                 return
             self._send(404, b"not found", "text/plain")
     return H
+
+
+def vpn_watch(state, interval=10):
+    """Live: ποια διεπαφή έχει την προεπιλεγμένη διαδρομή — αν είναι VPN, ψάχνουμε διαρροές εκτός τούνελ."""
+    import privacy
+    import wifiguard
+    while True:
+        try:
+            di = wifiguard.default_iface()
+            new = di if privacy.vpn_full_tunnel(di) else None
+            if new != state.vpn_iface:
+                log(f"🔒 VPN ενεργό ({new}) — παρακολουθώ για διαρροές" if new else "🔓 VPN ανενεργό")
+                state.vpn_iface = new
+                state.leak_dns.clear()
+        except Exception:
+            pass
+        time.sleep(interval)
 
 
 def watch_parent(pid):
@@ -2401,6 +2446,11 @@ def main():
     state.wifi = wifiguard.Guard(state, sim=wifiguard.demo_check if mode == "demo" else None,
                                  trusted_path=os.path.join(HERE, "data", "wifi_trusted.json") if mode == "live" else None)
     state.wifi.on_save = chown_to_user
+    import privacy
+    state.privacy = privacy.Runner(sim=privacy.demo_check if mode == "demo" else None,
+                                   vpn=lambda: privacy.vpn_full_tunnel(wifiguard.default_iface()))
+    if mode == "live" and cfg["detectors"].get("privacy_leaks", True):
+        threading.Thread(target=vpn_watch, args=(state,), daemon=True).start()
     if cfg["detectors"].get("wifi_guard", True):
         if mode == "live":
             threading.Thread(target=state.wifi.watch, daemon=True).start()

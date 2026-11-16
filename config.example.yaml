@@ -37,6 +37,7 @@ detectors:
   threat_intel: true
   cleartext_creds: true
   custom_rules: true
+  privacy_leaks: true          # live: alert when DNS/IPv6 leaves outside your VPN tunnel
   wifi_guard: true             # auto-check every new Wi‑Fi (contacts captive.apple.com, public DNS names, google/github/cloudflare)
 
 # Never alert on these
