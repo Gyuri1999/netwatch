@@ -127,3 +127,25 @@ def test_wifi_detector_can_be_disabled():
     s = nw.NetState("demo", "demo0", ["192.168.1.23"], "192.168.1.1", geo=False, rdns=False, cfg=cfg)
     wg.Guard(s, sim=wg.demo_check)._run("manual")
     assert not [a for a in s.alerts if "Wi‑Fi" in a["type"]]
+
+
+def test_status_summary_for_mac_app():
+    s = nw.NetState("demo", "demo0", ["192.168.1.23"], "192.168.1.1", geo=False, rdns=False)
+    s.wifi = wg.Guard(s, sim=wg.demo_check)
+    s.wifi._run("manual")
+    s.lab_ips.add("10.66.66.66")
+    s.alert("Port scan", "high", "10.66.66.66", "192.168.1.23", "lab", 1.0)  # το lab δεν μετράει
+    st = s.status()
+    assert st["mode"] == "demo" and st["alerts"] == st["high"] + st["med"] + st["low"] >= 2
+    assert st["last"]["type"] in ("Evil twin Wi‑Fi", "Ανοιχτό Wi‑Fi")
+    assert st["wifi"] == {"level": "bad", "verdict": st["wifi"]["verdict"], "score": 0, "ssid": "Cafe_Free_WiFi"}
+    json.dumps(st)
+
+
+def test_backend_exits_when_mac_app_dies():
+    import subprocess
+    parent = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(0.5)"])
+    child = subprocess.Popen([sys.executable, "-c", f"import sys; sys.path.insert(0, {ROOT!r}); import netwatch; "
+                              f"netwatch.watch_parent({parent.pid})"])
+    parent.wait()
+    assert child.wait(timeout=10) == 0

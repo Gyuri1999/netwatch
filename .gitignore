@@ -11,3 +11,7 @@ netwatch-incident-*.json
 data/
 config.yaml
 rules/local.yaml
+
+# macOS app build
+build/
+dist/

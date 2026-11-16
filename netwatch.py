@@ -1366,6 +1366,22 @@ class NetState:
                     "alerts": list(self.alerts)[:200], "stats": self._stats(1), "features": self.features(),
                     "feed": self.feed, "ctf": self.ctf_level}
 
+    def status(self):
+        """Μικρή περίληψη για την εφαρμογή του Mac (εικονίδιο στη γραμμή μενού)."""
+        with self.lock:
+            al = [a for a in self.alerts if not a.get("lab")]
+            by = collections.Counter(a["sev"] for a in al)
+            last = al[0] if al else None
+            out = {"mode": self.mode, "feed": self.feed, "iface": self.iface, "alerts": len(al),
+                   "high": by.get("high", 0), "med": by.get("med", 0), "low": by.get("low", 0),
+                   "hosts": len(self.hosts), "pkts": self.total_pkts,
+                   "last": {k: last[k] for k in ("id", "t", "type", "sev", "actor", "target")} if last else None}
+        r = self.wifi.result if self.wifi else None
+        out["wifi"] = {"level": r["level"], "verdict": r["verdict"], "score": r["score"],
+                       "ssid": (r.get("wifi") or {}).get("ssid")} if r else None
+        out["wifi_running"] = bool(self.wifi and self.wifi.running)
+        return out
+
     def _stats(self, dt):
         return {"pps": round(self.win_pkts / dt, 1), "bps": round(self.win_bytes / dt),
                 "pkts": self.total_pkts, "bytes": self.total_bytes, "hosts": len(self.hosts),
@@ -2178,6 +2194,11 @@ def make_handler(state):
                         return self._json({"error": "δεν βρέθηκε"}, 404)
                     r.enabled = bool(body.get("enabled"))
                     return self._json({"ok": True})
+                if u.path == "/api/shutdown":  # η εφαρμογή Mac κλείνει / αλλάζει λειτουργία
+                    self._json({"ok": True})
+                    log("Τερματισμός από την εφαρμογή.")
+                    threading.Timer(0.2, os._exit, args=(0,)).start()
+                    return
                 if u.path == "/api/wifi":
                     if not state.wifi:
                         return self._json({"error": "Wi‑Fi Guard off"}, 400)
@@ -2227,6 +2248,8 @@ def make_handler(state):
                 return self._json(state.rules_view())
             if u.path == "/api/wifi":
                 return self._json(state.wifi.status() if state.wifi else {"error": "off"})
+            if u.path == "/api/status":
+                return self._json(state.status())
             if u.path == "/api/ctf":
                 import ctf
                 try:
@@ -2282,6 +2305,19 @@ def make_handler(state):
     return H
 
 
+def watch_parent(pid):
+    """Η εφαρμογή του Mac ξεκινά το NetWatch (και με sudo): όταν εκείνη κλείσει, κλείνουμε κι εμείς."""
+    while True:
+        time.sleep(1)
+        try:
+            os.kill(pid, 0)
+        except ProcessLookupError:
+            log("Η εφαρμογή έκλεισε — τέλος.")
+            os._exit(0)
+        except PermissionError:
+            pass
+
+
 def open_browser(url):
     """Ανοίγει τον browser ως ο κανονικός χρήστης, ακόμα κι αν τρέχουμε με sudo."""
     time.sleep(1.5)
@@ -2312,6 +2348,8 @@ def main():
     ap.add_argument("--config", help="αρχείο ρυθμίσεων YAML (προεπιλογή: config.yaml δίπλα στο netwatch.py)")
     ap.add_argument("--history", help="αρχείο SQLite ιστορικού (live: data/netwatch.db, αλλιώς στη μνήμη)")
     ap.add_argument("--notify", action="store_true", help="ειδοποιήσεις macOS/Telegram και σε demo/pcap")
+    ap.add_argument("--port-file", help=argparse.SUPPRESS)  # η εφαρμογή Mac διαβάζει από εδώ τη θύρα
+    ap.add_argument("--parent-pid", type=int, help=argparse.SUPPRESS)  # τερματισμός όταν κλείσει η εφαρμογή
     ap.add_argument("--no-intel", action="store_true", help="χωρίς κατέβασμα blocklists (threat intel)")
     args = ap.parse_args()
 
@@ -2399,6 +2437,12 @@ def main():
         os._exit(1)
     srv.daemon_threads = True
     url = f"http://127.0.0.1:{port}"
+    if args.port_file:
+        with open(args.port_file, "w") as f:
+            f.write(str(port))
+        chown_to_user(args.port_file)
+    if args.parent_pid:
+        threading.Thread(target=watch_parent, args=(args.parent_pid,), daemon=True).start()
     log(f"NetWatch ({state.mode}) → {url}")
     if not args.no_open:
         threading.Thread(target=open_browser, args=(url,), daemon=True).start()
