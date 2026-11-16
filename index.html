@@ -1,0 +1,613 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>NetWatch</title>
+<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="/edu.js"></script>
+<style>
+:root{--bg:#05080f;--panel:#0b111c;--panel2:#101828;--line:#1c2638;--txt:#cfe0f5;--dim:#6d7f99;
+  --cyan:#3ec5ff;--green:#3ddc97;--yellow:#ffd23f;--orange:#ff9f43;--red:#ff3b5c;--purple:#b388ff;--pink:#ff6ad5}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden}
+header{height:52px;display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0b1424,#070b14)}
+.logo{font-weight:800;letter-spacing:3px;color:var(--cyan);text-shadow:0 0 12px #3ec5ff88;white-space:nowrap}
+.badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:1px}
+.live{background:#ff3b5c22;color:var(--red);border:1px solid #ff3b5c66}.demo{background:#ffd23f22;color:var(--yellow);border:1px solid #ffd23f66}
+.chip{display:flex;flex-direction:column;line-height:1.1;padding:0 10px;border-left:1px solid var(--line);white-space:nowrap}
+.chip b{font-size:15px;color:#fff}.chip span{font-size:10px;color:var(--dim);text-transform:uppercase}
+#status{margin-left:auto;padding:4px 10px;border-radius:5px;font-weight:700;font-size:12px;white-space:nowrap}
+.st-ok{background:#3ddc9722;color:var(--green);border:1px solid #3ddc9755}.st-warn{background:#ffd23f22;color:var(--yellow);border:1px solid #ffd23f55}
+.st-bad{background:#ff3b5c33;color:#ff8da0;border:1px solid var(--red);animation:blink 1s infinite}
+@keyframes blink{50%{box-shadow:0 0 18px #ff3b5c}}
+main{display:flex;height:calc(100% - 52px)}
+#viz{position:relative;flex:1;min-width:0}
+canvas#c{position:absolute;inset:0;width:100%;height:100%;cursor:grab}
+canvas#c:active{cursor:grabbing}
+aside{width:470px;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column}
+nav{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--line)}
+nav button{background:none;border:0;color:var(--dim);padding:8px 2px;font:inherit;font-size:12px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav button:hover{color:var(--txt)}nav button.on{color:#fff;border-color:var(--cyan);background:#ffffff06}
+nav .cnt{background:var(--red);color:#fff;border-radius:8px;padding:0 6px;font-size:10px;margin-left:4px}
+.tab{display:none;flex:1;overflow:auto;padding:10px 12px}.tab.on{display:block}
+#tip{position:absolute;pointer-events:none;background:#0b111cf2;border:1px solid var(--line);padding:8px 10px;border-radius:6px;display:none;max-width:340px;z-index:5}
+#legend{position:absolute;right:10px;top:10px;background:#0b111ccc;border:1px solid var(--line);border-radius:6px;padding:8px 10px;font-size:11px}
+#legend div{display:flex;align-items:center;gap:6px}#legend i{width:9px;height:9px;border-radius:50%;display:inline-block}
+#zc{position:absolute;right:10px;bottom:12px;display:flex;flex-direction:column;gap:4px}
+#zc button{width:34px;height:34px;background:#0b111ce6;border:1px solid #2d3b55;color:var(--txt);border-radius:6px;font-size:16px;cursor:pointer}
+#zc button:hover{border-color:var(--cyan);color:#fff}
+#zl{position:absolute;right:52px;bottom:14px;color:var(--dim);font-size:11px;background:#0b111ccc;padding:2px 6px;border-radius:4px}
+#toasts{position:absolute;top:10px;left:50%;transform:translateX(-50%);display:flex;flex-direction:column;gap:6px;z-index:10;width:min(560px,90%)}
+.toast{background:#2a0910f2;border:1px solid var(--red);border-radius:6px;padding:10px 12px;box-shadow:0 0 30px #ff3b5c55;animation:in .3s ease-out;cursor:pointer}
+@keyframes in{from{transform:translateY(-12px);opacity:0}}
+#flash{position:absolute;inset:0;pointer-events:none;box-shadow:inset 0 0 0 0 var(--red);transition:box-shadow .6s}
+.al{border:1px solid var(--line);border-left:4px solid var(--dim);border-radius:5px;padding:8px 10px;margin-bottom:8px;background:var(--panel2)}
+.al.high{border-left-color:var(--red)}.al.med{border-left-color:var(--orange)}.al.low{border-left-color:var(--yellow)}
+.al .h{display:flex;justify-content:space-between;gap:8px}.al .ty{font-weight:700;color:#fff}.al .tm{color:var(--dim);font-size:11px}
+.al .act{margin-top:6px;display:flex;gap:6px}
+.sev{font-size:10px;font-weight:700;padding:0 5px;border-radius:3px;margin-right:6px}
+.sev.high{background:var(--red);color:#fff}.sev.med{background:var(--orange);color:#000}.sev.low{background:var(--yellow);color:#000}
+.edu{background:#0a1a2a;border:1px solid #1d3a5a;border-radius:5px;padding:8px 10px;margin-top:6px;font-size:12px}
+.edu b{color:var(--cyan)}.edu ul{margin:4px 0 0 18px;padding:0}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{position:sticky;top:-10px;background:var(--panel);text-align:left;color:var(--dim);font-weight:500;padding:4px;cursor:pointer}
+td{padding:4px;border-top:1px solid #141d2c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+tr.r{cursor:pointer}tr.r:hover td{background:#13203a}tr.bad td{color:var(--red)}
+tr.ex td{white-space:normal;background:#0a1a2a;color:#cfe0f5;max-width:none}
+input.f{width:100%;background:var(--panel2);border:1px solid var(--line);color:var(--txt);padding:6px 8px;border-radius:4px;font:inherit;margin-bottom:8px}
+.kv{display:grid;grid-template-columns:125px 1fr;gap:4px 10px;margin:8px 0}.kv>span:nth-child(odd){color:var(--dim)}.kv span{overflow-wrap:anywhere}
+h3{margin:16px 0 6px;font-size:12px;color:var(--cyan);text-transform:uppercase;letter-spacing:1px}
+h2{margin:4px 0;font-size:18px;color:#fff;overflow-wrap:anywhere}
+.tag{display:inline-block;padding:1px 6px;border-radius:3px;margin:2px 4px 2px 0;font-size:11px;background:#1a2538}
+.tag.r{background:#ff3b5c33;color:#ff8da0}.tag.y{background:#ffd23f22;color:var(--yellow)}.tag.g{background:#3ddc9722;color:var(--green)}
+.links a{color:var(--cyan);margin-right:10px;text-decoration:none;display:inline-block;margin-bottom:4px}.links a:hover{text-decoration:underline}
+button.b{background:#13203a;border:1px solid #2d3b55;color:var(--txt);padding:4px 9px;border-radius:4px;font:inherit;font-size:11px;cursor:pointer}
+button.b:hover{border-color:var(--cyan)}
+pre{white-space:pre-wrap;background:#060a12;border:1px solid var(--line);padding:8px;border-radius:4px;font-size:11px;max-height:340px;overflow:auto}
+.bar{height:6px;background:#1a2538;border-radius:3px;overflow:hidden;margin:2px 0 6px}.bar i{display:block;height:100%}
+.brow{display:flex;justify-content:space-between;gap:8px;font-size:11.5px}.brow span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.feed td{max-width:none;font-size:11px}
+.empty{color:var(--dim);text-align:center;padding:40px 10px}
+.card{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:10px;margin-bottom:8px}
+.card.click{cursor:pointer}.card.click:hover{border-color:#2d3b55}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.big{font-size:20px;color:#fff;font-weight:700}.sm{font-size:11px;color:var(--dim)}
+.verdict{border-left:3px solid var(--red);background:#2a091033;padding:8px 10px;border-radius:4px;margin:8px 0}
+.hit{margin-bottom:6px}.hit .why{font-size:11px;color:#9fb4d0}
+details{background:var(--panel2);border:1px solid var(--line);border-radius:6px;margin-bottom:8px}
+summary{cursor:pointer;padding:8px 10px;font-weight:700;color:#fff}details>div{padding:0 10px 10px}
+details details{background:#0a1220}
+.lvl{font-size:10px;padding:0 5px;border-radius:3px;background:#1a2538;color:var(--dim);margin-left:6px}
+canvas.ch{width:100%;height:120px;display:block}
+a.mitre{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;background:#2b1a4a;color:#c9a8ff;text-decoration:none;border:1px solid #4a2f7a}
+a.mitre:hover{border-color:#b388ff}
+.tactic{display:inline-block;vertical-align:top;width:calc(50% - 4px);margin:0 4px 8px 0;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px}
+.tactic.hit{border-color:#4a2f7a;background:#1a1030}
+@media (max-width:900px){aside{display:none}.chip:nth-of-type(n+4){display:none}}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">◉ NETWATCH</div>
+  <span id="mode" class="badge live">LIVE</span>
+  <div class="chip"><span>interface / εγώ</span><b id="iface" style="font-size:12px">—</b></div>
+  <div class="chip"><span>πακέτα/s</span><b id="pps">0</b></div>
+  <div class="chip"><span>κίνηση</span><b id="bps">0</b></div>
+  <div class="chip"><span>hosts</span><b id="nh">0</b></div>
+  <div class="chip"><span>επιθέσεις</span><b id="na" style="color:var(--red)">0</b></div>
+  <canvas id="spark" width="160" height="34"></canvas>
+  <div id="status" class="st-ok">✓ Όλα καλά</div>
+</header>
+<main>
+  <section id="viz">
+    <canvas id="c"></canvas>
+    <div id="flash"></div>
+    <div id="tip"></div>
+    <div id="toasts"></div>
+    <div id="legend"></div>
+    <div id="zl">×1.0</div>
+    <div id="zc">
+      <button id="zin" title="Μεγέθυνση (ή ροδέλα ποντικιού)">+</button>
+      <button id="zout" title="Σμίκρυνση">−</button>
+      <button id="zhome" title="Ζουμ στο σπίτι μου">⌂</button>
+      <button id="zatk" title="Ζουμ στους επιτιθέμενους">🎯</button>
+      <button id="zreset" title="Όλος ο κόσμος">⟲</button>
+      <button id="zlan" title="Εμφάνιση/απόκρυψη LAN">▣</button>
+      <button id="zshot" title="Αποθήκευση εικόνας του χάρτη (PNG)">📸</button>
+    </div>
+  </section>
+  <aside>
+    <nav>
+      <button data-t="alerts" class="on">⚠ Επιθέσεις<span class="cnt" id="ac" style="display:none">0</span></button>
+      <button data-t="hosts">🌍 Προορισμοί</button>
+      <button data-t="devs">📟 Συσκευές</button>
+      <button data-t="stats">📊 Στατιστικά</button>
+      <button data-t="feed">📦 Πακέτα</button>
+      <button data-t="det">🔎 Λεπτομέρειες</button>
+      <button data-t="learn">📚 Μάθε</button>
+      <button data-t="tips">💡 Συμβουλές</button>
+      <button data-t="hist">🕓 Ιστορικό</button>
+    </nav>
+    <div class="tab on" id="t-alerts"><div class="empty">Καμία επίθεση ακόμα. Παρακολουθώ… 👀</div></div>
+    <div class="tab" id="t-hosts">
+      <input class="f" id="hf" placeholder="φίλτρο: IP, domain, χώρα, ISP…">
+      <table><thead><tr><th data-s="ip">Host</th><th data-s="name">Domain</th><th data-s="cc">Χώρα</th><th data-s="bytes">Bytes</th></tr></thead><tbody id="hb"></tbody></table>
+    </div>
+    <div class="tab" id="t-devs"></div>
+    <div class="tab" id="t-stats"></div>
+    <div class="tab feed" id="t-feed">
+      <div class="sm" style="margin-bottom:6px">Κάνε κλικ σε ένα πακέτο για να σου εξηγήσω τι κάνει. <label><input type="checkbox" id="fpause"> παύση</label> <label><input type="checkbox" id="fbad"> μόνο επιθέσεις</label></div>
+      <table><thead><tr><th>ώρα</th><th>proto</th><th>από → προς</th><th>len</th></tr></thead><tbody id="fb"></tbody></table>
+    </div>
+    <div class="tab" id="t-det"><div class="empty">Κάνε κλικ σε έναν κόμβο στον χάρτη ή σε μια γραμμή για αναλυτικά στοιχεία (OSINT).</div></div>
+    <div class="tab" id="t-learn"></div>
+    <div class="tab" id="t-tips"></div>
+    <div class="tab" id="t-hist"></div>
+  </aside>
+</main>
+<script>
+const COLORS={HTTPS:'#3ec5ff',HTTP:'#4d7cff',QUIC:'#b388ff',DNS:'#3ddc97',ICMP:'#ffd23f',ICMPv6:'#ffd23f',ARP:'#ff9f43',
+  mDNS:'#2fb48a',SSDP:'#ff6ad5',DHCP:'#ffffff',NTP:'#9be7ff',SSH:'#ff7b9c',TCP:'#5fa8d3',UDP:'#ff6ad5'};
+const LEG=[['HTTPS/TLS','#3ec5ff'],['HTTP','#4d7cff'],['QUIC','#b388ff'],['DNS','#3ddc97'],['UDP άλλο','#ff6ad5'],['ICMP','#ffd23f'],['ARP','#ff9f43'],['Επίθεση','#ff3b5c']];
+document.getElementById('legend').innerHTML=LEG.map(([n,c])=>`<div><i style="background:${c};box-shadow:0 0 6px ${c}"></i>${n}</div>`).join('')+'<div class="sm" style="margin-top:4px">ροδέλα = zoom · σύρε = μετακίνηση</div>';
+
+const S={hosts:new Map(),alerts:[],home:null,me:new Set(),gw:null,sel:null,feed:[],links:new Map(),stats:{},spark:[],hist:[],unread:0,mode:'live',showLan:true,openEdu:new Set(),feedEx:null};
+const $=id=>document.getElementById(id);
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const flag=cc=>cc&&cc.length===2?String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt())):'';
+const fmtB=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':b<1073741824?(b/1048576).toFixed(1)+' MB':(b/1073741824).toFixed(2)+' GB';
+const fmtT=t=>new Date(t*1000).toLocaleTimeString('el-GR');
+const fmtDur=s=>s<60?Math.round(s)+'s':s<3600?Math.round(s/60)+' λεπτά':(s/3600).toFixed(1)+' ώρες';
+const hash=s=>{let h=2166136261;for(const c of s)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0};
+const hname=h=>h?(h.names&&h.names[0])||h.rdns||'':'';
+function who(ip){const h=S.hosts.get(ip);if(!h)return ip;if(h.me)return'Εσύ ('+ip+')';if(h.gw)return'ο router ('+ip+')';
+  const n=hname(h);const g=h.geo;const base=n?n+' ('+ip+')':h.kind==='bcast'?'όλους/ομάδα ('+ip+')':ip;return base+(g?' '+flag(g.countryCode)+' '+g.country:'')}
+const randMac=m=>m&&/^.[26ae]/i.test(m);
+
+// ================= MAP + ZOOM =================
+const cv=$('c'),ctx=cv.getContext('2d');let W=0,H=0,DPR=1,proj,mapImg,world110=null,world50=null,loading50=false,ZT=d3.zoomIdentity,mapDirty=true;
+const featMeta=new WeakMap();
+fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json').then(r=>r.json()).then(t=>{world110=topojson.feature(t,t.objects.countries);mapDirty=true}).catch(()=>{});
+function load50(){if(world50||loading50)return;loading50=true;fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json').then(r=>r.json()).then(t=>{world50=topojson.feature(t,t.objects.countries);mapDirty=true}).catch(()=>{})}
+const zoom=d3.zoom().scaleExtent([1,60]).on('zoom',e=>{ZT=e.transform;mapDirty=true;$('zl').textContent='×'+ZT.k.toFixed(1);if(ZT.k>=3)load50()});
+d3.select(cv).call(zoom);
+function resize(){
+  const r=cv.getBoundingClientRect();DPR=window.devicePixelRatio||1;W=r.width;H=r.height;if(W<50||H<50)return;
+  cv.width=W*DPR;cv.height=H*DPR;proj=d3.geoNaturalEarth1().fitExtent([[20,20],[W-20,H-20]],{type:'Sphere'});
+  zoom.extent([[0,0],[W,H]]).translateExtent([[-W*.1,-H*.1],[W*1.1,H*1.1]]);
+  mapImg=document.createElement('canvas');mapImg.width=W*DPR;mapImg.height=H*DPR;mapDirty=true;
+}
+new ResizeObserver(()=>resize()).observe(cv);resize();
+function renderMap(){
+  const m=mapImg.getContext('2d'),k=ZT.k;m.setTransform(1,0,0,1,0,0);m.clearRect(0,0,mapImg.width,mapImg.height);
+  m.setTransform(DPR*k,0,0,DPR*k,DPR*ZT.x,DPR*ZT.y);const p=d3.geoPath(proj,m);
+  m.beginPath();p({type:'Sphere'});m.fillStyle='#070d18';m.fill();m.lineWidth=1/k;m.strokeStyle='#14223a';m.stroke();
+  m.beginPath();p(d3.geoGraticule10());m.strokeStyle='#0e1828';m.lineWidth=.5/k;m.stroke();
+  const w=(k>=3&&world50)||world110;if(!w)return;
+  m.beginPath();p(w);m.fillStyle='#0f1b2e';m.fill();m.strokeStyle='#1f3352';m.lineWidth=.7/k;m.stroke();
+  if(k<1.8)return;
+  m.setTransform(DPR,0,0,DPR,0,0);m.font='10px ui-monospace,monospace';m.fillStyle='#4a6185';m.textAlign='center';
+  for(const f of w.features){let md=featMeta.get(f);if(!md){md={c:d3.geoCentroid(f),a:d3.geoArea(f)};featMeta.set(f,md)}
+    if(md.a<0.03/(k*k))continue;const b=proj(md.c);if(!b)continue;const s=ZT.apply(b);if(s[0]<0||s[1]<0||s[0]>W||s[1]>H)continue;
+    m.fillText(f.properties.name||'',s[0],s[1])}
+  m.textAlign='start';
+}
+function P(lon,lat){const p=proj([lon,lat]);return p?ZT.apply(p):null}
+$('zin').onclick=()=>d3.select(cv).transition().duration(400).call(zoom.scaleBy,2);
+$('zout').onclick=()=>d3.select(cv).transition().duration(400).call(zoom.scaleBy,.5);
+$('zreset').onclick=()=>d3.select(cv).transition().duration(600).call(zoom.transform,d3.zoomIdentity);
+$('zlan').onclick=()=>{S.showLan=!S.showLan};
+$('zshot').onclick=()=>cv.toBlob(b=>download(b,`netwatch-map-${Date.now()}.png`),'image/png');
+function zoomTo(lonlats,maxK){
+  const pts=lonlats.map(l=>proj(l)).filter(Boolean);if(!pts.length)return;
+  const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]);const x0=Math.min(...xs),x1=Math.max(...xs),y0=Math.min(...ys),y1=Math.max(...ys);
+  const k=Math.min(maxK||8,.7/Math.max((x1-x0)/W,(y1-y0)/H,1/(maxK||8)));
+  const t=d3.zoomIdentity.translate(W/2,H/2).scale(k).translate(-(x0+x1)/2,-(y0+y1)/2);
+  d3.select(cv).transition().duration(900).call(zoom.transform,t)}
+$('zhome').onclick=()=>{const g=S.home||{lat:37.98,lon:23.73};zoomTo([[g.lon,g.lat]],6)};
+$('zatk').onclick=()=>{const l=[...S.hosts.values()].filter(h=>h.threat>=2&&h.geo).map(h=>[h.geo.lon,h.geo.lat]);
+  if(!l.length){toastInfo('Δεν υπάρχουν επιτιθέμενοι από το Internet με γνωστή τοποθεσία.');return}
+  const g=S.home||{lat:37.98,lon:23.73};l.push([g.lon,g.lat]);zoomTo(l,10)};
+function focusHost(ip){const h=S.hosts.get(ip);if(h?.geo)zoomTo([[h.geo.lon,h.geo.lat]],12)}
+
+const LAN={w:290,h:230};
+function lanBox(){return{x:16,y:H-LAN.h-16,w:LAN.w,h:LAN.h}}
+function homePt(){const g=S.home||{lat:37.98,lon:23.73};return P(g.lon,g.lat)}
+function pos(ip){
+  const h=S.hosts.get(ip);if(!h)return null;
+  if(h.kind==='public'){if(!h.geo)return null;const p=P(h.geo.lon,h.geo.lat);if(!p)return null;const k=hash(ip),s=.9*Math.sqrt(ZT.k);
+    return[p[0]+((k&15)-7.5)*s,p[1]+(((k>>4)&15)-7.5)*s]}
+  if(!S.showLan)return homePt();
+  const b=lanBox(),cx=b.x+b.w/2,cy=b.y+b.h/2+12;
+  if(h.me)return[cx,cy];if(h.gw)return[cx,b.y+34];
+  if(h.kind==='bcast'){const k=hash(ip);return[b.x+b.w-22,b.y+50+(k%5)*30]}
+  const a=(hash(ip)%360)*Math.PI/180;return[cx+Math.cos(a)*92,cy+Math.sin(a)*70];
+}
+function ends(sip,dip){const hs=S.hosts.get(sip),hd=S.hosts.get(dip);if(!hs||!hd)return[null,null];
+  if(hs.kind==='public'&&hd.kind!=='public')return[pos(sip),homePt()];
+  if(hd.kind==='public'&&hs.kind!=='public')return[homePt(),pos(dip)];
+  return[pos(sip),pos(dip)]}
+function colorFor(it){if(it.x)return'#ff3b5c';return COLORS[it.a]||COLORS[it.p]||'#8aa0bd'}
+
+let parts=[];const ripples=[];
+function spawn(it,delay){
+  if(!proj)return;const hs=S.hosts.get(it.s),hd=S.hosts.get(it.d);if(!hs||!hd)return;
+  const key=it.s<it.d?it.s+'|'+it.d:it.d+'|'+it.s;
+  let L=S.links.get(key);if(!L){L={a:it.s,b:it.d,bytes:0,pk:0};S.links.set(key,L)}
+  L.last=performance.now();L.bytes+=it.l;L.pk++;L.color=colorFor(it);L.bad=L.bad||it.x;
+  if(parts.length>900)return;
+  parts.push({s:it.s,d:it.d,t0:performance.now()+(delay||0),c:colorFor(it),r:it.x?2.6:1.2+Math.min(1.8,it.l/900),x:it.x});
+}
+function ctrl(a,b,d){return[(a[0]+b[0])/2,(a[1]+b[1])/2-Math.min(160,d*.28)]}
+function bez(a,c,b,t){const u=1-t;return[u*u*a[0]+2*u*t*c[0]+t*t*b[0],u*u*a[1]+2*u*t*c[1]+t*t*b[1]]}
+
+let nodesDrawn=[];
+function frame(){requestAnimationFrame(frame);
+  if(W<50||H<50||!mapImg||!mapImg.width){if(cv.getBoundingClientRect().width>50)resize();return}
+  try{if(mapDirty){mapDirty=false;renderMap()}draw()}catch(e){console.error(e)}}
+function draw(){
+  const now=performance.now();ctx.setTransform(DPR,0,0,DPR,0,0);ctx.drawImage(mapImg,0,0,W,H);
+  const hp=homePt(),b=lanBox(),sel=S.sel;
+  if(S.showLan){ctx.fillStyle='#08101ddd';ctx.strokeStyle='#1f3352';ctx.lineWidth=1;roundRect(b.x,b.y,b.w,b.h,10);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#6d7f99';ctx.font='10px ui-monospace,monospace';ctx.fillText('ΤΟΠΙΚΟ ΔΙΚΤΥΟ (LAN)',b.x+10,b.y+16);
+    const gwp=S.gw&&S.hosts.has(S.gw)?pos(S.gw):[b.x+b.w/2,b.y+34];
+    ctx.setLineDash([3,4]);ctx.strokeStyle='#3ec5ff44';ctx.beginPath();ctx.moveTo(gwp[0],gwp[1]);ctx.lineTo(hp[0],hp[1]);ctx.stroke();ctx.setLineDash([])}
+  for(const[k,L]of S.links){const age=(now-L.last)/1000;if(age>25){S.links.delete(k);continue}
+    const[a,c]=ends(L.a,L.b);if(!a||!c)continue;const d=Math.hypot(c[0]-a[0],c[1]-a[1]),q=ctrl(a,c,d);
+    let al=Math.max(0,.45*(1-age/25));if(sel)al*=(L.a===sel||L.b===sel)?2:.2;
+    ctx.globalAlpha=Math.min(1,al);ctx.strokeStyle=L.bad?'#ff3b5c':L.color;ctx.lineWidth=L.bad?1.6:Math.min(2.5,.5+Math.log10(L.bytes+1)/3);
+    ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.quadraticCurveTo(q[0],q[1],c[0],c[1]);ctx.stroke()}
+  ctx.globalAlpha=1;nodesDrawn=[];const top=[];
+  for(const h of S.hosts.values()){
+    if(!S.showLan&&h.kind!=='public')continue;
+    const p=pos(h.ip);if(!p||p[0]<-20||p[1]<-20||p[0]>W+20||p[1]>H+20)continue;const tot=h.bytes_in+h.bytes_out;
+    const r=h.me?7:h.gw?6:Math.min(7,1.5+Math.log10(tot+10)*.6);
+    const col=h.threat>=2?'#ff3b5c':h.threat===1?'#ffd23f':h.me?'#ffffff':h.gw?'#ffd23f':h.kind==='public'?'#3ec5ff':h.kind==='bcast'?'#6d7f99':'#3ddc97';
+    if(h.threat>=2){const ph=(now/900+hash(h.ip)%10/10)%1;ctx.strokeStyle=`rgba(255,59,92,${1-ph})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(p[0],p[1],r+ph*22,0,7);ctx.stroke()}
+    const fl=h._flash?Math.max(0,1-(now-h._flash)/400):0;
+    ctx.fillStyle=col;ctx.globalAlpha=(sel&&sel!==h.ip?.08:.16)+fl*.4;ctx.beginPath();ctx.arc(p[0],p[1],r*1.7+fl*4,0,7);ctx.fill();ctx.globalAlpha=1;
+    ctx.beginPath();ctx.arc(p[0],p[1],r*.65,0,7);ctx.fill();
+    if(sel===h.ip){ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(p[0],p[1],r+6+Math.sin(now/200)*2,0,7);ctx.stroke()}
+    nodesDrawn.push({ip:h.ip,x:p[0],y:p[1],r:Math.max(r,6)});
+    if(h.kind==='public')top.push([tot+(h.threat?1e12:0)+(sel===h.ip?1e13:0),h,p]);
+    else if(h.kind!=='bcast'){ctx.fillStyle=h.me?'#fff':'#9fb4d0';ctx.font='10px ui-monospace,monospace';
+      ctx.fillText(h.me?'ΕΣΥ '+h.ip.split('.').pop():h.gw?'ROUTER':(hname(h).split('.')[0]||'.'+h.ip.split('.').pop()),p[0]+9,p[1]+3)}
+  }
+  top.sort((x,y)=>y[0]-x[0]);ctx.font='11px ui-monospace,monospace';
+  const nl=Math.round(9*Math.min(4,Math.sqrt(ZT.k)));
+  for(const[,h,p]of top.slice(0,nl)){const t=`${flag(h.geo?.countryCode)} ${hname(h)||h.ip}${ZT.k>3&&h.geo?.city?' · '+h.geo.city:''}`.slice(0,44);
+    ctx.fillStyle='#000a';const w=ctx.measureText(t).width;ctx.fillRect(p[0]+9,p[1]-8,w+6,15);ctx.fillStyle=h.threat>=2?'#ff8da0':'#cfe0f5';ctx.fillText(t,p[0]+12,p[1]+3)}
+  const ph=(now/1400)%1;ctx.strokeStyle=`rgba(255,255,255,${.8-ph*.8})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(hp[0],hp[1],5+ph*18,0,7);ctx.stroke();
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(hp[0],hp[1],4,0,7);ctx.fill();ctx.font='bold 11px ui-monospace,monospace';ctx.fillText('⌂ '+(S.home?.city||'ΕΔΩ'),hp[0]+8,hp[1]-8);
+  ctx.globalCompositeOperation='lighter';const keep=[];
+  for(const p of parts){const[a,b2]=ends(p.s,p.d);if(!a||!b2)continue;
+    const d=Math.hypot(b2[0]-a[0],b2[1]-a[1]),dur=Math.min(2200,500+d*2.2/Math.max(1,Math.sqrt(ZT.k)));
+    const t=(now-p.t0)/dur;if(t<0){keep.push(p);continue}
+    if(t>=1){const h=S.hosts.get(p.d);if(h)h._flash=now;if(p.x)ripples.push({ip:p.d,t0:now});continue}
+    keep.push(p);const q=ctrl(a,b2,d);let dim=sel&&p.s!==sel&&p.d!==sel?.25:1;
+    for(let i=4;i>=1;i--){const pt=bez(a,q,b2,Math.max(0,t-i*.025));ctx.globalAlpha=.12*(5-i)*dim;ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(pt[0],pt[1],p.r*.8,0,7);ctx.fill()}
+    const pt=bez(a,q,b2,t);ctx.globalAlpha=.25*dim;ctx.fillStyle=p.c;ctx.beginPath();ctx.arc(pt[0],pt[1],p.r*3,0,7);ctx.fill();
+    ctx.globalAlpha=dim;ctx.beginPath();ctx.arc(pt[0],pt[1],p.r,0,7);ctx.fill()}
+  parts=keep;
+  for(let i=ripples.length-1;i>=0;i--){const r=ripples[i],t=(now-r.t0)/700;const p=pos(r.ip)||homePt();if(t>1||!p){ripples.splice(i,1);continue}
+    ctx.globalAlpha=1-t;ctx.strokeStyle='#ff3b5c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p[0],p[1],4+t*26,0,7);ctx.stroke()}
+  ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
+}
+function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
+requestAnimationFrame(frame);
+
+function pick(e){const r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bd=1e9;
+  for(const n of nodesDrawn){const d=Math.hypot(n.x-x,n.y-y);if(d<n.r+5&&d<bd){bd=d;best=n}}return[best,x,y]}
+cv.addEventListener('mousemove',e=>{const[n,x,y]=pick(e);const tip=$('tip');
+  if(!n){tip.style.display='none';return}const h=S.hosts.get(n.ip),g=h.geo;
+  const hits=(h.hits||[]).slice(0,3).map(([p,c,s])=>`${p}${s?' '+s:''}`).join(', ');
+  tip.innerHTML=`<b style="color:#fff">${esc(h.ip)}</b> ${h.threat>=2?'<span class="tag r">ΕΠΙΤΙΘΕΤΑΙ</span>':''}<br>${esc(hname(h))}<br>`+
+   (g?`${flag(g.countryCode)} ${esc(g.city)}, ${esc(g.country)}<br><span style="color:#6d7f99">${esc(g.isp)} · ${esc(g.as||'')}</span><br>`:'')+
+   (h.mac?`<span style="color:#6d7f99">MAC ${esc(h.mac)}</span><br>`:'')+
+   `↑ ${fmtB(h.bytes_out)} &nbsp; ↓ ${fmtB(h.bytes_in)}`+(hits?`<br>🎯 ${esc(hits)}`:'')+'<br><span style="color:#6d7f99">κλικ για λεπτομέρειες</span>';
+  tip.style.display='block';tip.style.left=Math.min(x+14,W-350)+'px';tip.style.top=Math.min(y+14,H-160)+'px'});
+cv.addEventListener('mouseleave',()=>$('tip').style.display='none');
+cv.addEventListener('click',e=>{const[n]=pick(e);if(n)select(n.ip);else if(S.sel){S.sel=null}});
+
+// ================= TABS =================
+let tab='alerts';
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
+function showTab(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
+  if(t==='alerts'){S.unread=0;$('ac').style.display='none'}renderTab()}
+function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist})[tab]()}
+function tabHover(){return document.querySelector('.tab.on:hover')}
+
+function eduHTML(type){const e=eduFor(type);if(!e)return'';
+  return `<div class="edu"><b>${esc(e.t)}</b><span class="lvl">${esc(e.lvl)}</span><br><b>Τι είναι:</b> ${esc(e.what)}<br><b>Πώς γίνεται:</b> ${esc(e.how)}<br><b>Κίνδυνος:</b> ${esc(e.risk)}<br><b>Τι να κάνεις:</b><ul>${e.todo.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`}
+function alertHTML(a){const h=S.hosts.get(a.actor),g=h?.geo,open=S.openEdu.has(a.id);
+  return `<div class="al ${a.sev}"><div class="h"><span><span class="sev ${a.sev}">${a.sev.toUpperCase()}</span><span class="ty">${esc(a.type)}</span></span><span class="tm">${fmtT(a.t)}</span></div>
+  <div style="margin:4px 0">${flag(g?.countryCode)} <b>${esc(a.actor)}</b> → ${esc(a.target)} ${g?`<span style="color:#6d7f99">· ${esc(g.country)} · ${esc(g.isp)}</span>`:''}</div>
+  <div style="color:#9fb4d0">${esc(a.detail)}</div>
+  ${a.mitre?`<div style="margin-top:4px"><a class="mitre" target="_blank" href="${esc(a.mitre.url)}" title="${esc(a.mitre.name)}">MITRE ATT&amp;CK ${esc(a.mitre.id)}</a> <span class="sm">${esc(a.mitre.tactic)} · ${esc(a.mitre.name)}</span></div>`:''}
+  <div class="act"><button class="b" data-sel="${esc(a.actor)}">🔎 Ανάλυση επιτιθέμενου</button><button class="b" data-edu="${a.id}">${open?'▾':'ℹ'} Τι σημαίνει;</button>${g?`<button class="b" data-map="${esc(a.actor)}">📍 Χάρτης</button>`:''}</div>
+  ${open?eduHTML(a.type):''}</div>`}
+function bindCommon(el){
+  el.querySelectorAll('[data-sel]').forEach(d=>d.onclick=e=>{e.stopPropagation();select(d.dataset.sel)});
+  el.querySelectorAll('[data-map]').forEach(d=>d.onclick=e=>{e.stopPropagation();S.sel=d.dataset.map;focusHost(d.dataset.map)});
+  el.querySelectorAll('[data-edu]').forEach(d=>d.onclick=e=>{e.stopPropagation();const id=+d.dataset.edu;S.openEdu.has(id)?S.openEdu.delete(id):S.openEdu.add(id);renderTab()});
+}
+function renderAlerts(){const el=$('t-alerts');if(!S.alerts.length)return;
+  const counts={};S.alerts.forEach(a=>counts[a.sev]=(counts[a.sev]||0)+1);
+  el.innerHTML=`<div style="margin-bottom:8px"><button class="b" onclick="exportReport()">⬇ Αναφορά συμβάντος (JSON)</button></div><div class="sm" style="margin-bottom:8px">${counts.high||0} σοβαρές · ${counts.med||0} μέτριες · ${counts.low||0} χαμηλές — πάτα «Τι σημαίνει;» για εξήγηση</div>`+S.alerts.slice(0,200).map(alertHTML).join('');bindCommon(el)}
+
+let sortK='bytes',sortD=-1;
+document.querySelectorAll('#t-hosts th').forEach(th=>th.onclick=()=>{const k=th.dataset.s;sortD=sortK===k?-sortD:(k==='bytes'?-1:1);sortK=k;renderHosts()});
+$('hf').oninput=()=>renderHosts();
+function renderHosts(){
+  const f=$('hf').value.toLowerCase();
+  let rows=[...S.hosts.values()].filter(h=>h.kind==='public').map(h=>({h,ip:h.ip,name:hname(h),cc:h.geo?.countryCode||'',bytes:h.bytes_in+h.bytes_out}));
+  if(f)rows=rows.filter(r=>(r.ip+' '+r.name+' '+(r.h.geo?`${r.h.geo.country} ${r.h.geo.city} ${r.h.geo.isp} ${r.h.geo.as}`:'')+' '+(r.h.names||[]).join(' ')).toLowerCase().includes(f));
+  rows.sort((a,b)=>(a[sortK]>b[sortK]?1:a[sortK]<b[sortK]?-1:0)*sortD);
+  $('hb').innerHTML=rows.slice(0,300).map(r=>`<tr class="r ${r.h.threat>=2?'bad':''}" data-ip="${esc(r.ip)}"><td>${esc(r.ip)}</td><td title="${esc(r.name)}">${esc(r.name)}</td><td>${flag(r.cc)} ${esc(r.cc)}</td><td>${fmtB(r.bytes)}</td></tr>`).join('');
+  $('hb').querySelectorAll('tr').forEach(tr=>tr.onclick=()=>select(tr.dataset.ip));
+}
+
+function renderDevs(){
+  const el=$('t-devs');const devs=[...S.hosts.values()].filter(h=>h.kind==='local').sort((a,b)=>(b.me-a.me)||(b.gw-a.gw)||((b.bytes_in+b.bytes_out)-(a.bytes_in+a.bytes_out)));
+  el.innerHTML=`<div class="sm" style="margin-bottom:8px">Οι συσκευές που φάνηκαν στο τοπικό σου δίκτυο (${devs.length}). Αν δεν αναγνωρίζεις κάποια, έλεγξε τον κατασκευαστή από τη MAC.</div>`+
+  devs.map(h=>{const tags=[];if(h.me)tags.push('<span class="tag g">ΕΣΥ</span>');if(h.gw)tags.push('<span class="tag y">ROUTER</span>');
+    if(h.threat>=2)tags.push('<span class="tag r">⚠ ΥΠΟΠΤΗ</span>');if(randMac(h.mac))tags.push('<span class="tag">τυχαία MAC (κινητό;)</span>');
+    if(h.ip.includes(':'))tags.push('<span class="tag">IPv6</span>');
+    const pr=Object.keys(h.protos||{}).slice(0,5).join(', ');
+    return `<div class="card click" data-sel="${esc(h.ip)}"><div style="display:flex;justify-content:space-between"><b style="color:#fff">${esc(hname(h)||h.ip)}</b><span class="sm">από ${fmtT(h.first)}</span></div>
+     <div>${esc(h.ip)} ${h.mac?'· '+esc(h.mac):''}</div><div>${tags.join('')}</div>
+     <div class="sm">↑ ${fmtB(h.bytes_out)} ↓ ${fmtB(h.bytes_in)} · ${esc(pr)}</div></div>`}).join('');
+  bindCommon(el)}
+
+function barList(entries,colorFn,fmt){const mx=Math.max(1,...entries.map(e=>e[1]));
+  return entries.map(([k,v,extra])=>`<div class="brow"><span>${k}</span><span>${fmt?fmt(v):v}</span></div><div class="bar"><i style="width:${v/mx*100}%;background:${colorFn?colorFn(k,extra):'#3ec5ff'}"></i></div>`).join('')}
+function renderStats(){
+  const el=$('t-stats'),st=S.stats,hosts=[...S.hosts.values()],pub=hosts.filter(h=>h.kind==='public');
+  const countries={},orgs={};for(const h of pub){const g=h.geo;if(!g)continue;const b=h.bytes_in+h.bytes_out;
+    const ck=flag(g.countryCode)+' '+g.country;countries[ck]=(countries[ck]||0)+b;const ok=g.org||g.isp||g.as;orgs[ok]=(orgs[ok]||0)+b}
+  const top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  const types={};S.alerts.forEach(a=>types[a.type]=(types[a.type]||0)+1);
+  const atk=hosts.filter(h=>h.threat>=2);
+  const tot=Object.values(st.protos||{}).reduce((a,b)=>a+b,0)||1;
+  const talkers=hosts.filter(h=>h.kind==='local').sort((a,b)=>(b.bytes_in+b.bytes_out)-(a.bytes_in+a.bytes_out)).slice(0,6);
+  el.innerHTML=`<div class="grid2">
+   <div class="card"><div class="sm">σύνολο πακέτων</div><div class="big">${(st.pkts||0).toLocaleString('el-GR')}</div></div>
+   <div class="card"><div class="sm">σύνολο δεδομένων</div><div class="big">${fmtB(st.bytes||0)}</div></div>
+   <div class="card"><div class="sm">χώρες που επικοινωνείς</div><div class="big">${Object.keys(countries).length}</div></div>
+   <div class="card"><div class="sm">επιτιθέμενοι</div><div class="big" style="color:${atk.length?'var(--red)':'var(--green)'}">${atk.length}</div></div></div>
+   <div class="sm">σε λειτουργία ${fmtDur(st.uptime||0)}</div>
+   <h3>Κίνηση (τελευταία 5 λεπτά)</h3><canvas class="ch" id="chT"></canvas><div class="sm"><span style="color:#3ec5ff">━ πακέτα/s</span> &nbsp; <span style="color:#b388ff">━ KB/s</span></div>
+   <h3>Πρωτόκολλα</h3>${barList(Object.entries(st.protos||{}).slice(0,8).map(([k,v])=>[esc(k)+` <span class="sm">${esc((PROTO_INFO[k]||'').slice(0,50))}${PROTO_INFO[k]?'…':''}</span>`,v,k]),(k,x)=>COLORS[x]||'#8aa0bd',v=>(v/tot*100).toFixed(1)+'%')}
+   <h3>Χώρες (κατά όγκο)</h3>${barList(top(countries).map(([k,v])=>[esc(k),v]),()=>'#3ec5ff',fmtB)||'<div class="sm">—</div>'}
+   <h3>Εταιρείες / πάροχοι</h3>${barList(top(orgs).map(([k,v])=>[esc(k),v]),()=>'#b388ff',fmtB)||'<div class="sm">—</div>'}
+   <h3>Ποια συσκευή καταναλώνει</h3>${barList(talkers.map(h=>[esc(h.me?'Εσύ':h.gw?'Router':hname(h)||h.ip),h.bytes_in+h.bytes_out]),()=>'#3ddc97',fmtB)}
+   ${systemHTML()}
+   <h3>MITRE ATT&amp;CK — τακτικές που είδα</h3><div class="sm" style="margin-bottom:6px">Το παγκόσμιο «λεξικό» τεχνικών επίθεσης που χρησιμοποιούν τα SOC.</div>${mitreGrid()}
+   <h3>Επιθέσεις ανά τύπο</h3>${barList(Object.entries(types).sort((a,b)=>b[1]-a[1]).map(([k,v])=>[esc(k),v]),()=>'#ff3b5c')||'<div class="sm">Καμία ακόμα 🎉</div>'}
+   ${atk.length?'<h3>Επιτιθέμενοι</h3>'+atk.map(h=>`<div class="card click" data-sel="${esc(h.ip)}">${flag(h.geo?.countryCode)} <b>${esc(h.ip)}</b> <span class="sm">${esc(h.geo?.country||'LAN')} · ${esc(h.geo?.isp||h.mac||'')}</span><br><span class="sm">${(h.hits||[]).slice(0,5).map(x=>x[0]+(x[2]?' '+x[2]:'')).join(', ')}</span></div>`).join(''):''}`;
+  bindCommon(el);drawChart($('chT'),[S.hist.map(x=>x.pps),S.hist.map(x=>x.bps/1024)],['#3ec5ff','#b388ff']);
+}
+function systemHTML(){const f=S.features;if(!f)return'';const it=f.intel||{};
+  const det=Object.entries(f.detectors||{}),on=det.filter(d=>d[1]).length;
+  return `<h3>Σύστημα</h3><div class="card">
+   <div>🧠 Ανιχνευτές: <b>${on}/${det.length}</b> ενεργοί ${det.filter(d=>!d[1]).map(d=>`<span class="tag">${esc(d[0])} off</span>`).join('')}</div>
+   <div>⛔ Threat intel: ${it.loaded?`<b>${(it.entries||0).toLocaleString('el-GR')}</b> δίκτυα`:'φόρτωση…'} ${(it.feeds||[]).map(x=>`<span class="tag ${x.ok?'g':'r'}" title="${esc(x.error||x.source||'')}">${esc(x.name)} ${x.ok?x.entries:'✖'}</span>`).join('')}</div>
+   <div>🛡 AbuseIPDB: ${f.abuseipdb?'<span class="tag g">ενεργό</span>':'<span class="sm">βάλε abuseipdb_key στο config.yaml</span>'}</div>
+   <div>🔔 Ειδοποιήσεις: ${f.notify?`${f.notify.macos?'<span class="tag g">macOS</span>':''}${f.notify.telegram?'<span class="tag g">Telegram</span>':''} <span class="sm">από ${esc(f.notify.min_severity)}</span>`:'<span class="sm">ανενεργές (μόνο σε live ή με --notify)</span>'}</div>
+   <div>🗄 Ιστορικό: <span class="sm">${esc(f.history===':memory:'?'στη μνήμη (χάνεται στο κλείσιμο)':f.history)}</span></div>
+   <div>⚙ Ρυθμίσεις: <span class="sm">${esc(f.config||'προεπιλογές (φτιάξε config.yaml από το config.example.yaml)')}</span> · allowlist ${f.allowlist?.ips||0} IP / ${f.allowlist?.macs||0} MAC / ${f.allowlist?.domains||0} domains</div></div>`}
+const TACTICS=['Reconnaissance','Initial Access','Discovery','Credential Access','Command and Control','Impact'];
+function mitreGrid(){const by={};for(const a of S.alerts){if(!a.mitre)continue;const t=by[a.mitre.tactic]||(by[a.mitre.tactic]={});
+    const k=a.mitre.id;t[k]=t[k]||{m:a.mitre,n:0};t[k].n++}
+  return TACTICS.map(tc=>{const t=by[tc]||{};const ks=Object.values(t);
+    return `<div class="tactic ${ks.length?'hit':''}"><b style="color:${ks.length?'#c9a8ff':'#6d7f99'}">${tc}</b>${ks.map(x=>`<div><a class="mitre" target="_blank" href="${esc(x.m.url)}">${esc(x.m.id)}</a> <span class="sm">${esc(x.m.name.split(': ').pop())} ×${x.n}</span></div>`).join('')||'<div class="sm">—</div>'}</div>`}).join('')}
+function exportReport(){
+  const atk=[...S.hosts.values()].filter(h=>h.threat>=1).map(h=>({ip:h.ip,threat:h.threat,geo:h.geo,mac:h.mac,rdns:h.rdns,first_seen:new Date(h.first*1000).toISOString(),last_seen:new Date(h.last*1000).toISOString(),targeted_ports:h.hits,victims:h.victims}));
+  const rep={generator:'NetWatch',generated:new Date().toISOString(),mode:S.mode,sensor:{me:[...S.me],gateway:S.gw},
+    summary:{alerts:S.alerts.length,high:S.alerts.filter(a=>a.sev==='high').length,attackers:atk.length,packets:S.stats.pkts,bytes:S.stats.bytes},
+    alerts:S.alerts.map(a=>({...a,time:new Date(a.t*1000).toISOString()})),attackers:atk};
+  download(new Blob([JSON.stringify(rep,null,2)],{type:'application/json'}),`netwatch-incident-${Date.now()}.json`)}
+function download(blob,name){const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000)}
+function drawChart(c,series,colors){if(!c)return;const r=c.getBoundingClientRect(),d=window.devicePixelRatio||1;c.width=r.width*d;c.height=r.height*d;
+  const g=c.getContext('2d');g.scale(d,d);const w=r.width,h=r.height;g.strokeStyle='#1c2638';g.lineWidth=1;
+  for(let i=1;i<4;i++){g.beginPath();g.moveTo(0,h*i/4);g.lineTo(w,h*i/4);g.stroke()}
+  series.forEach((s,i)=>{if(s.length<2)return;const mx=Math.max(1,...s);g.beginPath();s.forEach((v,j)=>g[j?'lineTo':'moveTo'](j/(Math.max(s.length,60)-1)*w,h-4-v/mx*(h-12)));
+    g.strokeStyle=colors[i];g.lineWidth=1.5;g.stroke();g.fillStyle=colors[i];g.font='10px ui-monospace';g.fillText('max '+Math.round(mx),4+i*80,10)})}
+
+function explainPacket(p){
+  const A=who(p.s),B=who(p.d),out=[];if(p.x)out.push('⚠ <b style="color:#ff8da0">Πακέτο από επιτιθέμενο.</b>');
+  const pi=portInfo(p.dp)||portInfo(p.sp);
+  if(p.p==='ARP')out.push(p.f==='who-has'?`${esc(A)} φωνάζει σε όλο το LAN: «Ποιος έχει την IP ${esc(p.d)};»`:`${esc(A)} απαντά: «Εγώ έχω την IP ${esc(p.s)} — να η MAC μου». ${S.alerts.some(a=>a.type.startsWith('ARP spoofing')&&a.target===p.s)?'<b style="color:#ff8da0">Προσοχή: για αυτή την IP έχει εντοπιστεί ARP spoofing!</b>':''}`);
+  else if(p.a==='DNS')out.push(p.dp===53?`${esc(A)} ρωτάει τον DNS server ${esc(B)} για τη διεύθυνση ενός site.`:`Ο DNS server ${esc(A)} απαντά στον ${esc(B)} με τη διεύθυνση IP που ζητήθηκε.`);
+  else if(p.p==='ICMP')out.push(`${esc(A)} στέλνει ping/ICMP στον ${esc(B)} («είσαι εκεί;»).`);
+  else if(p.p==='TCP'){const svc=pi?pi[0]:'θύρα '+p.dp;out.push(`${esc(A)} → ${esc(B)}: ${esc(FLAGS[p.f]||'σημαίες '+p.f)}.`);
+    if(p.f==='S'&&pi)out.push(`Στόχος: <b>${esc(svc)}</b> — ${esc(pi[1])}.`)}
+  else if(p.a==='QUIC')out.push(`${esc(A)} → ${esc(B)}: κρυπτογραφημένη κίνηση QUIC (HTTP/3) — π.χ. YouTube/Google.`);
+  else if(p.p==='UDP')out.push(`${esc(A)} → ${esc(B)}: πακέτο UDP ${pi?'('+esc(pi[0])+': '+esc(pi[1])+')':''}.`);
+  else out.push(`${esc(A)} → ${esc(B)}`);
+  if(PROTO_INFO[p.a])out.push(`<span class="sm">${esc(p.a)}: ${esc(PROTO_INFO[p.a])}</span>`);
+  out.push(`<span class="sm">Μέγεθος ${p.l} bytes · θύρες ${p.sp??'-'} → ${p.dp??'-'}</span>`);
+  return out.join('<br>')}
+function renderFeed(){if($('fpause').checked&&S.feedEx==null)return;
+  let list=S.feed;if($('fbad').checked)list=list.filter(p=>p.x);
+  $('fb').innerHTML=list.slice(0,200).map((p,i)=>`<tr class="r" data-i="${i}" style="color:${p.x?'#ff3b5c':COLORS[p.a]||COLORS[p.p]||'#cfe0f5'}"><td>${fmtT(p.t)}</td><td>${esc(p.a)}${p.f?' ['+esc(p.f)+']':''}</td><td>${esc(p.s)}${p.sp!=null?':'+p.sp:''} → ${esc(p.d)}${p.dp!=null?':'+p.dp:''}</td><td>${p.l}</td></tr>`+
+    (S.feedEx===p?`<tr class="ex"><td colspan="4">${explainPacket(p)}</td></tr>`:'')).join('');
+  $('fb').querySelectorAll('tr.r').forEach(tr=>tr.onclick=()=>{const p=list[+tr.dataset.i];S.feedEx=S.feedEx===p?null:p;$('fpause').checked=!!S.feedEx;renderFeed()})}
+$('fpause').onchange=()=>{if(!$('fpause').checked)S.feedEx=null;renderFeed()};$('fbad').onchange=renderFeed;
+
+function verdict(h,al){
+  const g=h.geo,types=[...new Set(al.filter(a=>a.actor===h.ip).map(a=>a.type))];if(!types.length)return'';
+  const ports=(h.hits||[]).filter(x=>typeof x[0]==='number');const parts=[];
+  parts.push(`<b>${esc(h.ip)}</b>${g?` από ${flag(g.countryCode)} ${esc(g.country)} (${esc(g.isp)})`:h.mac?` (συσκευή του LAN σου, MAC ${esc(h.mac)})`:''}`);
+  if(g?.hosting)parts.push('είναι server σε datacenter — όχι οικιακός χρήστης, πιθανότατα αυτοματοποιημένο εργαλείο');
+  if(g?.proxy)parts.push('κρύβεται πίσω από proxy/VPN/Tor, άρα η πραγματική του θέση είναι άγνωστη');
+  const acts=types.map(t=>{const e=eduFor(t);return e?e.t.toLowerCase():t});parts.push('έκανε: '+acts.join(', '));
+  if(ports.length>=10)parts.push(`δοκίμασε ${ports.length}+ διαφορετικές θύρες — ψάχνει «ανοιχτές πόρτες» για να μπει`);
+  else if(ports.length){const pi=portInfo(ports[0][0]);if(pi)parts.push(`στοχεύει κυρίως το <b>${esc(pi[0])}</b>: ${esc(pi[2])}`)}
+  const vict=(h.victims||[]).map(([ip])=>who(ip));if(vict.length)parts.push('θύματα: '+vict.slice(0,4).map(esc).join(', '));
+  return `<div class="verdict">🧠 <b>Συμπέρασμα:</b> ${parts.join('. ')}.</div>`}
+function actChart(h){const a=h.act||[];if(a.length<2)return'';const mx=Math.max(...a.map(x=>x[1]));
+  return `<h3>Δραστηριότητα (ανά 10s)</h3><div style="display:flex;align-items:flex-end;gap:1px;height:50px">${a.slice(-60).map(([t,c])=>`<div title="${fmtT(t)}: ${c} πακέτα" style="flex:1;background:${h.threat>=2?'#ff3b5c':'#3ec5ff'};height:${Math.max(2,c/mx*50)}px"></div>`).join('')}</div>`}
+function select(ip){S.sel=ip;S.whois=null;S.abuse=null;showTab('det')}
+function abuseHTML(j){if(j.error)return `<div class="card">AbuseIPDB: ${esc(j.error)}</div>`;const d=j.data||{},sc=d.abuseConfidenceScore??0;
+  const col=sc>=75?'#ff3b5c':sc>=25?'#ff9f43':'#3ddc97';
+  return `<div class="card" style="border-left:3px solid ${col}"><b>AbuseIPDB</b> — βαθμός κατάχρησης <b style="color:${col};font-size:16px">${sc}%</b><br>
+   <span class="sm">${d.totalReports||0} αναφορές από ${d.numDistinctUsers||0} χρήστες · ${esc(d.usageType||'')} · ${esc(d.domain||'')}${d.isTor?' · TOR':''} · τελευταία: ${esc(d.lastReportedAt||'—')}</span></div>`}
+function renderDet(){
+  const el=$('t-det'),h=S.hosts.get(S.sel);if(!h)return;const g=h.geo,pub=h.kind==='public';
+  const tags=[];if(h.me)tags.push('<span class="tag g">ΑΥΤΟΣ ΕΙΣΑΙ ΕΣΥ</span>');if(h.gw)tags.push('<span class="tag y">ROUTER / GATEWAY</span>');
+  if(h.threat>=2)tags.push('<span class="tag r">⚠ ΕΠΙΤΙΘΕΜΕΝΟΣ</span>');else if(h.threat===1)tags.push('<span class="tag y">ύποπτος</span>');
+  for(const f of h.intel||[])tags.push(`<span class="tag r" title="Threat intelligence">⛔ ${esc(f.name)}</span>`);
+  if(g?.proxy)tags.push('<span class="tag r">PROXY / VPN / TOR</span>');if(g?.hosting)tags.push('<span class="tag">Datacenter / Hosting</span>');if(g?.mobile)tags.push('<span class="tag">Κινητό δίκτυο</span>');
+  if(randMac(h.mac))tags.push('<span class="tag">τυχαία MAC</span>');
+  tags.push(`<span class="tag">${pub?'Internet':h.kind==='local'?'Τοπικό δίκτυο':'Broadcast/Multicast'}</span>`);
+  const peers=[];for(const L of S.links.values())if(L.a===h.ip||L.b===h.ip)peers.push([L.a===h.ip?L.b:L.a,L.bytes]);peers.sort((a,b)=>b[1]-a[1]);
+  const al=S.alerts.filter(a=>a.actor===h.ip||a.target===h.ip);const ip=encodeURIComponent(h.ip);
+  const hits=h.hits||[],mx=Math.max(1,...hits.map(x=>x[1]));const atk=h.threat>=2;
+  el.innerHTML=`<h2>${flag(g?.countryCode)} ${esc(h.ip)}</h2><div>${tags.join('')}</div>
+  <div style="margin-top:6px">${g?`<button class="b" data-map="${esc(h.ip)}">📍 Δείξε στον χάρτη</button>`:''}</div>
+  ${verdict(h,al)}
+  ${hits.length?`<h3>🎯 ${atk?'Τι χτυπάει':'Πού συνδέεται / τι ζητάει'}</h3><div class="sm" style="margin-bottom:6px">${atk?'Οι θύρες/υπηρεσίες που δοκίμασε και γιατί τις θέλει ένας επιτιθέμενος:':'Οι υπηρεσίες στις οποίες ξεκίνησε συνδέσεις:'}</div>`+
+    hits.slice(0,15).map(([p,c,s])=>{const pi=portInfo(p);return `<div class="hit"><div class="brow"><span><b>${esc(p)}</b> ${esc(pi?pi[0]:s||'')} <span class="sm">${esc(pi?pi[1]:'')}</span></span><span>×${c}</span></div><div class="bar"><i style="width:${c/mx*100}%;background:${atk?'#ff3b5c':'#3ec5ff'}"></i></div>${atk&&pi?`<div class="why">→ ${esc(pi[2])}</div>`:''}</div>`}).join(''):''}
+  ${(h.victims||[]).length?`<h3>${atk?'Θύματα':'Προορισμοί'}</h3>`+h.victims.slice(0,10).map(([v,c])=>`<div class="r" style="cursor:pointer" data-sel="${esc(v)}">→ ${esc(who(v))} <span class="sm">×${c}</span></div>`).join(''):''}
+  ${actChart(h)}
+  <h3>Στοιχεία</h3><div class="kv">
+   <span>Hostname</span><span>${esc(h.rdns||'—')}</span>
+   <span>Domains</span><span>${(h.names||[]).map(esc).join('<br>')||'—'}</span>
+   ${h.mac?`<span>MAC</span><span>${esc(h.mac)}${randMac(h.mac)?' <span class="sm">(τυχαία — iPhone/Android ιδιωτική διεύθυνση)</span>':''}</span>`:''}
+   ${g?`<span>Χώρα</span><span>${flag(g.countryCode)} ${esc(g.country)}</span><span>Πόλη</span><span>${esc(g.city)}${g.regionName?', '+esc(g.regionName):''}</span>
+   <span>Συντεταγμένες</span><span>${g.lat}, ${g.lon}</span><span>ISP</span><span>${esc(g.isp)}</span><span>Οργανισμός</span><span>${esc(g.org||'—')}</span><span>ASN</span><span>${esc(g.as||'—')}</span>`:''}
+   <span>Πρώτη φορά</span><span>${fmtT(h.first)}</span><span>Τελευταία</span><span>${fmtT(h.last)} (${fmtDur(Date.now()/1000-h.last)} πριν)</span>
+   <span>Έστειλε</span><span>${fmtB(h.bytes_out)} (${h.pkts_out} πακ.)</span><span>Έλαβε</span><span>${fmtB(h.bytes_in)} (${h.pkts_in} πακ.)</span></div>
+  ${(h.ja3||[]).length?`<h3>TLS fingerprints (JA3)</h3><div class="sm" style="margin-bottom:4px">Το «δακτυλικό αποτύπωμα» του προγράμματος που άνοιξε τη σύνδεση TLS. Ίδιο JA3 = ίδιο πρόγραμμα (Chrome, Safari, curl, malware…), ακόμα κι αν η κίνηση είναι κρυπτογραφημένη.</div>`+
+    h.ja3.map(([j,c,sn])=>`<div class="card" style="padding:6px 8px"><code style="color:#c9a8ff">${esc(j)}</code> <span class="sm">×${c}</span><br><span class="sm">${sn.map(esc).join(', ')||'—'}</span></div>`).join(''):''}
+  <h3>Υπηρεσίες / θύρες</h3><div>${(h.ports||[]).map(([p,c,n])=>`<span class="tag" title="${esc(portInfo(p)?.[1]||'')}">${p}${n?' '+esc(n):''} ×${c}</span>`).join('')||'—'}</div>
+  <h3>Πρωτόκολλα</h3><div>${Object.entries(h.protos||{}).map(([k,v])=>`<span class="tag" title="${esc(PROTO_INFO[k]||'')}" style="color:${COLORS[k]||'#cfe0f5'}">${esc(k)} ${v}</span>`).join('')}</div>
+  <h3>Επικοινωνεί με (τελευταία 25s)</h3><div>${peers.slice(0,15).map(([p,b])=>`<div class="r" style="cursor:pointer" data-sel="${esc(p)}">${esc(who(p))} <span class="sm">${fmtB(b)}</span></div>`).join('')||'—'}</div>
+  ${al.length?`<h3>Ειδοποιήσεις (${al.length})</h3>`+al.slice(0,20).map(alertHTML).join(''):''}
+  ${pub?`<h3>OSINT — έρευνα σε δημόσιες πηγές</h3><div class="links">
+    <a target="_blank" href="https://www.abuseipdb.com/check/${ip}" title="Αναφορές κατάχρησης από άλλους">AbuseIPDB</a><a target="_blank" href="https://www.shodan.io/host/${ip}" title="Ανοιχτές θύρες & υπηρεσίες">Shodan</a>
+    <a target="_blank" href="https://www.virustotal.com/gui/ip-address/${ip}" title="Malware & φήμη">VirusTotal</a><a target="_blank" href="https://viz.greynoise.io/ip/${ip}" title="Είναι μαζικός scanner;">GreyNoise</a>
+    <a target="_blank" href="https://search.censys.io/hosts/${ip}">Censys</a><a target="_blank" href="https://ipinfo.io/${ip}">ipinfo</a>
+    <a target="_blank" href="https://bgp.he.net/ip/${ip}" title="Δρομολόγηση / ASN">BGP.he.net</a><a target="_blank" href="https://otx.alienvault.com/indicator/ip/${ip}" title="Threat intelligence">AlienVault OTX</a></div>
+    <div class="sm">AbuseIPDB: αν άλλοι την έχουν αναφέρει · Shodan: τι τρέχει πάνω της · GreyNoise: αν σκανάρει όλο το Internet (θόρυβος) ή στοχευμένα εσένα.</div>
+    <div style="margin-top:8px"><button class="b" id="wb">📄 WHOIS — σε ποιον ανήκει</button> ${S.features?.abuseipdb?'<button class="b" id="ab">🛡 AbuseIPDB score</button>':''}</div>
+    ${S.abuse&&S.abuse.ip===h.ip?abuseHTML(S.abuse):''}${S.whois?`<pre>${esc(S.whois)}</pre>`:''}`
+   :h.mac?`<h3>OSINT</h3><div class="links"><a target="_blank" href="https://maclookup.app/search/result?mac=${encodeURIComponent(h.mac)}">Κατασκευαστής συσκευής (MAC lookup)</a></div>`:''}`;
+  bindCommon(el);
+  const ab=$('ab');if(ab)ab.onclick=()=>{ab.textContent='φόρτωση…';fetch('/api/abuseipdb?ip='+ip).then(r=>r.json()).then(j=>{S.abuse=j;renderDet()})};
+  const wb=$('wb');if(wb)wb.onclick=()=>{wb.textContent='φόρτωση…';fetch('/api/whois?ip='+ip).then(r=>r.json()).then(j=>{if(S.sel===j.ip){S.whois=j.text;renderDet()}})};
+}
+
+let histHours=24,histData=null,histQ='',histBusy=false;
+function loadHist(){if(histBusy)return;histBusy=true;fetch('/api/history?hours='+histHours).then(r=>r.json()).then(j=>{histData=j;histBusy=false;if(tab==='hist')drawHist()}).catch(()=>{histBusy=false})}
+function renderHist(){loadHist();if(histData)drawHist();else $('t-hist').innerHTML='<div class="empty">φόρτωση…</div>'}
+function drawHist(){const d=histData,el=$('t-hist');if(!d)return;const focus=document.activeElement&&document.activeElement.id==='hq';
+  const sevCol={high:'#ff3b5c',med:'#ff9f43',low:'#ffd23f'};const hrs={};for(const[h,sev,c]of d.by_hour){(hrs[h]=hrs[h]||{high:0,med:0,low:0})[sev]=c}
+  const start=Math.floor((d.ref-d.hours*3600)/3600)*3600,bins=[];for(let h=start;h<=d.ref;h+=Math.max(3600,Math.floor(d.hours/48)*3600))bins.push(h);
+  const step=bins.length>1?bins[1]-bins[0]:3600;const agg=bins.map(b=>{const o={high:0,med:0,low:0};for(const[h,v]of Object.entries(hrs))if(+h>=b&&+h<b+step)for(const k in o)o[k]+=v[k];return[b,o]});
+  const mx=Math.max(1,...agg.map(([,o])=>o.high+o.med+o.low));
+  const q=histQ.toLowerCase();const rows=d.alerts.filter(a=>!q||(a.type+' '+a.actor+' '+a.target+' '+a.detail+' '+(a.mitre||'')).toLowerCase().includes(q));
+  const fmtD=t=>new Date(t*1000).toLocaleString('el-GR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  el.innerHTML=`<div style="display:flex;gap:4px;margin-bottom:8px">${[[1,'1 ώρα'],[24,'24 ώρες'],[168,'7 μέρες'],[720,'30 μέρες']].map(([h,l])=>`<button class="b" data-h="${h}" style="${h===histHours?'border-color:var(--cyan);color:#fff':''}">${l}</button>`).join('')}</div>
+   <div class="sm">Αποθηκεύονται μόνιμα σε SQLite: ${esc(S.features?.history||'')} · σύνολο ${d.total_alerts} ειδοποιήσεις${d.since_ever?' από '+fmtD(d.since_ever):''}</div>
+   <h3>Ειδοποιήσεις ανά ώρα</h3><div style="display:flex;align-items:flex-end;gap:1px;height:70px">${agg.map(([b,o])=>`<div title="${fmtD(b)}: ${o.high} high / ${o.med} med / ${o.low} low" style="flex:1;display:flex;flex-direction:column-reverse;height:70px">${['low','med','high'].map(k=>`<div style="height:${o[k]/mx*70}px;background:${sevCol[k]}"></div>`).join('')}</div>`).join('')}</div>
+   <div class="brow sm"><span>${agg.length?fmtD(agg[0][0]):''}</span><span>τώρα</span></div>
+   <h3>Κίνηση ανά λεπτό</h3><canvas class="ch" id="chH"></canvas>
+   <h3>Συσκευές που έχουν εμφανιστεί ποτέ (${d.devices.length})</h3>${d.devices.slice(0,30).map(v=>`<div class="brow"><span>${esc(v.ip)} <span class="sm">${esc(v.mac)}${randMac(v.mac)?' (τυχαία)':''}</span></span><span class="sm">πρώτη: ${fmtD(v.first_seen)}</span></div>`).join('')||'<div class="sm">—</div>'}
+   <h3>Αρχείο ειδοποιήσεων (${rows.length})</h3><input class="f" id="hq" placeholder="αναζήτηση: τύπος, IP, MITRE…" value="${esc(histQ)}">
+   <table><tbody>${rows.slice(0,300).map(a=>`<tr class="r" data-ip="${esc(a.actor)}"><td><span class="sev ${a.sev}">${a.sev.toUpperCase()}</span></td><td>${fmtD(a.t)}</td><td title="${esc(a.detail)}">${esc(a.type)}</td><td>${esc(a.actor)}</td><td>${esc(a.mitre||'')}</td></tr>`).join('')}</tbody></table>`;
+  el.querySelectorAll('[data-h]').forEach(b=>b.onclick=()=>{histHours=+b.dataset.h;histData=null;renderHist()});
+  const hq=$('hq');hq.oninput=()=>{histQ=hq.value;drawHist()};if(focus){hq.focus();hq.setSelectionRange(hq.value.length,hq.value.length)}
+  el.querySelectorAll('tr[data-ip]').forEach(tr=>tr.onclick=()=>{if(S.hosts.has(tr.dataset.ip))select(tr.dataset.ip)});
+  drawChart($('chH'),[d.traffic.map(x=>x[1]/60),d.traffic.map(x=>x[2]/60/1024)],['#3ec5ff','#b388ff'])}
+let learnDone=false;
+function renderLearn(){if(learnDone)return;learnDone=true;
+  $('t-learn').innerHTML=`<div class="sm" style="margin-bottom:8px">Μικρός οδηγός για να καταλαβαίνεις τι βλέπεις.</div>
+  <details open><summary>🗺 Πώς διαβάζω τον χάρτη</summary><div>
+   <p>⌂ <b>Λευκή κουκκίδα</b> = το σπίτι σου (η δημόσια IP σου). Κάθε <b>φωτεινή κουκκίδα που ταξιδεύει</b> είναι ένα πακέτο: από εσένα προς τον server ή αντίστροφα.</p>
+   <p><b>Μπλε κόμβοι</b> = servers στο Internet (το μέγεθος δείχνει πόση κίνηση). <b>Πράσινοι</b> = συσκευές του σπιτιού. <b>Κίτρινος</b> = router. <b>Κόκκινος που πάλλεται</b> = επιτιθέμενος.</p>
+   <p>Το <b>κουτί LAN</b> κάτω αριστερά δείχνει τι γίνεται μέσα στο σπίτι σου — εκεί φαίνονται τα ARP spoofing και οι σαρώσεις. Οι <b>γραμμές</b> είναι ενεργές συνδέσεις των τελευταίων 25 δευτερολέπτων.</p>
+   <p><b>Ροδέλα</b> = zoom, <b>σύρσιμο</b> = μετακίνηση, κουμπί 🎯 = ζουμ στους επιτιθέμενους, ⌂ = στο σπίτι σου. Επιλέγοντας έναν κόμβο σβήνουν οι υπόλοιπες γραμμές για να δεις μόνο τις δικές του.</p>
+   <p>Μια χώρα στον χάρτη δεν σημαίνει ότι εκεί είναι ο <i>άνθρωπος</i> — συχνά είναι ο server (CDN, cloud) ή ένα VPN.</p></div></details>
+  <details><summary>⚔ Επιθέσεις που ανιχνεύω</summary><div>${Object.values(EDU).map(e=>`<details><summary>${esc(e.t)}<span class="lvl">${esc(e.lvl)}</span></summary><div><b>Τι είναι:</b> ${esc(e.what)}<br><b>Πώς γίνεται:</b> ${esc(e.how)}<br><b>Κίνδυνος:</b> ${esc(e.risk)}<br><b>Τι να κάνεις:</b><ul>${e.todo.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div></details>`).join('')}</div></details>
+  <details><summary>📡 Πρωτόκολλα</summary><div>${Object.entries(PROTO_INFO).map(([k,v])=>`<p><b style="color:${COLORS[k]||'#fff'}">${esc(k)}</b> — ${esc(v)}</p>`).join('')}</div></details>
+  <details><summary>🚪 Θύρες: τι είναι & γιατί τις θέλουν οι hackers</summary><div><table>${Object.entries(PORT_INFO).map(([p,[n,d,a]])=>`<tr><td style="vertical-align:top"><b>${esc(p)}</b><br>${esc(n)}</td><td style="white-space:normal;max-width:none">${esc(d)}<br><span style="color:#ff8da0">⚠ ${esc(a)}</span></td></tr>`).join('')}</table></div></details>
+  <details><summary>🤝 TCP flags — η «χειραψία»</summary><div><p>Μια σύνδεση TCP ξεκινά με 3 βήματα: <b>SYN</b> → <b>SYN‑ACK</b> → <b>ACK</b>. Ένας port scanner στέλνει μόνο SYN και κοιτάει την απάντηση.</p>${Object.entries(FLAGS).map(([k,v])=>`<p><b>[${esc(k||'κενό')}]</b> ${esc(v)}</p>`).join('')}</div></details>
+  <details><summary>📖 Λεξικό όρων</summary><div>${TERMS.map(([k,v])=>`<p><b style="color:#fff">${esc(k)}</b> — ${esc(v)}</p>`).join('')}</div></details>
+  <details><summary>🔍 Τι μπορεί και τι δεν μπορεί να δει το NetWatch</summary><div>
+   <p>✅ Όλη την κίνηση του δικού σου υπολογιστή, σε ποια sites πας (DNS/SNI), πού βρίσκονται οι servers.</p>
+   <p>✅ Broadcast/ARP/DHCP όλου του LAN — άρα ARP spoofing, σαρώσεις, ψεύτικους DHCP.</p>
+   <p>❌ Το <i>περιεχόμενο</i> της κρυπτογραφημένης κίνησης (HTTPS) — ούτε εσύ ούτε ένας hacker το βλέπει.</p>
+   <p>❌ Την ιδιωτική κίνηση άλλων συσκευών στο Wi‑Fi (π.χ. τι βλέπει το κινητό του αδερφού σου) — το Wi‑Fi/switch δεν τη στέλνει σε σένα.</p>
+   <p>❌ Επιθέσεις από το Internet που σταματάει ο router πριν φτάσουν σε σένα.</p></div></details>`}
+
+function renderTips(){
+  const types=new Set(S.alerts.map(a=>a.type.split(' (')[0]));const now=Date.now()/1000;
+  const live=[];
+  if([...types].some(t=>t.startsWith('ARP spoofing')))live.push(['Εντοπίστηκε ARP spoofing','Κάποιος στο δίκτυό σου μπορεί να βλέπει την κίνησή σου. Απόφυγε τράπεζες/κωδικούς, άνοιξε VPN, και βρες τη συσκευή από τη MAC της στην καρτέλα Συσκευές.']);
+  if(types.has('Rogue DHCP server'))live.push(['Ψεύτικος DHCP','Έλεγξε αν έχεις δεύτερο router ή mesh. Αν όχι, αποσύνδεσε τη συσκευή αμέσως.']);
+  if(types.has('Brute force'))live.push(['Δοκιμή κωδικών','Κλείσε την υπηρεσία που δέχεται επίθεση (SSH/RDP/VNC) ή άλλαξε σε ισχυρό κωδικό.']);
+  if(types.has('Port scan')||types.has('Stealth scan'))live.push(['Σε σκανάρουν','Ενεργοποίησε Firewall + Stealth mode στο Mac και κλείσε κάθε Κοινή χρήση που δεν χρειάζεσαι.']);
+  if(types.has('Εισερχόμενη σύνδεση'))live.push(['Φαίνεσαι από το Internet','Έλεγξε για port forwarding/UPnP στο router και απενεργοποίησέ τα.']);
+  if(types.has('Network sweep'))live.push(['Κάποιος χαρτογραφεί το δίκτυο','Αν δεν είναι δική σου εφαρμογή (π.χ. Fing), άλλαξε κωδικό Wi‑Fi.']);
+  if(types.has('Beaconing'))live.push(['Πιθανό malware που «τηλεφωνεί σπίτι»','Μια συσκευή συνδέεται σε σταθερά διαστήματα σε έναν server. Δες ποια είναι (Λεπτομέρειες → Θύματα), έλεγξε την IP στο AbuseIPDB/VirusTotal και σάρωσε τη συσκευή για malware.']);
+  if(types.has('DNS tunneling'))live.push(['Δεδομένα φεύγουν μέσα από DNS','Αποσύνδεσε τη συσκευή από το δίκτυο και έλεγξέ τη. Το DNS tunneling χρησιμοποιείται για κλοπή δεδομένων και για παράκαμψη firewall.']);
+  if(types.has('DGA domains'))live.push(['Συσκευή ψάχνει «τυχαία» domains','Κλασικό σύμπτωμα botnet (π.χ. σε κάμερες/smart TV). Κάνε επαναφορά εργοστασιακών ρυθμίσεων και ενημέρωση firmware.']);
+  if(types.has('Σύνδεση σε κακόβουλη IP'))live.push(['Επικοινωνία με γνωστή κακόβουλη IP','Η IP είναι σε δημόσια blocklist. Βρες ποιο πρόγραμμα το κάνει: «lsof -i | grep IP» στο Terminal.']);
+  if(types.has('Νέα συσκευή'))live.push(['Μπήκε νέα συσκευή στο Wi‑Fi','Αν δεν την ξέρεις, άλλαξε κωδικό Wi‑Fi. Αν την ξέρεις, βάλε τη MAC της στο allowlist του config.yaml.']);
+  const http=[...S.hosts.values()].filter(h=>h.kind==='public'&&h.protos&&h.protos.HTTP);
+  if(http.length)live.push(['Ακρυπτογράφητη κίνηση HTTP',`${http.length} server(s) χρησιμοποιούν απλό HTTP (π.χ. ${esc(hname(http[0])||http[0].ip)}). Μην βάζεις ποτέ κωδικούς σε σελίδα χωρίς 🔒.`]);
+  const unknown=[...S.hosts.values()].filter(h=>h.kind==='local'&&!h.me&&!h.gw&&!hname(h)&&now-h.first<600);
+  if(unknown.length)live.push(['Νέες συσκευές χωρίς όνομα',`${unknown.length} συσκευή(ές) εμφανίστηκαν πρόσφατα στο LAN. Τις αναγνωρίζεις;`]);
+  $('t-tips').innerHTML=`<h3 style="margin-top:0">Με βάση όσα βλέπω τώρα</h3>`+(live.length?live.map(([t,d])=>`<div class="card" style="border-left:3px solid var(--orange)"><b style="color:#fff">${t}</b><br>${d}</div>`).join(''):'<div class="card" style="border-left:3px solid var(--green)">👍 Τίποτα ανησυχητικό αυτή τη στιγμή.</div>')+
+   `<h3>Γενικές συμβουλές ασφάλειας</h3>`+TIPS.map((t,i)=>`<div class="card">💡 ${esc(t)}</div>`).join('')+
+   `<h3>Χρήσιμες εντολές Terminal</h3><div class="card"><code>lsof -i -P | grep ESTABLISHED</code><br><span class="sm">ποιο πρόγραμμα έχει ποια σύνδεση</span></div>
+    <div class="card"><code>arp -a</code><br><span class="sm">οι συσκευές του LAN και οι MAC τους — αν δύο IP έχουν την ίδια MAC με τον router, κάτι τρέχει</span></div>
+    <div class="card"><code>netstat -rn | grep default</code><br><span class="sm">ποιος είναι ο router σου</span></div>
+    <div class="card"><code>scutil --dns | grep nameserver</code><br><span class="sm">ποιον DNS χρησιμοποιείς</span></div>`}
+
+// ================= DATA =================
+function upsert(list){for(const h of list){const o=S.hosts.get(h.ip);if(o)h._flash=o._flash;S.hosts.set(h.ip,h)}}
+function toastInfo(msg){const t=document.createElement('div');t.className='toast';t.style.borderColor='#3ec5ff';t.style.background='#0b1424f2';t.textContent=msg;$('toasts').prepend(t);setTimeout(()=>t.remove(),3500)}
+function addAlert(a,quiet){S.alerts.unshift(a);if(quiet)return;
+  if(tab!=='alerts'){S.unread++;$('ac').textContent=S.unread;$('ac').style.display=''}
+  if(a.sev!=='low'){const g=S.hosts.get(a.actor)?.geo,e=eduFor(a.type);const t=document.createElement('div');t.className='toast';
+    t.innerHTML=`<b style="color:#ff8da0">⚠ ${esc(a.type)}</b> — ${flag(g?.countryCode)} ${esc(a.actor)} → ${esc(a.target)}<div style="color:#cfe0f5;margin-top:3px">${esc(a.detail)}</div>${e?`<div class="sm" style="margin-top:3px">${esc(e.what)}</div>`:''}`;
+    t.onclick=()=>{select(a.actor);t.remove()};$('toasts').prepend(t);setTimeout(()=>t.remove(),8000);
+    while($('toasts').children.length>3)$('toasts').lastChild.remove();
+    $('flash').style.boxShadow='inset 0 0 80px 10px #ff3b5c88';setTimeout(()=>$('flash').style.boxShadow='inset 0 0 0 0 #ff3b5c',600)}
+  $('na').textContent=S.alerts.length;updStatus()}
+function updStatus(){const now=Date.now()/1000,rec=S.alerts.filter(a=>now-a.t<300),el=$('status');
+  if(rec.some(a=>a.sev==='high')){el.className='st-bad';el.textContent='⚠ ΕΝΕΡΓΗ ΑΠΕΙΛΗ'}
+  else if(rec.length){el.className='st-warn';el.textContent='! Ύποπτη δραστηριότητα'}
+  else{el.className='st-ok';el.textContent='✓ Όλα καλά'}}
+function setStats(s){S.stats=s;$('pps').textContent=s.pps;$('bps').textContent=fmtB(s.bps)+'/s';$('nh').textContent=s.hosts;
+  S.hist.push({pps:s.pps,bps:s.bps});if(S.hist.length>300)S.hist.shift();
+  S.spark.push(s.pps);if(S.spark.length>53)S.spark.shift();const sp=$('spark'),c=sp.getContext('2d'),mx=Math.max(10,...S.spark);
+  c.clearRect(0,0,160,34);c.beginPath();S.spark.forEach((v,i)=>c[i?'lineTo':'moveTo'](i*3,32-v/mx*30));c.strokeStyle='#3ec5ff';c.lineWidth=1.5;c.stroke();
+  c.lineTo((S.spark.length-1)*3,34);c.lineTo(0,34);c.fillStyle='#3ec5ff22';c.fill();updStatus()}
+function handle(m){
+  if(m.type==='snapshot'){S.hosts.clear();upsert(m.hosts);S.me=new Set(m.me);S.gw=m.gw;S.home=m.home;S.mode=m.mode;S.alerts=[];
+    S.features=m.features;m.alerts.slice().reverse().forEach(a=>addAlert(a,true));$('na').textContent=S.alerts.length;
+    $('mode').textContent={demo:'DEMO',pcap:'▶ PCAP'}[m.mode]||'● LIVE';$('mode').className='badge '+(m.mode==='live'?'live':'demo');
+    $('iface').textContent=`${m.iface} · ${m.me.filter(i=>!i.includes(':'))[0]||m.me[0]||'?'}`;setStats(m.stats);renderTab();return}
+  if(m.type==='home'){S.home=m.home;return}
+  if(m.type==='features'){S.features=m.features;if(tab==='stats')renderStats();return}
+  if(m.type==='alert'){addAlert(m.alert);if(tab==='alerts')renderAlerts();return}
+  if(m.type==='pkts'){if(m.hosts)upsert(m.hosts);
+    const n=m.items.length;m.items.forEach((it,i)=>spawn(it,i*200/Math.max(1,n)));
+    if(!$('fpause').checked){for(const it of m.items)S.feed.unshift(it);if(S.feed.length>400)S.feed.length=400}
+    if(m.stats)setStats(m.stats)}
+}
+setInterval(()=>{if(tab==='feed'&&!$('fpause').checked)renderFeed()},700);
+setInterval(()=>{if(tab==='hist')loadHist()},10000);
+setInterval(()=>{if(tabHover())return;if(tab==='hosts')renderHosts();else if(tab==='det')renderDet();else if(tab==='devs')renderDevs();else if(tab==='stats')renderStats();else if(tab==='tips')renderTips()},2000);
+function connect(){const es=new EventSource('/events');es.onmessage=e=>handle(JSON.parse(e.data));es.onerror=()=>{es.close();setTimeout(connect,2000)}}
+connect();
+</script>
+</body>
+</html>

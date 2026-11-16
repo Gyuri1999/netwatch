@@ -1,0 +1,9 @@
+services:
+  netwatch:
+    build: .
+    network_mode: host          # see the host's real interfaces (Linux only)
+    cap_add: [NET_RAW, NET_ADMIN]
+    volumes:
+      - ./data:/app/data        # history DB + cached blocklists survive restarts
+      # - ./config.yaml:/app/config.yaml:ro   # optional: cp config.example.yaml config.yaml first
+    restart: unless-stopped

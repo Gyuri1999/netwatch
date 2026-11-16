@@ -1,0 +1,337 @@
+"""Tests για τη μηχανή ανίχνευσης του NetWatch (τρέχουν χωρίς root και χωρίς δίκτυο)."""
+import os
+import sys
+
+import pytest
+
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, ROOT)
+sys.path.insert(0, os.path.join(ROOT, "tools"))
+
+import netwatch as nw  # noqa: E402
+
+ME, GW = "192.168.1.50", "192.168.1.1"
+EVIL = "192.168.1.66"
+
+
+@pytest.fixture
+def state():
+    s = nw.NetState("test", "test0", [ME], GW, geo=False, rdns=False)
+    s.arp_table[GW] = s.arp_first[GW] = "a4:2b:b0:00:00:01"
+    return s
+
+
+class Clock:
+    def __init__(self):
+        self.t = 1_700_000_000.0
+
+    def __call__(self, dt=0.01):
+        self.t += dt
+        return self.t
+
+
+def feed(s, clock, **P):
+    P.setdefault("len", 60)
+    P["t"] = clock(P.pop("dt", 0.01))
+    s.process(P)
+
+
+def types(s):
+    return {a["type"] for a in s.alerts}
+
+
+# ---------------- κανονική κίνηση: χωρίς ψευδείς συναγερμούς ----------------
+def test_normal_browsing_raises_no_alerts(state):
+    c = Clock()
+    for i in range(300):
+        sp = 50000 + i
+        dst = f"142.250.184.{i % 50 + 1}"
+        feed(state, c, src=ME, dst=GW, proto="UDP", sp=sp, dp=53)
+        feed(state, c, src=GW, dst=ME, proto="UDP", sp=53, dp=sp)
+        feed(state, c, src=ME, dst=dst, proto="TCP", sp=sp, dp=443, flags="S")
+        feed(state, c, src=dst, dst=ME, proto="TCP", sp=443, dp=sp, flags="SA")
+        feed(state, c, src=dst, dst=ME, proto="UDP", sp=443, dp=sp, len=1300)  # QUIC
+    assert list(state.alerts) == []
+
+
+# ---------------- σαρώσεις ----------------
+def test_tcp_port_scan(state):
+    c = Clock()
+    for port in range(1, 25):
+        feed(state, c, src=EVIL, dst=ME, proto="TCP", sp=44444, dp=port, flags="S")
+    a = next(a for a in state.alerts if a["type"] == "Port scan")
+    assert a["actor"] == EVIL and a["sev"] == "high"
+    assert a["mitre"]["id"] == "T1046"
+
+
+def test_slow_scan_outside_window_is_ignored(state):
+    c = Clock()
+    for port in range(1, 25):
+        feed(state, c, src=EVIL, dst=ME, proto="TCP", sp=44444, dp=port, flags="S", dt=1.0)
+    assert "Port scan" not in types(state)
+
+
+@pytest.mark.parametrize("flags,name", [("FPU", "XMAS"), ("", "NULL"), ("F", "FIN")])
+def test_stealth_scans(state, flags, name):
+    feed(state, Clock(), src=EVIL, dst=ME, proto="TCP", sp=1, dp=80, flags=flags)
+    assert f"Stealth scan ({name})" in types(state)
+
+
+def test_arp_sweep_does_not_create_phantom_hosts(state):
+    c = Clock()
+    for n in range(2, 60):
+        feed(state, c, src=EVIL, dst=f"192.168.1.{n}", proto="ARP",
+             arp=dict(op=1, psrc=EVIL, pdst=f"192.168.1.{n}", hwsrc="de:ad:be:ef:00:66"))
+    assert "Network sweep (ARP)" in types(state)
+    assert "192.168.1.30" not in state.hosts
+
+
+# ---------------- επιθέσεις ----------------
+def test_ssh_brute_force(state):
+    c = Clock()
+    for i in range(16):
+        feed(state, c, src=EVIL, dst=ME, proto="TCP", sp=40000 + i, dp=22, flags="S", dt=0.5)
+    a = next(a for a in state.alerts if a["type"] == "Brute force")
+    assert a["mitre"]["tactic"] == "Credential Access"
+    assert dict((k, v) for k, v, _ in state.ser(state.hosts[EVIL])["hits"])[22] == 16
+
+
+def test_syn_flood(state):
+    c = Clock()
+    for i in range(310):
+        feed(state, c, src=EVIL, dst=ME, proto="TCP", sp=1024 + i, dp=443, flags="S", dt=0.005)
+    assert "SYN flood" in types(state)
+
+
+def test_arp_spoofing_attributed_to_attacker_and_restore_is_quiet(state):
+    c = Clock()
+    evil_mac = "de:ad:be:ef:00:66"
+    feed(state, c, src=EVIL, dst=GW, proto="ARP", arp=dict(op=2, psrc=EVIL, pdst=GW, hwsrc=evil_mac))
+    feed(state, c, src=GW, dst=ME, proto="ARP", arp=dict(op=2, psrc=GW, pdst=ME, hwsrc=evil_mac))
+    spoof = [a for a in state.alerts if a["type"].startswith("ARP spoofing")]
+    assert len(spoof) == 1 and spoof[0]["actor"] == EVIL and spoof[0]["target"] == GW
+    # ο πραγματικός router ξαναστέλνει τη σωστή MAC → όχι νέος συναγερμός, ο router δεν γίνεται «ύποπτος»
+    feed(state, c, src=GW, dst=ME, proto="ARP", arp=dict(op=2, psrc=GW, pdst=ME, hwsrc="a4:2b:b0:00:00:01"), dt=120)
+    assert len([a for a in state.alerts if a["type"].startswith("ARP spoofing")]) == 1
+    assert state.hosts[GW]["threat"] == 0
+
+
+def test_rogue_dhcp(state):
+    feed(state, Clock(), src=EVIL, dst="255.255.255.255", proto="UDP", sp=67, dp=68)
+    assert "Rogue DHCP server" in types(state)
+
+
+def test_legit_dhcp_from_router_is_quiet(state):
+    feed(state, Clock(), src=GW, dst="255.255.255.255", proto="UDP", sp=67, dp=68)
+    assert list(state.alerts) == []
+
+
+def test_unsolicited_dns_answer(state):
+    c = Clock()
+    feed(state, c, src=ME, dst=GW, proto="UDP", sp=5000, dp=53)
+    feed(state, c, src=EVIL, dst=ME, proto="UDP", sp=53, dp=5000)
+    assert "Ύποπτη απάντηση DNS" in types(state)
+
+
+def test_alert_cooldown(state):
+    c = Clock()
+    for _ in range(5):
+        feed(state, c, src=EVIL, dst=ME, proto="TCP", sp=1, dp=80, flags="FPU")
+    assert len(state.alerts) == 1
+
+
+# ---------------- MITRE ----------------
+@pytest.mark.parametrize("typ,tid", [
+    ("Port scan (UDP)", "T1046"), ("Network sweep (ping)", "T1018"), ("Brute force", "T1110.001"),
+    ("ARP spoofing (ROUTER)", "T1557.002"), ("Rogue DHCP server", "T1557.003"), ("SYN flood", "T1498.001"),
+])
+def test_mitre_mapping(typ, tid):
+    m = nw.mitre_for(typ)
+    assert m["id"] == tid
+    assert m["url"].startswith("https://attack.mitre.org/techniques/T")
+
+
+# ---------------- parsers ----------------
+def test_parse_sni():
+    from make_sample_pcap import client_hello
+    assert nw.parse_sni(client_hello("github.com")) == "github.com"
+    assert nw.parse_sni(b"\x16\x03\x01garbage") is None
+    assert nw.parse_sni(b"") is None
+
+
+def test_scapy_parser_dns_and_flags():
+    from scapy.all import DNS, DNSQR, DNSRR, IP, TCP, UDP, Ether
+    parse = nw.make_parser()
+    pkt = Ether(bytes(Ether(dst="ff:ff:ff:ff:ff:ff") / IP(src="8.8.8.8", dst=ME) / UDP(sport=53, dport=5555) /
+                      DNS(qr=1, qd=DNSQR(qname="example.com"), an=DNSRR(rrname="example.com", rdata="93.184.216.34"))))
+    P = parse(pkt)
+    assert P["proto"] == "UDP" and ("example.com", "93.184.216.34") in P["dns"]
+    P = parse(Ether(dst="ff:ff:ff:ff:ff:ff") / IP(src=EVIL, dst=ME) / TCP(flags="FPU"))
+    assert P["flags"] == "FPU"
+
+
+def test_ip_kind():
+    assert nw.ip_kind("8.8.8.8") == "public"
+    assert nw.ip_kind("192.168.1.5") == "local"
+    assert nw.ip_kind("224.0.0.251") == "bcast"
+    assert nw.ip_kind("not-an-ip") == "other"
+
+
+# ---------------- end-to-end με pcap ----------------
+def test_pcap_replay_end_to_end(tmp_path):
+    from make_sample_pcap import build
+    path = str(tmp_path / "attack.pcap")
+    build(path)
+    me, gw = nw.pcap_guess(path)
+    assert (me, gw) == (ME, GW)
+    s = nw.NetState("pcap", "attack.pcap", [me], gw, geo=False, rdns=False)
+    nw.pcap_replay(s, path, speed=0)
+    expected = {"Network sweep (ARP)", "Port scan", "Stealth scan (XMAS)", "Brute force",
+                "ARP spoofing (ROUTER)", "Rogue DHCP server", "Ύποπτη απάντηση DNS", "SYN flood",
+                "DNS tunneling", "DGA domains", "Νέα συσκευή"}
+    assert expected <= types(s)
+    assert {a["actor"] for a in s.alerts if a["type"] != "Νέα συσκευή"} == {EVIL}
+    assert next(a for a in s.alerts if a["type"] == "Νέα συσκευή")["actor"] == "192.168.1.88"
+    assert s.hosts[ME]["ja3"], "JA3 should be extracted from the ClientHello"
+    assert "github.com" in s.hosts["140.82.121.4"]["names"]  # από DNS + TLS SNI
+
+
+# ---------------- beaconing (C2) ----------------
+def test_beaconing_detected(state):
+    c = Clock()
+    c2 = "185.100.87.1"
+    for i in range(10):
+        feed(state, c, src=ME, dst=c2, proto="TCP", sp=50000 + i, dp=8443, flags="S", dt=60 + (i % 3) * 0.5)
+    a = next(a for a in state.alerts if a["type"].startswith("Beaconing"))
+    assert a["actor"] == c2 and a["target"] == ME and a["mitre"]["id"] == "T1071"
+
+
+def test_irregular_browsing_is_not_beaconing(state):
+    import random
+    rnd = random.Random(1)
+    c = Clock()
+    for i in range(30):
+        feed(state, c, src=ME, dst="142.250.184.110", proto="TCP", sp=50000 + i, dp=443, flags="S",
+             dt=rnd.uniform(2, 120))
+    assert not any(a["type"].startswith("Beaconing") for a in state.alerts)
+
+
+# ---------------- DNS tunneling / DGA ----------------
+def test_dns_tunneling(state):
+    c = Clock()
+    for i in range(32):
+        sub = f"{i:02x}" + "a9f3c1e7b2d4806f5e1c3a7b9d2f4e6a"[i % 7:] + "0b1c2d3e"
+        feed(state, c, src=ME, dst=GW, proto="UDP", sp=40000 + i, dp=53, dns_q=(f"{sub}.t.evil.example", 16))
+    a = next(a for a in state.alerts if a["type"] == "DNS tunneling")
+    assert a["target"] == "evil.example" and a["mitre"]["id"] == "T1071.004"
+
+
+def test_normal_dns_is_not_tunneling(state):
+    c = Clock()
+    for i in range(60):
+        feed(state, c, src=ME, dst=GW, proto="UDP", sp=40000 + i, dp=53,
+             dns_q=(["www.google.com", "i.ytimg.com", "graph.facebook.com", "api.github.com"][i % 4], 1))
+    assert "DNS tunneling" not in types(state)
+
+
+def test_dga_nxdomain_burst(state):
+    c = Clock()
+    for name in ["xk3j9qz7lpwe", "qz8mt2vkx9rp", "b7x2kq9zmtw4", "pl0zq8xv3nkr", "w9tqz2xk7mbv",
+                 "z4kx8qv2mtpr", "k2zq9xv7nwt3", "v8xq2zk9mtb5", "r7q2xz9kvmt8"]:
+        feed(state, c, src=GW, dst=ME, proto="UDP", sp=53, dp=40000, nx=name + ".com")
+    a = next(a for a in state.alerts if a["type"] == "DGA domains")
+    assert a["actor"] == ME and a["mitre"]["id"] == "T1568.002"
+
+
+def test_typos_are_not_dga(state):
+    c = Clock()
+    for name in ["gooogle", "facebok", "wikipeida", "amazom", "micorsoft", "youtub", "netflx", "githbu", "redit"]:
+        feed(state, c, src=GW, dst=ME, proto="UDP", sp=53, dp=40000, nx=name + ".com")
+    assert "DGA domains" not in types(state)
+
+
+@pytest.mark.parametrize("label,is_dga", [("xk3j9qz7lpwe", True), ("google", False), ("microsoftonline", False),
+                                          ("nflxvideo", False), ("qz8mt2vkx9rp", True)])
+def test_dga_score(label, is_dga):
+    assert (nw.dga_score(label) >= 0.6) == is_dga
+
+
+def test_split_domain():
+    assert nw.split_domain("a.b.example.com") == ("example.com", "a.b")
+    assert nw.split_domain("www.bbc.co.uk") == ("bbc.co.uk", "www")
+
+
+# ---------------- new devices ----------------
+def test_new_device_after_warmup(state):
+    c = Clock()
+    feed(state, c, src="192.168.1.20", dst="224.0.0.251", proto="UDP", sp=5353, dp=5353, smac="f0:de:f1:00:00:20")
+    feed(state, c, src="192.168.1.88", dst="224.0.0.251", proto="UDP", sp=5353, dp=5353, smac="6a:3e:51:00:00:88",
+         dt=120)
+    new = [a for a in state.alerts if a["type"] == "Νέα συσκευή"]
+    assert [a["actor"] for a in new] == ["192.168.1.88"]  # η πρώτη ήταν στο warm-up
+    assert "τυχαία MAC" in new[0]["detail"]
+
+
+def test_known_device_from_history_is_quiet(tmp_path):
+    db = str(tmp_path / "h.db")
+    h = nw.History(db)
+    h.device_seen("6a:3e:51:00:00:88", "192.168.1.88", 1.0)
+    s = nw.NetState("test", "t", [ME], GW, geo=False, rdns=False, history=nw.History(db))
+    feed(s, Clock(), src="192.168.1.88", dst="224.0.0.251", proto="UDP", sp=5353, dp=5353, smac="6a:3e:51:00:00:88")
+    feed(s, Clock(), src="192.168.1.99", dst="224.0.0.251", proto="UDP", sp=5353, dp=5353, smac="00:11:22:33:44:99")
+    assert [a["actor"] for a in s.alerts if a["type"] == "Νέα συσκευή"] == ["192.168.1.99"]
+
+
+# ---------------- threat intel ----------------
+def test_intel_parsing_and_lookup():
+    nets = {}
+    text = "# comment\n1.2.3.0/24\n5.6.7.8\n10.0.0.0/8\n" + '{"cidr":"9.9.0.0/16","sblid":"x"}\n{"type":"metadata"}\n'
+    assert nw.Intel.parse(text, {"name": "t", "kind": "block"}, nets) == 3  # 10/8 (bogon) αγνοείται
+    i = nw.Intel()
+    i.nets = nets
+    assert i.lookup("1.2.3.200")[0]["name"] == "t"
+    assert i.lookup("5.6.7.8") and i.lookup("9.9.255.1")
+    assert not i.lookup("5.6.7.9") and not i.lookup("10.1.1.1")
+
+
+def test_contact_with_c2_from_intel(state):
+    state.intel.add("185.100.87.0/24", "Feodo Tracker", "c2")
+    feed(state, Clock(), src=ME, dst="185.100.87.5", proto="TCP", sp=50000, dp=443, flags="S")
+    a = next(a for a in state.alerts if a["type"] == "Σύνδεση σε κακόβουλη IP")
+    assert a["sev"] == "high" and a["actor"] == "185.100.87.5"
+    assert state.ser(state.hosts["185.100.87.5"])["intel"][0]["kind"] == "c2"
+
+
+# ---------------- config / allowlist ----------------
+def test_config_overrides_and_allowlist(tmp_path):
+    p = tmp_path / "c.yaml"
+    p.write_text("thresholds:\n  port_scan: {count: 5}\nallowlist:\n  ips: ['192.168.1.30']\n"
+                 "detectors:\n  stealth_scan: false\n")
+    cfg = nw.load_config(str(p))
+    assert cfg["thresholds"]["port_scan"] == {"count": 5, "window": 10}  # deep merge κρατά το window
+    s = nw.NetState("test", "t", [ME], GW, geo=False, rdns=False, cfg=cfg)
+    c = Clock()
+    for port in range(1, 7):
+        feed(s, c, src=EVIL, dst=ME, proto="TCP", sp=1, dp=port, flags="S")
+        feed(s, c, src="192.168.1.30", dst=ME, proto="TCP", sp=1, dp=port, flags="S")
+    feed(s, c, src=EVIL, dst=ME, proto="TCP", sp=1, dp=80, flags="FPU")
+    assert {a["actor"] for a in s.alerts if a["type"] == "Port scan"} == {EVIL}
+    assert not any(a["type"].startswith("Stealth") for a in s.alerts)
+
+
+# ---------------- JA3 / history ----------------
+def test_ja3_fingerprint_is_stable_and_ignores_sni():
+    from make_sample_pcap import client_hello
+    a, b = nw.parse_client_hello(client_hello("github.com")), nw.parse_client_hello(client_hello("example.org"))
+    assert a["sni"] == "github.com" and len(a["ja3"]) == 32
+    assert a["ja3"] == b["ja3"]  # ίδιο πρόγραμμα → ίδιο JA3, άσχετα με το site
+    assert a["ja3_str"].startswith("771,4865,")
+
+
+def test_history_persists_alerts(tmp_path, state):
+    db = str(tmp_path / "h.db")
+    s = nw.NetState("test", "t", [ME], GW, geo=False, rdns=False, history=nw.History(db))
+    feed(s, Clock(), src=EVIL, dst=ME, proto="TCP", sp=1, dp=80, flags="FPU")
+    q = nw.History(db).query(hours=24, ref=1_700_000_100)
+    assert q["total_alerts"] == 1 and q["alerts"][0]["mitre"] == "T1046"
+    assert q["by_hour"] and q["by_hour"][0][1] == "high"

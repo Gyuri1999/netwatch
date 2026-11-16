@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+*.pcap
+*.pcapng
+!samples/*.pcap
+netwatch-incident-*.json
+.DS_Store
+data/
+config.yaml

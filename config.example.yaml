@@ -1,0 +1,60 @@
+# NetWatch configuration — copy to config.yaml and edit.
+#   cp config.example.yaml config.yaml
+# Anything you leave out falls back to the built-in defaults.
+
+thresholds:
+  alert_cooldown: 60            # seconds before the same alert (type, actor) can fire again
+  port_scan:   {count: 20, window: 10}     # distinct (target, port) probes in N seconds
+  brute_force: {count: 15, window: 30}     # connections to SSH/RDP/SMB/… in N seconds
+  syn_flood:   {count: 300, window: 5}
+  icmp_flood:  {count: 100, window: 5}
+  ping_sweep:  {count: 30, window: 10}
+  arp_sweep:   {count: 40, window: 10}
+  arp_flood:   {count: 60, window: 5}
+  beaconing:   {min_events: 8, max_jitter: 0.15, min_interval: 10, max_interval: 3600}
+  dns_tunnel:  {unique_subdomains: 30, window: 60, min_length: 20, min_entropy: 3.5}
+  dga:         {nxdomain: 8, window: 60, min_score: 0.6}
+  new_device:  {warmup: 60}     # seconds after the first run starts before new MACs alert
+
+# Turn individual detectors on/off
+detectors:
+  port_scan: true
+  stealth_scan: true
+  network_sweep: true          # set false if you use Fing / network scanner apps
+  brute_force: true
+  syn_flood: true
+  icmp_flood: true
+  arp_spoofing: true
+  arp_flood: true
+  rogue_dhcp: true             # set false if you have a second DHCP server (mesh in router mode)
+  dns_spoofing: true
+  inbound: true
+  suspicious_port: true
+  beaconing: true
+  dns_tunnel: true
+  dga: true
+  new_device: true
+  threat_intel: true
+
+# Never alert on these
+allowlist:
+  ips: []          # e.g. ["192.168.1.30"]  (your NAS that scans the network)
+  macs: []         # e.g. ["aa:bb:cc:dd:ee:ff"]
+  domains: []      # e.g. ["apple.com", "googleapis.com"] — also matches subdomains
+
+intel:
+  enabled: true
+  max_age_hours: 24             # re-download blocklists once a day (cached in data/intel/)
+  abuseipdb_key: ""             # optional: free key from https://www.abuseipdb.com/account/api
+  # feeds: [...]                # override the default list (Feodo Tracker, Spamhaus DROP, FireHOL level1)
+
+notify:                         # live mode (or --notify)
+  min_severity: high            # low | med | high
+  cooldown: 30                  # seconds between notifications of the same type
+  macos: true                   # Notification Center
+  telegram:
+    bot_token: ""               # from @BotFather
+    chat_id: ""                 # your chat id
+
+history:
+  path: data/netwatch.db        # SQLite — alerts, traffic per minute, known devices
