@@ -136,3 +136,41 @@ def test_capturing_on_the_tunnel_itself_is_not_a_leak():
     for i in range(5):
         s.process(_pkt("192.168.1.50", "100.100.100.100", t=100 + i))
     assert not [a for a in s.alerts if a["type"].startswith("Διαρροή")]
+
+
+def test_own_tor_relay_connection_is_marked_expected(monkeypatch):
+    monkeypatch.setattr(nw, "local_tor_running", lambda: True)
+    s = nw.NetState("live", "en0", ["192.168.1.50"], "192.168.1.1", geo=False, rdns=False)
+    s.process({"t": 1.0, "len": 60, "src": "192.168.1.50", "dst": "195.154.170.135", "proto": "TCP",
+               "sp": 50000, "dp": 9001, "flags": "S"})
+    a = next(a for a in s.alerts if a["type"] == "Ύποπτη εξερχόμενη θύρα")
+    assert "δικό σου Tor" in a["benign"]
+    assert s.hosts["195.154.170.135"]["threat"] == 0 and s.status()["alerts"] == 0
+    monkeypatch.setattr(nw, "local_tor_running", lambda: False)
+    s.process({"t": 2.0, "len": 60, "src": "192.168.1.50", "dst": "5.6.7.8", "proto": "TCP",
+               "sp": 50001, "dp": 9001, "flags": "S"})
+    other = next(a for a in s.alerts if a["actor"] == "5.6.7.8")
+    assert not other.get("benign") and s.status()["alerts"] == 1
+
+
+TRACE = """traceroute to 140.82.121.4 (140.82.121.4), 20 hops max, 40 byte packets
+ 1  192.168.1.1  5.301 ms
+ 2  10.106.108.100  8.017 ms
+ 3  79.128.234.168  14.697 ms
+ 4  *
+ 5  80.81.196.79  50.714 ms
+"""
+
+
+def test_parse_traceroute_and_input_validation():
+    hops = nw.parse_traceroute(TRACE)
+    assert [h["n"] for h in hops] == [1, 2, 3, 4, 5]
+    assert hops[0] == {"n": 1, "ip": "192.168.1.1", "ms": 5.301} and hops[3]["ip"] is None
+    s = nw.NetState("live", "en0", ["192.168.1.50"], "192.168.1.1", geo=False, rdns=False)
+    import pytest
+    for bad in ("192.168.1.1", "1.1.1.1; rm -rf /", "example.com", ""):
+        with pytest.raises(ValueError):
+            nw.traceroute(s, bad)
+    demo = nw.NetState("demo", "demo0", ["192.168.1.23"], "192.168.1.1", geo=False, rdns=False)
+    r = nw.traceroute(demo, "45.57.90.1")
+    assert r["demo"] and r["hops"][-1]["ip"] == "45.57.90.1"

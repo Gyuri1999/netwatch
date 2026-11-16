@@ -46,7 +46,20 @@ SERVICES = {
 BRUTE_PORTS = {21, 22, 23, 25, 110, 143, 445, 1433, 3306, 3389, 5432, 5900}
 SUSPECT_PORTS = {1337: "backdoor", 4444: "Metasploit", 5555: "ADB/backdoor",
                  6666: "IRC/botnet", 6667: "IRC/botnet", 31337: "Back Orifice",
-                 9001: "Tor relay"}
+                 9001: "Tor relay", 9030: "Tor directory"}
+TOR_PORTS = {9001, 9030}
+
+
+_tor_cache = [0.0, False]
+
+
+def local_tor_running():
+    """Τρέχει Tor στο Mac (tor daemon 9050 / Tor Browser 9150); — έλεγχος το πολύ κάθε 30″."""
+    now = time.time()
+    if now - _tor_cache[0] > 30:
+        import privacy
+        _tor_cache[:] = [now, privacy.tor_port() is not None]
+    return _tor_cache[1]
 SEV = {"low": 1, "med": 2, "high": 3}
 # Υπηρεσίες που αν «ακούν» σε συσκευή του LAN αυξάνουν την επιφάνεια επίθεσης: (κίνδυνος, γιατί)
 RISKY_SERVICES = {
@@ -700,7 +713,7 @@ class NetState:
     def _allowed_name(self, name):
         return bool(self.allow_domains) and name.lower().endswith(self.allow_domains)
 
-    def alert(self, typ, sev, actor, target, detail, t, key=None, cooldown=None, mark=True, mitre=None):
+    def alert(self, typ, sev, actor, target, detail, t, key=None, cooldown=None, mark=True, mitre=None, benign=None):
         det = detector_for(typ)
         if det and not self.cfg["detectors"].get(det, True):
             return
@@ -715,6 +728,8 @@ class NetState:
         lab = actor in self.lab_ips
         a = dict(id=self.alert_seq, t=t, type=typ, sev=sev, actor=actor,
                  target=target, detail=detail, mitre=mitre or mitre_for(typ), lab=lab)
+        if benign:  # γνωστή αθώα εξήγηση (π.χ. το δικό σου Tor): φαίνεται, αλλά δεν «χρωματίζει» τίποτα
+            a["benign"], mark = benign, False
         self.alerts.appendleft(a)
         h = self.host(actor, t)
         if h:
@@ -730,7 +745,7 @@ class NetState:
             self.history.add_alert(a, self.mode)
         except Exception as e:
             log("history error:", e)
-        if self.notifier:
+        if self.notifier and not benign:
             self.notifier(a)
         log(f"⚠  [{sev.upper()}] {typ} [{(a['mitre'] or {}).get('id', '-')}]: {actor} → {target} — {detail}")
 
@@ -947,8 +962,13 @@ class NetState:
                            "Απάντηση DNS από διακομιστή που δεν ρωτήθηκε — πιθανό DNS spoofing", t)
 
         if from_me and proto in ("TCP", "UDP") and dp in SUSPECT_PORTS and ("S" in fl or proto == "UDP"):
+            benign = None
+            if dp in TOR_PORTS and self.mode == "live" and local_tor_running():
+                benign = ("Είναι το δικό σου Tor: τρέχει στο Mac σου και συνδέεται σε κόμβους (relays) του δικτύου "
+                          "Tor σε αυτή τη θύρα. Αναμενόμενο — δεν χρειάζεται να κάνεις τίποτα.")
             self.alert("Ύποπτη εξερχόμενη θύρα", "low", dst, src,
-                       f"Σύνδεση προς θύρα {dp} ({SUSPECT_PORTS[dp]})", t)
+                       f"Ο υπολογιστής σου συνδέθηκε στη θύρα {dp} ({SUSPECT_PORTS[dp]}) αυτής της IP", t,
+                       key=f"{dst}:{dp}" if benign else None, cooldown=3600 if benign else None, benign=benign)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
     KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "vpn_iface", "geo_q", "rdns_pool", "demo_geo", "home",
@@ -1392,7 +1412,7 @@ class NetState:
     def status(self):
         """Μικρή περίληψη για την εφαρμογή του Mac (εικονίδιο στη γραμμή μενού)."""
         with self.lock:
-            al = [a for a in self.alerts if not a.get("lab")]
+            al = [a for a in self.alerts if not a.get("lab") and not a.get("benign")]
             by = collections.Counter(a["sev"] for a in al)
             last = al[0] if al else None
             out = {"mode": self.mode, "feed": self.feed, "iface": self.iface, "alerts": len(al),
@@ -1499,6 +1519,65 @@ def fetch_home(state):
             log(f"Δημόσια IP {g['query']} — {g.get('city')}, {g.get('country')} ({g.get('isp')})")
     except Exception as e:
         log("home lookup error:", e)
+
+
+TRACE_RE = re.compile(r"^\s*(\d+)\s+(\S+)(?:\s+([\d.]+) ms)?")
+
+
+def parse_traceroute(text):
+    hops = []
+    for line in text.splitlines():
+        m = TRACE_RE.match(line)
+        if m:
+            hops.append({"n": int(m.group(1)), "ip": None if m.group(2) == "*" else m.group(2),
+                         "ms": float(m.group(3)) if m.group(3) else None})
+    return hops
+
+
+def geo_batch(ips):
+    ips = [i for i in dict.fromkeys(ips) if i and ip_kind(i) == "public"][:100]
+    if not ips:
+        return {}
+    req = urllib.request.Request(f"http://ip-api.com/batch?fields={GEO_FIELDS}", data=json.dumps(ips).encode(),
+                                 headers={"Content-Type": "application/json"})
+    with urllib.request.urlopen(req, timeout=10) as r:
+        return {g["query"]: g for g in json.load(r) if g.get("status") == "success"}
+
+
+def traceroute(state, ip, max_hops=20):
+    """Από ποιους routers περνά η κίνηση μέχρι τον server (traceroute, χωρίς root)."""
+    a = ipaddress.ip_address(ip)  # ValueError αν δεν είναι IP — τίποτα δεν περνά σε shell
+    if not a.is_global:
+        raise ValueError("Μόνο για διευθύνσεις του Internet")
+    if state.mode == "demo":
+        return demo_trace(state, ip)
+    exe = "traceroute6" if a.version == 6 else "traceroute"
+    out = subprocess.run([exe, "-n", "-q", "1", "-w", "1", "-m", str(max_hops), ip],
+                         capture_output=True, text=True, timeout=60).stdout
+    hops = parse_traceroute(out)
+    reached = bool(hops) and hops[-1]["ip"] == ip
+    while hops and hops[-1]["ip"] is None:  # οι τελευταίοι «σιωπηλοί» routers δεν λένε τίποτα
+        hops.pop()
+    if state.geo_enabled:
+        try:
+            geo = geo_batch([h["ip"] for h in hops])
+            for h in hops:
+                h["geo"] = geo.get(h["ip"])
+        except Exception as e:
+            log("trace geo error:", e)
+    return {"ip": ip, "hops": hops, "reached": reached}
+
+
+def demo_trace(state, ip):
+    g = (state.hosts.get(ip) or {}).get("geo") or {"country": "Germany", "countryCode": "DE", "city": "Frankfurt"}
+    gr = {"country": "Greece", "countryCode": "GR", "city": "Athens", "isp": "Demo ISP", "as": "AS64500 Demo ISP"}
+    ix = {"country": "Germany", "countryCode": "DE", "city": "Frankfurt am Main", "isp": "DE-CIX",
+          "as": "AS6695 DE-CIX Frankfurt"}
+    hops = [{"n": 1, "ip": "192.168.1.1", "ms": 2.1}, {"n": 2, "ip": "10.106.108.100", "ms": 9.8},
+            {"n": 3, "ip": "79.128.234.168", "ms": 11.4, "geo": gr}, {"n": 4, "ip": "79.128.224.186", "ms": 12.9, "geo": gr},
+            {"n": 5, "ip": None, "ms": None}, {"n": 6, "ip": "80.81.192.1", "ms": 38.2, "geo": ix},
+            {"n": 7, "ip": ip, "ms": 41.7, "geo": g}]
+    return {"ip": ip, "hops": hops, "reached": True, "demo": True}
 
 
 def whois(ip):
@@ -2230,6 +2309,8 @@ def make_handler(state):
                     else:
                         state.wifi.start("manual")
                     return self._json(state.wifi.status())
+                if u.path == "/api/trace":
+                    return self._json(traceroute(state, str(body.get("ip") or "")))
                 if u.path == "/api/privacy":
                     state.privacy.start(on_done=lambda r: state.publish({"type": "privacy", "result": r}))
                     return self._json(state.privacy.status())
