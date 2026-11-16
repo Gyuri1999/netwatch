@@ -18,9 +18,11 @@
 |---|---|
 | 🗺 **Live world map** | Packets fly between your home and each server, coloured by protocol (HTTPS, QUIC, DNS, ICMP, ARP…). Zoom and pan go down to city level, with country labels. |
 | 🏠 **LAN view** | Shows you, the router and every device on the local network. MITM attacks and sweeps show up here. |
-| 🚨 **17 detectors** | Port/UDP scans, NULL/FIN/XMAS stealth scans, brute force, SYN/ICMP flood, ping and ARP sweeps, ARP spoofing, ARP flood, rogue DHCP, DNS spoofing, inbound probes, C2-style ports, **C2 beaconing**, **DNS tunneling**, **DGA domains**, **new devices**, **threat-intel matches**. |
+| 🚨 **18 detectors** | Port/UDP scans, NULL/FIN/XMAS stealth scans, brute force, SYN/ICMP flood, ping and ARP sweeps, ARP spoofing, ARP flood, rogue DHCP, DNS spoofing, inbound probes, C2-style ports, **C2 beaconing**, **DNS tunneling**, **DGA domains**, **new devices**, **threat-intel matches**, **passwords sent in cleartext**. |
 | ⛔ **Threat intelligence** | Downloads Feodo Tracker (botnet C2), Spamhaus DROP and FireHOL level1 once a day, giving about 4,500 CIDRs with prefix-bucketed O(1) lookups. One click checks an IP's AbuseIPDB score (with your own API key). |
 | 🔏 **JA3 fingerprints** | Fingerprints the client application of every TLS ClientHello (with GREASE removed), even though the traffic is encrypted. |
+| 🛡 **Security audit** | A passive home-network check graded A–F. It lists cleartext logins (FTP, Telnet, POP3, IMAP, SMTP, HTTP Basic and form posts), risky services listening on the LAN (Telnet, RDP, VNC, SMB, UPnP, open databases…), recent attacks, unknown devices and unencrypted HTTP/DNS, each with a fix. Usernames are masked and **passwords are never stored or shown**. |
+| 🎓 **Learning mode** | Click any packet to see it split into OSI layers (L1–L7), each with a plain-language explanation. A quiz tab asks about attacks, ports, TCP flags, MITRE tactics and defence steps, and also builds questions from **the alerts your own network just raised**. |
 | 🕓 **History** | SQLite stores alerts, traffic per minute and every device ever seen. A history tab shows alerts per hour, a searchable alert archive and a device inventory. |
 | 🔔 **Notifications** | macOS Notification Center (also under `sudo`) and Telegram bot, with a severity floor and cooldown. |
 | ⚙ **YAML config** | Every threshold, per-detector on/off switches, and an allowlist of IPs, MACs and domains. |
@@ -79,7 +81,7 @@ flowchart LR
   P[Parser<br/>Ether/ARP/IP/TCP/UDP/ICMP<br/>DNS q/a/NXDOMAIN · TLS SNI+JA3 · HTTP Host] --> N
   CFG[config.yaml<br/>thresholds · allowlist] -.-> D
   N[NetState.process] --> H[(Host table<br/>bytes · ports · targets · MAC · JA3)]
-  N --> D{17 detectors<br/>sliding windows}
+  N --> D{18 detectors<br/>sliding windows}
   TI[Threat intel<br/>Feodo · Spamhaus · FireHOL] -.-> H
   D -->|alert + MITRE| AL[(Alerts)]
   AL --> DB[(SQLite history)]
@@ -115,6 +117,7 @@ flowchart LR
 | DGA domains | ≥ 8 NXDOMAINs for machine-generated names in 60 s | [T1568.002](https://attack.mitre.org/techniques/T1568/002/) Domain Generation Algorithms |
 | New device | a MAC never seen before (remembered across runs in SQLite) | [T1200](https://attack.mitre.org/techniques/T1200/) Hardware Additions |
 | Threat-intel match | traffic to or from an IP on Feodo / Spamhaus / FireHOL | [T1071](https://attack.mitre.org/techniques/T1071/) C2 · [T1595](https://attack.mitre.org/techniques/T1595/) Active Scanning |
+| Cleartext credentials | FTP/POP3 `USER`+`PASS`, IMAP `LOGIN`, SMTP `AUTH`, HTTP `Authorization: Basic`, login forms over HTTP, Telnet sessions | [T1040](https://attack.mitre.org/techniques/T1040/) Network Sniffing |
 
 All thresholds can be changed in `config.yaml`.
 
@@ -125,9 +128,9 @@ pip install -r requirements.txt -r requirements-dev.txt
 python -m pytest -v
 ```
 
-There are 43 tests. They cover every detector, including **negative cases**: normal browsing/DNS/QUIC raises nothing, irregular browsing is not beaconing, popular domains are not tunneling, typo domains are not DGA, and known devices from history stay quiet. They also cover the threat-intel parser and lookup, config deep-merge and allowlist, JA3 stability, SQLite persistence, the scapy and TLS parsers, and an **end-to-end PCAP replay** of [`samples/lan-attack.pcap`](samples/lan-attack.pcap), which must raise all 12 expected alerts and attribute them to the right hosts. CI runs them on Python 3.9 and 3.12.
+There are 52 tests. They cover every detector, including **negative cases**: normal browsing/DNS/QUIC raises nothing, irregular browsing is not beaconing, popular domains are not tunneling, typo domains are not DGA, known devices from history stay quiet, and ordinary HTTP requests are not mistaken for logins. The credential tests also assert that **the password never appears** in any parser result or alert. They also cover the threat-intel parser and lookup, config deep-merge and allowlist, JA3 stability, SQLite persistence, the scapy and TLS parsers, and an **end-to-end PCAP replay** of [`samples/lan-attack.pcap`](samples/lan-attack.pcap), which must raise all 14 expected alerts and attribute them to the right hosts. CI runs them on Python 3.9 and 3.12.
 
-The sample capture is generated reproducibly by [`tools/make_sample_pcap.py`](tools/make_sample_pcap.py). It plays a compromised laptop on the LAN that runs an ARP sweep, a SYN and XMAS scan, SSH brute force, ARP spoofing of the gateway, a rogue DHCP server, DNS spoofing, a SYN flood, DNS-tunnel exfiltration and DGA lookups. Then an unknown device joins the network.
+The sample capture is generated reproducibly by [`tools/make_sample_pcap.py`](tools/make_sample_pcap.py). It plays a compromised laptop on the LAN that runs an ARP sweep, a SYN and XMAS scan, SSH brute force, ARP spoofing of the gateway, a rogue DHCP server, DNS spoofing, a SYN flood, DNS-tunnel exfiltration and DGA lookups. The user then logs into the router (HTTP Basic) and a media server (FTP) without encryption, and finally an unknown device joins the network.
 
 ## Limitations
 

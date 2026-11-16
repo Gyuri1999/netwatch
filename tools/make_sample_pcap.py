@@ -9,10 +9,12 @@
   5. στήνει ψεύτικο DHCP server και ψεύτικες απαντήσεις DNS
   6. κάνει SYN flood
   7. «βγάζει» δεδομένα μέσω DNS tunneling και ψάχνει C2 με DGA domains
-  8. λίγο αργότερα συνδέεται και μια άγνωστη συσκευή στο Wi-Fi
+  8. ο χρήστης μπαίνει στον router και στον NAS με κωδικούς χωρίς κρυπτογράφηση (HTTP Basic, FTP)
+  9. λίγο αργότερα συνδέεται και μια άγνωστη συσκευή στο Wi-Fi
 
 Χρήση:  python tools/make_sample_pcap.py samples/lan-attack.pcap
 """
+import base64
 import random
 import struct
 import sys
@@ -116,7 +118,20 @@ def build(path, seed=7):
         add(e(EVIL_MAC, GW_MAC) / IP(src=EVIL, dst=GW) / UDP(sport=sp, dport=53) / DNS(rd=1, qd=DNSQR(qname=name)), 0.2)
         add(e(GW_MAC, EVIL_MAC) / IP(src=GW, dst=EVIL) / UDP(sport=53, dport=sp) /
             DNS(qr=1, rcode=3, qd=DNSQR(qname=name)), 0.01)
-    # --- 8. νέα συσκευή, 90 δευτερόλεπτα αργότερα ---
+    # --- 8. logins χωρίς κρυπτογράφηση (ο κωδικός είναι ψεύτικος) ---
+    def tcp_session(src, smac, dst, dmac, dport, payloads):
+        sp = rnd.randint(49152, 65000)
+        add(e(smac, dmac) / IP(src=src, dst=dst) / TCP(sport=sp, dport=dport, flags="S"), 0.2)
+        add(e(dmac, smac) / IP(src=dst, dst=src) / TCP(sport=dport, dport=sp, flags="SA"), 0.002)
+        add(e(smac, dmac) / IP(src=src, dst=dst) / TCP(sport=sp, dport=dport, flags="A"), 0.001)
+        for pl in payloads:
+            add(e(smac, dmac) / IP(src=src, dst=dst) / TCP(sport=sp, dport=dport, flags="PA") / Raw(pl), 0.05)
+    basic = base64.b64encode(b"admin:not-a-real-password")
+    tcp_session(ME, ME_MAC, GW, GW_MAC, 80,
+                [b"GET /admin HTTP/1.1\r\nHost: 192.168.1.1\r\nAuthorization: Basic " + basic + b"\r\n\r\n"])
+    tcp_session(ME, ME_MAC, TV, TV_MAC, 21, [b"USER media\r\n", b"PASS not-a-real-password\r\n"])
+
+    # --- 9. νέα συσκευή, 90 δευτερόλεπτα αργότερα ---
     t += 90
     for _ in range(2):
         add(e(NEW_MAC) / IP(src=NEW, dst="224.0.0.251") / UDP(sport=5353, dport=5353) / Raw(b"\x00" * 40), 0.5)

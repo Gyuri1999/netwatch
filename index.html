@@ -27,7 +27,7 @@ main{display:flex;height:calc(100% - 52px)}
 canvas#c{position:absolute;inset:0;width:100%;height:100%;cursor:grab}
 canvas#c:active{cursor:grabbing}
 aside{width:470px;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column}
-nav{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--line)}
+nav{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--line)}
 nav button{background:none;border:0;color:var(--dim);padding:8px 2px;font:inherit;font-size:12px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
 nav button:hover{color:var(--txt)}nav button.on{color:#fff;border-color:var(--cyan);background:#ffffff06}
 nav .cnt{background:var(--red);color:#fff;border-radius:8px;padding:0 6px;font-size:10px;margin-left:4px}
@@ -129,6 +129,8 @@ a.mitre:hover{border-color:#b388ff}
       <button data-t="learn">📚 Μάθε</button>
       <button data-t="tips">💡 Συμβουλές</button>
       <button data-t="hist">🕓 Ιστορικό</button>
+      <button data-t="audit">🛡 Έλεγχος</button>
+      <button data-t="quiz">🎓 Κουίζ</button>
     </nav>
     <div class="tab on" id="t-alerts"><div class="empty">Καμία επίθεση ακόμα. Παρακολουθώ… 👀</div></div>
     <div class="tab" id="t-hosts">
@@ -145,6 +147,8 @@ a.mitre:hover{border-color:#b388ff}
     <div class="tab" id="t-learn"></div>
     <div class="tab" id="t-tips"></div>
     <div class="tab" id="t-hist"></div>
+    <div class="tab" id="t-audit"></div>
+    <div class="tab" id="t-quiz"></div>
   </aside>
 </main>
 <script>
@@ -317,7 +321,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.datas
 function showTab(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
   if(t==='alerts'){S.unread=0;$('ac').style.display='none'}renderTab()}
-function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist})[tab]()}
+function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz})[tab]()}
 function tabHover(){return document.querySelector('.tab.on:hover')}
 
 function eduHTML(type){const e=eduFor(type);if(!e)return'';
@@ -430,7 +434,18 @@ function explainPacket(p){
   else out.push(`${esc(A)} → ${esc(B)}`);
   if(PROTO_INFO[p.a])out.push(`<span class="sm">${esc(p.a)}: ${esc(PROTO_INFO[p.a])}</span>`);
   out.push(`<span class="sm">Μέγεθος ${p.l} bytes · θύρες ${p.sp??'-'} → ${p.dp??'-'}</span>`);
-  return out.join('<br>')}
+  return out.join('<br>')+layersHTML(p)}
+// τα στρώματα ενός πακέτου (μοντέλο OSI), από πάνω προς τα κάτω
+function ipClass(ip){if(S.me.has(ip))return'εσύ';if(ip===S.gw)return'router';
+  if(/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|f[cd]|fe80)/i.test(ip))return'ιδιωτική IP (LAN)';
+  if(/^(22[4-9]|23\d)\./.test(ip)||ip==='255.255.255.255'||/^ff/i.test(ip))return'multicast/broadcast';return'δημόσια IP (Internet)'}
+function layersHTML(p){const L=[],pi=portInfo(p.dp)||portInfo(p.sp);
+  if(p.p!=='ARP'&&p.p!=='ICMP')L.push(['7','Εφαρμογή',p.a,PROTO_INFO[p.a]||(pi?pi[0]+': '+pi[1]:'Τα δεδομένα του προγράμματος (συχνά κρυπτογραφημένα).'),'#b388ff']);
+  if(p.p==='TCP'||p.p==='UDP')L.push(['4','Μεταφορά',`${p.p} θύρα ${p.sp} → ${p.dp}${p.f?' ['+p.f+']':''}`,p.p==='TCP'?'TCP: αξιόπιστη σύνδεση με χειραψία και επιβεβαιώσεις. Οι θύρες λένε σε ποιο πρόγραμμα πάει το πακέτο.':'UDP: «στείλε και ξέχνα», χωρίς σύνδεση — γρήγορο, για DNS, βίντεο, παιχνίδια.','#3ec5ff']);
+  if(p.p!=='ARP')L.push(['3','Δίκτυο',`${p.p==='ICMP'?'ICMP μέσα σε ':''}IP ${p.s} → ${p.d}`,`Από ${ipClass(p.s)} προς ${ipClass(p.d)}. Οι routers προωθούν το πακέτο με βάση αυτή τη διεύθυνση.`,'#3ddc97']);
+  L.push(['2','Ζεύξη δεδομένων',p.p==='ARP'?'ARP πάνω σε Ethernet/Wi‑Fi':'Ethernet / Wi‑Fi (MAC)',p.p==='ARP'?'Το ARP ζει εδώ: λέει ποια MAC έχει μια IP μέσα στο LAN — χωρίς καμία πιστοποίηση, γι’ αυτό γίνεται ARP spoofing.':'Οι διευθύνσεις MAC ισχύουν μόνο μέχρι το επόμενο «βήμα» (συνήθως τον router).','#ff9f43']);
+  L.push(['1','Φυσικό','ραδιοκύματα ή καλώδιο',`${p.l} bytes ταξιδεύουν ως bits.`,'#6d7f99']);
+  return `<div style="margin-top:8px"><div class="sm" style="margin-bottom:3px">📚 Τα στρώματα του πακέτου (μοντέλο OSI) — κάθε στρώμα «τυλίγει» το από πάνω:</div>${L.map(([n,name,val,info,c])=>`<div style="border-left:3px solid ${c};background:${c}14;padding:3px 8px;margin:2px 0;border-radius:3px"><b style="color:${c}">L${n} ${name}</b> <code>${esc(val)}</code><div class="sm">${esc(info)}</div></div>`).join('')}</div>`}
 function renderFeed(){if($('fpause').checked&&S.feedEx==null)return;
   let list=S.feed;if($('fbad').checked)list=list.filter(p=>p.x);
   $('fb').innerHTML=list.slice(0,200).map((p,i)=>`<tr class="r" data-i="${i}" style="color:${p.x?'#ff3b5c':COLORS[p.a]||COLORS[p.p]||'#cfe0f5'}"><td>${fmtT(p.t)}</td><td>${esc(p.a)}${p.f?' ['+esc(p.f)+']':''}</td><td>${esc(p.s)}${p.sp!=null?':'+p.sp:''} → ${esc(p.d)}${p.dp!=null?':'+p.dp:''}</td><td>${p.l}</td></tr>`+
@@ -603,7 +618,59 @@ function handle(m){
     if(!$('fpause').checked){for(const it of m.items)S.feed.unshift(it);if(S.feed.length>400)S.feed.length=400}
     if(m.stats)setStats(m.stats)}
 }
+
+// ================= 🛡 ΕΛΕΓΧΟΣ ΑΣΦΑΛΕΙΑΣ =================
+let auditData=null,auditBusy=false;
+function loadAudit(){if(auditBusy)return;auditBusy=true;fetch('/api/audit').then(r=>r.json()).then(j=>{auditData=j;auditBusy=false;if(tab==='audit'&&!tabHover())drawAudit()}).catch(()=>{auditBusy=false})}
+function renderAudit(){loadAudit();if(auditData)drawAudit();else $('t-audit').innerHTML='<div class="empty">ελέγχω το δίκτυο…</div>'}
+const RISK={high:['r','ΥΨΗΛΟΣ'],med:['y','ΜΕΣΑΙΟΣ'],low:['','ΧΑΜΗΛΟΣ'],info:['g','—']};
+function drawAudit(){const a=auditData,el=$('t-audit');
+  const col=a.score>=90?'#3ddc97':a.score>=75?'#9be15d':a.score>=60?'#ffd23f':a.score>=40?'#ff9f43':'#ff3b5c';const icon={ok:'✅',warn:'⚠️',bad:'❌'};
+  el.innerHTML=`<div class="card" style="display:flex;align-items:center;gap:14px">
+    <div style="flex:none;width:76px;height:76px;border-radius:50%;border:5px solid ${col};display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 18px ${col}55"><div style="color:${col};font-size:26px;font-weight:700;line-height:1">${a.grade}</div><div class="sm">${a.score}/100</div></div>
+    <div><b style="color:#fff">Βαθμός ασφάλειας του δικτύου σου</b><div class="sm" style="margin-top:3px">Βγαίνει από ό,τι έχει δει το NetWatch: επιθέσεις, κωδικούς χωρίς κρυπτογράφηση, επικίνδυνες υπηρεσίες, άγνωστες συσκευές, HTTP και DNS χωρίς κρυπτογράφηση.</div></div></div>
+  <h3>Έλεγχοι</h3>${a.checks.map(c=>`<div class="card"><div class="brow"><span>${icon[c.status]} <b style="color:#fff">${esc(c.title)}</b></span><span class="sm">${c.penalty?'−'+c.penalty+' βαθμοί':''}</span></div><div style="color:#9fb4d0;margin-top:3px;white-space:normal">${esc(c.detail)}</div>${c.advice&&c.status!=='ok'?`<div class="sm" style="margin-top:4px">👉 ${esc(c.advice)}</div>`:''}</div>`).join('')}
+  <h3>Κωδικοί χωρίς κρυπτογράφηση</h3>${a.creds.length?`<table><thead><tr><th>Από</th><th>Προς</th><th>Πρωτόκολλο</th><th>Χρήστης</th><th>#</th></tr></thead><tbody>${a.creds.map(c=>`<tr class="r" data-sel="${esc(c.server)}"><td>${esc(who(c.client))}</td><td>${esc(who(c.server))}:${c.port}</td><td>${esc(c.proto)}</td><td>${esc(c.user||'—')}</td><td>${c.n}</td></tr>`).join('')}</tbody></table><div class="sm" style="margin-top:4px">🔒 Το NetWatch δεν κρατά και δεν δείχνει ποτέ τον κωδικό. Κάποιος που «ακούει» στο ίδιο Wi‑Fi όμως θα τον έβλεπε ολόκληρο.</div>`:'<div class="sm">Κανένας 🎉</div>'}
+  <h3>Υπηρεσίες που «ακούν» στο LAN — επιφάνεια επίθεσης</h3>${a.services.length?`<table><thead><tr><th>Συσκευή</th><th>Υπηρεσία</th><th>Κίνδυνος</th></tr></thead><tbody>${a.services.map(s=>`<tr class="r" data-sel="${esc(s.ip)}" title="${esc(s.why)}"><td>${esc(s.name||s.ip)}${s.gw?' <span class="tag">router</span>':''}${s.me?' <span class="tag">εσύ</span>':''}</td><td>${s.port} ${esc(s.svc)}</td><td><span class="tag ${RISK[s.risk][0]}">${RISK[s.risk][1]}</span></td></tr>${s.risk!=='info'?`<tr class="ex"><td colspan="3" class="sm">${esc(s.why)}</td></tr>`:''}`).join('')}</tbody></table>`:'<div class="sm">Δεν έχω δει ακόμα υπηρεσίες (φαίνονται μόνο όσες χρησιμοποιούνται).</div>'}
+  ${a.plain.length?`<h3>Πρωτόκολλα χωρίς κρυπτογράφηση (πακέτα)</h3>${barList(a.plain.map(p=>[esc(who(p.client))+' · '+esc(p.proto),p.n]),()=>'#ffd23f')}`:''}
+  <div class="sm" style="margin-top:10px">Ο έλεγχος είναι παθητικός: βλέπει μόνο ό,τι περνά από το δίκτυο. Για πλήρη εικόνα σκάναρε το δικό σου δίκτυο με <code>nmap -sV 192.168.1.0/24</code>.</div>`;
+  el.querySelectorAll('[data-sel]').forEach(r=>r.onclick=()=>select(r.dataset.sel))}
+
+// ================= 🎓 ΚΟΥΙΖ =================
+const QZ={score:0,total:0,streak:0,best:0,q:null,ans:null};
+try{const v=JSON.parse(localStorage.getItem('nw-quiz')||'{}');QZ.score=v.score||0;QZ.total=v.total||0;QZ.best=v.best||0}catch(e){}
+function saveQZ(){try{localStorage.setItem('nw-quiz',JSON.stringify({score:QZ.score,total:QZ.total,best:QZ.best}))}catch(e){}}
+const shuffle=a=>{a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.random()*(i+1)|0;[a[i],a[j]]=[a[j],a[i]]}return a};
+const rnd1=a=>a[Math.random()*a.length|0];
+const others=(pool,n,right)=>shuffle([...new Set(pool)].filter(x=>x!==right)).slice(0,n);
+const reEsc=s=>s.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+function makeQuestion(){const MT=S.features?.mitre||[],keys=Object.keys(EDU);
+  const kinds=['edu','edu','port','flag','todo','term'];if(MT.length)kinds.push('tactic');if(S.alerts.length)kinds.push('real','real','real');
+  const k=rnd1(kinds);
+  if(k==='edu'){const e=EDU[rnd1(keys)];return{cat:'Επιθέσεις',q:`Ποια επίθεση περιγράφει αυτό;<div class="edu">${esc(e.what)}</div>`,opts:shuffle([e.t,...others(keys.map(x=>EDU[x].t),3,e.t)]),ok:e.t,why:'Πώς γίνεται: '+e.how}}
+  if(k==='port'){const ports=Object.keys(PORT_INFO).filter(p=>/^\d+$/.test(p)),p=rnd1(ports),pi=PORT_INFO[p];
+    return{cat:'Θύρες',q:`Ποια υπηρεσία ακούει συνήθως στη θύρα <b>${p}</b>;`,opts:shuffle([pi[0],...others(ports.map(x=>PORT_INFO[x][0]),3,pi[0])]),ok:pi[0],why:`${pi[0]}: ${pi[1]}. Τι ψάχνει εκεί ένας επιτιθέμενος: ${pi[2]}.`}}
+  if(k==='flag'){const f=rnd1(Object.keys(FLAGS));return{cat:'TCP',q:`Τι σημαίνει ένα πακέτο TCP με σημαίες <b>[${esc(f||'καμία')}]</b>;`,opts:shuffle([FLAGS[f],...others(Object.values(FLAGS),3,FLAGS[f])]),ok:FLAGS[f],why:'Η «χειραψία» TCP είναι SYN → SYN‑ACK → ACK. Παράξενοι συνδυασμοί (NULL, FIN, XMAS) δείχνουν εργαλεία σάρωσης όπως το nmap.'}}
+  if(k==='tactic'){const m=rnd1(MT);return{cat:'MITRE ATT&CK',q:`Σε ποια τακτική του MITRE ATT&CK ανήκει το «${esc(m[0])}» (${esc(m[1])} — ${esc(m[2])});`,opts:shuffle([m[3],...others(MT.map(x=>x[3]),3,m[3])]),ok:m[3],why:`${m[3]}: ${TACTIC_INFO[m[3]]||''}`}}
+  if(k==='todo'){const key=rnd1(keys),e=EDU[key],right=e.todo[0];return{cat:'Άμυνα',q:`Εντοπίστηκε «${esc(e.t)}». Ποια είναι η σωστή πρώτη κίνηση;`,opts:shuffle([right,...others(keys.filter(x=>x!==key).map(x=>EDU[x].todo[0]),3,right)]),ok:right,why:'Όλα τα βήματα: '+e.todo.join(' · ')}}
+  if(k==='term'){const[t,d]=rnd1(TERMS),w=t.split(/[ (/]/)[0];return{cat:'Ορολογία',q:`Ποιος όρος ταιριάζει σε αυτόν τον ορισμό;<div class="edu">${esc(d.replace(new RegExp(reEsc(w),'gi'),'___'))}</div>`,opts:shuffle([t,...others(TERMS.map(x=>x[0]),3,t)]),ok:t,why:`${t}: ${d}`}}
+  const a=rnd1(S.alerts.slice(0,40)),e=eduFor(a.type);
+  if(a.mitre&&MT.length&&Math.random()<0.5){const ok=a.mitre.id+' — '+a.mitre.name;return{cat:'Από το δίκτυό σου',q:`Πριν λίγο το NetWatch είδε <b>${esc(a.type)}</b> από ${esc(a.actor)}:<div class="edu">${esc(a.detail)}</div>Ποια τεχνική MITRE ATT&amp;CK είναι;`,opts:shuffle([ok,...others(MT.map(x=>x[1]+' — '+x[2]),3,ok)]),ok,why:e?e.what:''}}
+  if(!e)return makeQuestion();
+  return{cat:'Από το δίκτυό σου',q:`Το NetWatch είδε αυτό από ${esc(a.actor)}:<div class="edu">${esc(a.detail)}</div>Τι είδους επίθεση είναι;`,opts:shuffle([e.t,...others(keys.map(x=>EDU[x].t),3,e.t)]),ok:e.t,why:`${e.what} Κίνδυνος: ${e.risk}`}}
+function renderQuiz(){const el=$('t-quiz');if(!QZ.q)QZ.q=makeQuestion();const q=QZ.q,done=QZ.ans!=null;
+  el.innerHTML=`<div class="card brow"><span>🎓 Σκορ <b style="color:#fff">${QZ.score}/${QZ.total}</b>${QZ.total?` <span class="sm">(${Math.round(100*QZ.score/QZ.total)}%)</span>`:''}</span><span>🔥 σερί ${QZ.streak} · ρεκόρ ${QZ.best}</span></div>
+  <div class="card"><div class="sm" style="margin-bottom:4px">${esc(q.cat)}</div><div style="color:#fff;font-size:13px;white-space:normal">${q.q}</div>
+  <div style="display:flex;flex-direction:column;gap:6px;margin-top:10px">${q.opts.map((o,i)=>{let st='';if(done){if(o===q.ok)st='border-color:#3ddc97;background:#3ddc9722';else if(i===QZ.ans)st='border-color:#ff3b5c;background:#ff3b5c22'}
+    return`<button class="b qo" data-i="${i}" style="text-align:left;padding:8px 10px;font-size:12px;white-space:normal;${st}" ${done?'disabled':''}>${esc(o)}</button>`}).join('')}</div>
+  ${done?`<div class="edu" style="margin-top:10px">${q.opts[QZ.ans]===q.ok?'✅ <b>Σωστά!</b>':'❌ <b>Όχι.</b> Σωστό: '+esc(q.ok)}<br>${esc(q.why)}</div><button class="b" id="qnext" style="margin-top:8px">Επόμενη ερώτηση →</button>`:''}</div>
+  <div class="sm">Οι ερωτήσεις βγαίνουν από το υλικό του 📚 Μάθε και από τις πραγματικές ειδοποιήσεις του δικτύου σου. <button class="b" id="qreset">μηδενισμός</button></div>`;
+  el.querySelectorAll('.qo').forEach(b=>b.onclick=()=>{if(QZ.ans!=null)return;QZ.ans=+b.dataset.i;QZ.total++;
+    if(q.opts[QZ.ans]===q.ok){QZ.score++;QZ.streak++;QZ.best=Math.max(QZ.best,QZ.streak)}else QZ.streak=0;saveQZ();renderQuiz()});
+  const n=$('qnext');if(n)n.onclick=()=>{QZ.q=null;QZ.ans=null;renderQuiz()};
+  $('qreset').onclick=()=>{QZ.score=QZ.total=QZ.streak=QZ.best=0;QZ.q=null;QZ.ans=null;saveQZ();renderQuiz()}}
 setInterval(()=>{if(tab==='feed'&&!$('fpause').checked)renderFeed()},700);
+setInterval(()=>{if(tab==='audit')loadAudit()},3000);
 setInterval(()=>{if(tab==='hist')loadHist()},10000);
 setInterval(()=>{if(tabHover())return;if(tab==='hosts')renderHosts();else if(tab==='det')renderDet();else if(tab==='devs')renderDevs();else if(tab==='stats')renderStats();else if(tab==='tips')renderTips()},2000);
 function connect(){const es=new EventSource('/events');es.onmessage=e=>handle(JSON.parse(e.data));es.onerror=()=>{es.close();setTimeout(connect,2000)}}

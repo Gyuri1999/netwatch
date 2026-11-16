@@ -6,6 +6,7 @@ Demo:  .venv/bin/python netwatch.py --demo           (προσομοίωση, χ
 Μετά άνοιξε  http://127.0.0.1:8765
 """
 import argparse
+import base64
 import collections
 import copy
 import functools
@@ -47,6 +48,29 @@ SUSPECT_PORTS = {1337: "backdoor", 4444: "Metasploit", 5555: "ADB/backdoor",
                  6666: "IRC/botnet", 6667: "IRC/botnet", 31337: "Back Orifice",
                  9001: "Tor relay"}
 SEV = {"low": 1, "med": 2, "high": 3}
+# Υπηρεσίες που αν «ακούν» σε συσκευή του LAN αυξάνουν την επιφάνεια επίθεσης: (κίνδυνος, γιατί)
+RISKY_SERVICES = {
+    23: ("high", "Telnet: όλα χωρίς κρυπτογράφηση, ο νο1 στόχος των botnets (Mirai)"),
+    21: ("high", "FTP: κωδικοί και αρχεία χωρίς κρυπτογράφηση"),
+    3389: ("high", "RDP: απομακρυσμένη επιφάνεια εργασίας, κύρια πόρτα εισόδου για ransomware"),
+    5900: ("high", "VNC: απομακρυσμένος έλεγχος οθόνης, συχνά με αδύναμο κωδικό"),
+    7547: ("high", "TR-069: απομακρυσμένη διαχείριση router, στόχος botnets"),
+    3306: ("high", "MySQL ανοιχτή στο δίκτυο"), 5432: ("high", "PostgreSQL ανοιχτή στο δίκτυο"),
+    6379: ("high", "Redis: συχνά χωρίς κωδικό → εκτέλεση κώδικα"),
+    27017: ("high", "MongoDB: συχνά χωρίς κωδικό"),
+    445: ("med", "SMB: κοινόχρηστα αρχεία, στόχος ransomware (WannaCry)"),
+    139: ("med", "NetBIOS/SMB v1: παλιό και ευάλωτο"),
+    1900: ("med", "UPnP: προγράμματα μπορούν να ανοίξουν θύρες στο router χωρίς να ρωτήσουν"),
+    161: ("med", "SNMP: συχνά με default κωδικό «public»"),
+    554: ("med", "RTSP: ροή βίντεο κάμερας"),
+    1883: ("med", "MQTT: μηνύματα IoT χωρίς κρυπτογράφηση"),
+    80: ("low", "HTTP: σελίδα διαχείρισης χωρίς HTTPS"), 8080: ("low", "HTTP-alt: σελίδα διαχείρισης χωρίς HTTPS"),
+    9100: ("low", "Εκτυπωτής (JetDirect): δέχεται εργασίες από οποιονδήποτε"),
+    22: ("low", "SSH: ασφαλές αν έχει κλειδιά ή δυνατό κωδικό"),
+}
+# Πρωτόκολλα χωρίς κρυπτογράφηση (θύρα προορισμού → όνομα)
+PLAIN_PORTS = {80: "HTTP", 21: "FTP", 23: "Telnet", 110: "POP3", 143: "IMAP", 25: "SMTP",
+               53: "DNS", 161: "SNMP", 69: "TFTP", 1883: "MQTT"}
 
 # Αντιστοίχιση ειδοποιήσεων σε MITRE ATT&CK (https://attack.mitre.org) και στο κλειδί του ανιχνευτή
 MITRE = [  # (πρόθεμα τύπου, technique id, όνομα, tactic, ανιχνευτής στο config)
@@ -68,6 +92,7 @@ MITRE = [  # (πρόθεμα τύπου, technique id, όνομα, tactic, αν�
     ("Νέα συσκευή", "T1200", "Hardware Additions", "Initial Access", "new_device"),
     ("Σύνδεση σε κακόβουλη IP", "T1071", "Application Layer Protocol", "Command and Control", "threat_intel"),
     ("Κίνηση από κακόβουλη IP", "T1595", "Active Scanning", "Reconnaissance", "threat_intel"),
+    ("Κωδικός σε καθαρό κείμενο", "T1040", "Network Sniffing", "Credential Access", "cleartext_creds"),
 ]
 
 
@@ -105,7 +130,7 @@ DEFAULT_CONFIG = {
     "detectors": {d: True for d in (
         "port_scan", "stealth_scan", "network_sweep", "brute_force", "syn_flood", "icmp_flood",
         "arp_spoofing", "arp_flood", "rogue_dhcp", "dns_spoofing", "inbound", "suspicious_port",
-        "beaconing", "dns_tunnel", "dga", "new_device", "threat_intel")},
+        "beaconing", "dns_tunnel", "dga", "new_device", "threat_intel", "cleartext_creds")},
     "allowlist": {"ips": [], "macs": [], "domains": []},
     "intel": {
         "enabled": True,
@@ -485,6 +510,9 @@ class NetState:
         self.had_devices = bool(self.known_macs)
         self.seen_macs = set()
         self.beacons = {}
+        self.services = collections.defaultdict(dict)  # ip → {θύρα που «ακούει": t}
+        self.creds, self.cred_users = {}, {}
+        self.plain = collections.Counter()  # (client, πρωτόκολλο) → πακέτα χωρίς κρυπτογράφηση
         self.first_t, self.last_t = None, 0.0
         self.min_pkts = self.min_bytes = 0
         self.cur_minute = int(time.time() // 60)
@@ -621,6 +649,7 @@ class NetState:
             "detectors": self.cfg["detectors"], "thresholds": self.cfg["thresholds"],
             "allowlist": {"ips": len(self.allow_ips), "macs": len(self.allow_macs), "domains": len(self.allow_domains)},
             "config": self.cfg.get("_path"),
+            "mitre": [[p, tid, nm, tac] for p, tid, nm, tac, _ in MITRE],
         }
 
     # ---------- alerts ----------
@@ -636,7 +665,7 @@ class NetState:
     def _allowed_name(self, name):
         return bool(self.allow_domains) and name.lower().endswith(self.allow_domains)
 
-    def alert(self, typ, sev, actor, target, detail, t, key=None, cooldown=None):
+    def alert(self, typ, sev, actor, target, detail, t, key=None, cooldown=None, mark=True):
         det = detector_for(typ)
         if det and not self.cfg["detectors"].get(det, True):
             return
@@ -653,7 +682,8 @@ class NetState:
         self.alerts.appendleft(a)
         h = self.host(actor, t)
         if h:
-            h["threat"] = max(h["threat"], SEV[sev])
+            if mark:
+                h["threat"] = max(h["threat"], SEV[sev])
             h["alerts"].append(a["id"])
             self.dirty.add(actor)
         self.publish({"type": "alert", "alert": a})
@@ -705,6 +735,12 @@ class NetState:
                 if P.get("smac") and hs["kind"] == "local" and proto != "ARP":
                     hs["mac"] = norm_mac(P["smac"])
                     self._mac_seen(src, hs["mac"], t)
+                if hs["kind"] == "local":
+                    if (proto == "TCP" and P.get("flags") == "SA") or (proto == "UDP" and sp == 1900):
+                        if len(self.services[src]) < 200:
+                            self.services[src][sp] = t
+                    elif dp in PLAIN_PORTS and proto in ("TCP", "UDP") and (sp or 0) > dp and len(self.plain) < 5000:
+                        self.plain[(src, PLAIN_PORTS[dp])] += 1
                 if P.get("ja3"):
                     hs["ja3"][P["ja3"]] += 1
                     if P.get("sni"):
@@ -767,6 +803,8 @@ class NetState:
         if proto == "ARP":
             return self._arp(P, t)
         self._intel_check(src, dst, dp, t)
+        if P.get("cred"):
+            self._cred(P, t)
         if P.get("dns_q"):
             self._dns_query(src, P["dns_q"][0], t)
         if P.get("nx"):
@@ -847,6 +885,130 @@ class NetState:
         if from_me and proto in ("TCP", "UDP") and dp in SUSPECT_PORTS and ("S" in fl or proto == "UDP"):
             self.alert("Ύποπτη εξερχόμενη θύρα", "low", dst, src,
                        f"Σύνδεση προς θύρα {dp} ({SUSPECT_PORTS[dp]})", t)
+
+    # --- κωδικοί που ταξιδεύουν χωρίς κρυπτογράφηση ---
+    def _cred(self, P, t):
+        c, src, dst, dp = P["cred"], P["src"], P["dst"], P.get("dp")
+        if c["field"] == "user":
+            if len(self.cred_users) > 5000:
+                self.cred_users.clear()
+            self.cred_users[(src, dst, dp)] = c.get("user")
+            return
+        user = mask_user(c.get("user") or self.cred_users.pop((src, dst, dp), None))
+        k = (src, dst, c["proto"])
+        rec = self.creds.get(k)
+        if rec is None:
+            if len(self.creds) > 1000:
+                return
+            rec = self.creds[k] = {"client": src, "server": dst, "port": dp, "proto": c["proto"],
+                                   "user": user, "n": 0, "first": t}
+        rec["n"] += 1
+        rec["last"] = t
+        rec["user"] = user or rec["user"]
+        if c["field"] == "session":
+            what = "η συνεδρία Telnet (ό,τι πληκτρολογείς, μαζί με τον κωδικό)"
+        else:
+            what = "ο κωδικός" + (f" του χρήστη «{user}»" if user else "")
+        self.alert("Κωδικός σε καθαρό κείμενο", "med" if c["field"] == "session" else "high", src, dst,
+                   f"{c['proto']} προς {dst}:{dp} — {what} ταξιδεύει χωρίς κρυπτογράφηση· "
+                   "όποιος «ακούει» το δίκτυο τον βλέπει", t, key=k, mark=False)
+
+    # --- έλεγχος ασφάλειας του δικτύου (καρτέλα 🛡) ---
+    def audit(self):
+        with self.lock:
+            now = self.last_t or time.time()
+            checks, score = [], 100
+
+            def chk(cid, status, title, detail, advice, penalty=0):
+                nonlocal score
+                score -= penalty
+                checks.append({"id": cid, "status": status, "title": title, "detail": detail,
+                               "advice": advice, "penalty": penalty})
+
+            def name(ip):
+                h = self.hosts.get(ip) or {}
+                return h.get("rdns") or (sorted(h.get("names") or ()) or [None])[0]
+
+            creds = sorted(self.creds.values(), key=lambda r: -r["last"])
+            if creds:
+                chk("creds", "bad", "Κωδικοί σε καθαρό κείμενο",
+                    f"{len(creds)} σύνδεση(εις) έστειλαν κωδικό χωρίς κρυπτογράφηση "
+                    f"({', '.join(sorted({c['proto'] for c in creds}))}).",
+                    "Άλλαξε αυτούς τους κωδικούς και χρησιμοποίησε την ασφαλή εκδοχή: SFTP αντί FTP, SSH αντί Telnet, "
+                    "HTTPS αντί HTTP, IMAPS/POP3S αντί IMAP/POP3.", min(30, 15 * len(creds)))
+            else:
+                chk("creds", "ok", "Κωδικοί σε καθαρό κείμενο", "Δεν είδα κανέναν κωδικό να ταξιδεύει ακρυπτογράφητος.",
+                    "Συνέχισε να χρησιμοποιείς HTTPS και κρυπτογραφημένα πρωτόκολλα.")
+
+            services = []
+            for ip, ports in self.services.items():
+                h = self.hosts.get(ip) or {}
+                for p in sorted(ports):
+                    risk, why = RISKY_SERVICES.get(p, ("info", SERVICES.get(p, "")))
+                    services.append({"ip": ip, "name": name(ip), "mac": h.get("mac"), "port": p,
+                                     "svc": SERVICES.get(p, ""), "risk": risk, "why": why,
+                                     "gw": ip == self.gateway, "me": ip in self.me})
+            services.sort(key=lambda s: (-SEV.get(s["risk"], 0), s["ip"], s["port"]))
+            high = [s for s in services if s["risk"] == "high"]
+            med = [s for s in services if s["risk"] == "med"]
+            if high or med:
+                chk("services", "bad" if high else "warn", "Επικίνδυνες υπηρεσίες στο LAN",
+                    f"{len(high)} υψηλού και {len(med)} μεσαίου κινδύνου: " +
+                    ", ".join(f"{s['svc'] or s['port']} στη {s['ip']}" for s in (high + med)[:5]),
+                    "Κλείσε ό,τι δεν χρησιμοποιείς, άλλαξε default κωδικούς, βάλε τις IoT συσκευές σε δίκτυο επισκεπτών.",
+                    min(30, 10 * len(high) + 5 * len(med)))
+            else:
+                chk("services", "ok", "Επικίνδυνες υπηρεσίες στο LAN",
+                    f"Δεν είδα επικίνδυνες υπηρεσίες ({len(services)} υπηρεσίες συνολικά).",
+                    "Το NetWatch βλέπει μόνο υπηρεσίες που χρησιμοποιήθηκαν· για πλήρη εικόνα κάνε σάρωση με nmap.")
+
+            recent = [a for a in self.alerts if now - a["t"] < 3600]
+            attacks = [a for a in recent if not a["type"].startswith(("Κωδικός σε καθαρό", "Νέα συσκευή"))]
+            hi = [a for a in attacks if a["sev"] == "high"]
+            if attacks:
+                chk("attacks", "bad" if hi else "warn", "Επιθέσεις την τελευταία ώρα",
+                    f"{len(attacks)} ειδοποιήσεις ({len(hi)} υψηλής σοβαρότητας) από "
+                    f"{len({a['actor'] for a in attacks})} πηγές.",
+                    "Δες την καρτέλα ⚠ Επιθέσεις και το «ℹ Τι σημαίνει;» σε κάθε μία.", 20 if hi else 8)
+            else:
+                chk("attacks", "ok", "Επιθέσεις την τελευταία ώρα", "Καμία.", "")
+
+            intel = [a for a in recent if "κακόβουλη IP" in a["type"]]
+            if intel:
+                chk("intel", "bad", "Επικοινωνία με γνωστές κακόβουλες IP",
+                    f"{len({a['actor'] for a in intel})} IP από λίστες threat intel.",
+                    "Βρες ποια συσκευή του LAN μιλάει μαζί τους (🔎 Λεπτομέρειες) και έλεγξέ τη για malware.", 15)
+
+            newdev = [a for a in recent if a["type"].startswith("Νέα συσκευή")]
+            if newdev:
+                chk("devices", "warn", "Άγνωστες συσκευές",
+                    f"{len(newdev)} νέα(ες) συσκευή(ές) μπήκαν στο δίκτυο: " + ", ".join(a["actor"] for a in newdev[:5]),
+                    "Αν δεν τις αναγνωρίζεις, άλλαξε τον κωδικό του Wi‑Fi (WPA2/WPA3).", 5)
+            else:
+                chk("devices", "ok", "Άγνωστες συσκευές", "Καμία νέα συσκευή την τελευταία ώρα.", "")
+
+            http, enc = self.protos.get("HTTP", 0), self.protos.get("HTTPS", 0) + self.protos.get("QUIC", 0)
+            share = http / (http + enc) if http + enc else 0
+            if share > 0.05:
+                chk("http", "warn", "Ιστοσελίδες χωρίς HTTPS", f"{share:.0%} της κίνησης web είναι ακρυπτογράφητο HTTP.",
+                    "Ενεργοποίησε «HTTPS-Only mode» στον browser.", 5)
+            else:
+                chk("http", "ok", "Ιστοσελίδες χωρίς HTTPS", f"Μόνο {share:.0%} της κίνησης web είναι HTTP.", "")
+
+            dns_plain = sum(n for (c, p), n in self.plain.items() if p == "DNS")
+            if dns_plain:
+                chk("dns", "warn", "DNS χωρίς κρυπτογράφηση",
+                    f"{dns_plain} ερωτήματα DNS στάλθηκαν «ανοιχτά» — ο πάροχος και όποιος είναι στη μέση "
+                    "βλέπουν κάθε site που επισκέπτεσαι.",
+                    "Ενεργοποίησε DNS over HTTPS (DoH) στον browser ή στο σύστημα (π.χ. 1.1.1.1, Quad9).", 5)
+            else:
+                chk("dns", "ok", "DNS χωρίς κρυπτογράφηση", "Δεν είδα ακρυπτογράφητο DNS.", "")
+
+            plain = [{"client": c, "proto": p, "n": n} for (c, p), n in self.plain.most_common(20) if p != "DNS"]
+            score = max(0, min(100, score))
+            grade = "A" if score >= 90 else "B" if score >= 75 else "C" if score >= 60 else "D" if score >= 40 else "F"
+            return {"score": score, "grade": grade, "checks": checks, "services": services[:100],
+                    "creds": creds[:50], "plain": plain, "t": now}
 
     # --- C2 beaconing: συνδέσεις με «ρολόι» ---
     def _beacon(self, src, dst, dp, t):
@@ -1148,6 +1310,69 @@ def parse_sni(b):
 
 
 HTTP_HOST = re.compile(rb"\r\nHost:\s*([^\r\n:]+)", re.I)
+BASIC_AUTH = re.compile(rb"\r\nAuthorization:\s*Basic\s+([A-Za-z0-9+/=]{4,})", re.I)
+FORM_PASS = re.compile(rb"(?:^|&)(?:pass|passwd|password|pwd|pin)=[^&]", re.I)
+FORM_USER = re.compile(rb"(?:^|&)(?:user|username|login|email|uname|usr)=([^&\s]{1,64})", re.I)
+
+
+def mask_user(u):
+    """Δείχνουμε μόνο τα 2 πρώτα γράμματα του ονόματος χρήστη."""
+    if not u:
+        return None
+    return (u[:2] if len(u) > 3 else u[:1]) + "***"
+
+
+def _txt(b):
+    return b.decode("utf-8", "ignore").strip()[:64]
+
+
+def parse_cleartext(sp, dp, pl):
+    """Εντοπίζει login που στέλνεται χωρίς κρυπτογράφηση (FTP, POP3, IMAP, SMTP, Telnet, HTTP).
+    Επιστρέφει {proto, field, user}. Τον κωδικό τον αναγνωρίζει αλλά ΔΕΝ τον κρατά ποτέ."""
+    if not pl:
+        return None
+    head = pl[:2048]
+    try:
+        if dp in (21, 110):
+            proto, cmd = ("FTP" if dp == 21 else "POP3"), head[:5].upper()
+            if cmd == b"USER ":
+                return {"proto": proto, "field": "user", "user": _txt(head[5:].split(b"\r")[0])}
+            if cmd == b"PASS ":
+                return {"proto": proto, "field": "pass"}
+            return None
+        if dp == 143:
+            parts = head.split(None, 3)
+            if len(parts) >= 4 and parts[1].upper() == b"LOGIN":
+                return {"proto": "IMAP", "field": "pass", "user": _txt(parts[2].strip(b'"'))}
+            return None
+        if dp in (25, 587):
+            up = head.upper()
+            if up.startswith(b"AUTH PLAIN"):
+                user = None
+                arg = head[10:].strip().split(b"\r")[0]
+                if arg:
+                    bits = base64.b64decode(arg + b"==", validate=False).split(b"\0")
+                    user = _txt(bits[1]) if len(bits) >= 3 else None
+                return {"proto": "SMTP", "field": "pass", "user": user}
+            if up.startswith(b"AUTH LOGIN"):
+                return {"proto": "SMTP", "field": "pass"}
+            return None
+        if dp == 23:
+            return {"proto": "Telnet", "field": "session"}
+        if head[:4] in (b"GET ", b"POST", b"PUT ", b"HEAD"):
+            m = BASIC_AUTH.search(head)
+            if m:
+                cred = base64.b64decode(m.group(1) + b"==", validate=False)
+                return {"proto": "HTTP Basic", "field": "pass", "user": _txt(cred.split(b":")[0])}
+            if head[:4] == b"POST" and b"\r\n\r\n" in pl:
+                body = pl.split(b"\r\n\r\n", 1)[1][:4096]
+                if FORM_PASS.search(body):
+                    m = FORM_USER.search(body)
+                    user = urllib.parse.unquote_plus(m.group(1).decode("ascii", "ignore")) if m else None
+                    return {"proto": "HTTP φόρμα", "field": "pass", "user": user and user[:64]}
+    except Exception:
+        return None
+    return None
 
 
 def make_parser():
@@ -1174,6 +1399,9 @@ def make_parser():
             P.update(proto="TCP", sp=int(tcp.sport), dp=int(tcp.dport), flags=str(tcp.flags))
             pl = bytes(tcp.payload)
             if pl:
+                cred = parse_cleartext(P["sp"], P["dp"], pl)
+                if cred:
+                    P["cred"] = cred
                 if pl[0] == 0x16:
                     ch = parse_client_hello(pl)
                     if ch:
@@ -1384,10 +1612,10 @@ def demo_attackers():
 def demo_run(state):
     me, gw = "192.168.1.23", "192.168.1.1"
     lan = {"192.168.1.10": "smart-tv.local", "192.168.1.15": "iphone.local",
-           "192.168.1.40": "printer.local", "192.168.1.77": "unknown-laptop.local"}
+           "192.168.1.40": "printer.local", "192.168.1.77": "unknown-laptop.local", "192.168.1.30": "ipcam.local"}
     macs = {gw: "a4:2b:b0:11:22:01", me: "3c:22:fb:aa:bb:23", "192.168.1.10": "f0:de:f1:10:10:10",
             "192.168.1.15": "ac:1f:74:15:15:15", "192.168.1.40": "00:1e:0b:40:40:40",
-            "192.168.1.77": "de:ad:be:ef:77:77"}
+            "192.168.1.77": "de:ad:be:ef:77:77", "192.168.1.30": "c0:56:e3:30:30:30"}
     state.arp_table.update(macs)
     state.arp_first.update(macs)
     for ip, m in macs.items():
@@ -1458,6 +1686,14 @@ def demo_run(state):
                 emit(src=b, dst=a, proto="ARP", len=42, arp=dict(op=2, psrc=b, pdst=a, hwsrc=macs[b]))
             if random.random() < 0.05:
                 emit(src="192.168.1.10", dst="192.168.1.40", proto="TCP", sp=51000, dp=9100, flags="PA", len=900)
+            if random.random() < 0.02:  # υπηρεσίες που «ακούν» στις συσκευές του LAN (για τον έλεγχο 🛡)
+                dev, port = random.choice([(gw, 80), (gw, 53), ("192.168.1.40", 9100), ("192.168.1.40", 21),
+                                           ("192.168.1.30", 23), ("192.168.1.30", 554), ("192.168.1.10", 8008)])
+                csp = random.randint(49152, 65000)
+                emit(src=me, dst=dev, proto="TCP", sp=csp, dp=port, flags="S", len=60)
+                emit(src=dev, dst=me, proto="TCP", sp=port, dp=csp, flags="SA", len=60, smac=macs[dev])
+            if random.random() < 0.01:
+                emit(src=gw, dst="239.255.255.250", proto="UDP", sp=1900, dp=1900, len=320, smac=macs[gw])
             time.sleep(random.uniform(0.008, 0.03))
 
     def beacon():
@@ -1476,7 +1712,7 @@ def demo_run(state):
     def scenarios():
         time.sleep(8)
         i = 0
-        order = ["portscan", "dga", "arpspoof", "newdev", "brute", "dnstunnel", "xmas", "synflood",
+        order = ["portscan", "cleartext", "dga", "arpspoof", "newdev", "brute", "dnstunnel", "xmas", "synflood",
                  "arpsweep", "dhcp", "pingsweep"]
         while True:
             kind = order[i % len(order)]
@@ -1539,6 +1775,16 @@ def demo_run(state):
                     emit(src=newdev, dst=gw, proto="ARP", len=42,
                          arp=dict(op=1, psrc=newdev, pdst=gw, hwsrc=newdev_mac))
                     time.sleep(0.5)
+            elif kind == "cleartext":  # login χωρίς κρυπτογράφηση: FTP στον εκτυπωτή, φόρμα HTTP στον router
+                sp = random.randint(49152, 65000)
+                emit(src=me, dst="192.168.1.40", proto="TCP", sp=sp, dp=21, flags="PA", len=70,
+                     cred={"proto": "FTP", "field": "user", "user": "scanner"})
+                time.sleep(0.3)
+                emit(src=me, dst="192.168.1.40", proto="TCP", sp=sp, dp=21, flags="PA", len=70,
+                     cred={"proto": "FTP", "field": "pass"})
+                time.sleep(1)
+                emit(src="192.168.1.15", dst=gw, proto="TCP", sp=random.randint(49152, 65000), dp=80, flags="PA",
+                     len=520, http_host="router.home", cred={"proto": "HTTP φόρμα", "field": "pass", "user": "admin"})
             elif kind == "pingsweep":
                 for n in range(1, 50):
                     emit(src=A, dst=f"192.168.1.{n}", proto="ICMP", icmp_type=8, len=98)
@@ -1582,6 +1828,8 @@ def make_handler(state):
                     hours = 24
                 ref = state.last_t if state.mode == "pcap" and state.last_t else None
                 return self._send(200, json.dumps(state.history.query(hours, ref)).encode(), "application/json")
+            if u.path == "/api/audit":
+                return self._send(200, json.dumps(state.audit()).encode(), "application/json")
             if u.path == "/api/abuseipdb":
                 ip = parse_qs(u.query).get("ip", [""])[0]
                 key = state.cfg.get("intel", {}).get("abuseipdb_key")

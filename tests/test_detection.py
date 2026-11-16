@@ -190,7 +190,13 @@ def test_pcap_replay_end_to_end(tmp_path):
                 "ARP spoofing (ROUTER)", "Rogue DHCP server", "Ύποπτη απάντηση DNS", "SYN flood",
                 "DNS tunneling", "DGA domains", "Νέα συσκευή"}
     assert expected <= types(s)
-    assert {a["actor"] for a in s.alerts if a["type"] != "Νέα συσκευή"} == {EVIL}
+    assert {a["actor"] for a in s.alerts if a["type"] not in ("Νέα συσκευή", "Κωδικός σε καθαρό κείμενο")} == {EVIL}
+    leaks = [a for a in s.alerts if a["type"] == "Κωδικός σε καθαρό κείμενο"]
+    assert {a["target"] for a in leaks} == {GW, "192.168.1.20"} and all(a["actor"] == ME for a in leaks)
+    assert not any("not-a-real-password" in a["detail"] for a in s.alerts)
+    au = s.audit()
+    assert {(x["ip"], x["port"]) for x in au["services"]} >= {(GW, 80), ("192.168.1.20", 21)}
+    assert {c["proto"] for c in au["creds"]} == {"HTTP Basic", "FTP"}
     assert next(a for a in s.alerts if a["type"] == "Νέα συσκευή")["actor"] == "192.168.1.88"
     assert s.hosts[ME]["ja3"], "JA3 should be extracted from the ClientHello"
     assert "github.com" in s.hosts["140.82.121.4"]["names"]  # από DNS + TLS SNI
@@ -335,3 +341,59 @@ def test_history_persists_alerts(tmp_path, state):
     q = nw.History(db).query(hours=24, ref=1_700_000_100)
     assert q["total_alerts"] == 1 and q["alerts"][0]["mitre"] == "T1046"
     assert q["by_hour"] and q["by_hour"][0][1] == "high"
+
+
+# ---------------- κωδικοί σε καθαρό κείμενο / έλεγχος ασφάλειας ----------------
+SECRET = "Sup3rSecret!"
+
+
+@pytest.mark.parametrize("dp,payload,proto,user", [
+    (21, b"USER nikos\r\n", "FTP", "nikos"),
+    (110, b"USER mail@example.com\r\n", "POP3", "mail@example.com"),
+    (143, b'a1 LOGIN "nikos" ' + SECRET.encode() + b"\r\n", "IMAP", "nikos"),
+    (25, b"AUTH PLAIN " + __import__("base64").b64encode(b"\0nikos\0" + SECRET.encode()) + b"\r\n", "SMTP", "nikos"),
+    (80, b"GET / HTTP/1.1\r\nHost: r\r\nAuthorization: Basic " +
+     __import__("base64").b64encode(b"admin:" + SECRET.encode()) + b"\r\n\r\n", "HTTP Basic", "admin"),
+    (8080, b"POST /login HTTP/1.1\r\nHost: r\r\n\r\nusername=nikos%40x.gr&password=" + SECRET.encode(),
+     "HTTP φόρμα", "nikos@x.gr"),
+])
+def test_parse_cleartext_finds_login_but_never_keeps_password(dp, payload, proto, user):
+    r = nw.parse_cleartext(50000, dp, payload)
+    assert r["proto"] == proto and r.get("user") == user
+    assert SECRET not in repr(r)
+
+
+def test_parse_cleartext_ignores_normal_traffic():
+    assert nw.parse_cleartext(50000, 80, b"GET /index.html HTTP/1.1\r\nHost: example.org\r\n\r\n") is None
+    assert nw.parse_cleartext(50000, 8080, b"POST /search HTTP/1.1\r\n\r\nq=passwords") is None
+    assert nw.parse_cleartext(50000, 443, b"\x16\x03\x01binary") is None
+    assert nw.parse_cleartext(50000, 21, b"LIST\r\n") is None
+
+
+def test_ftp_login_alert_masks_user_and_does_not_mark_victim(state):
+    c = Clock()
+    nas = "192.168.1.40"
+    feed(state, c, src=ME, dst=nas, proto="TCP", sp=50000, dp=21, flags="PA",
+         cred=nw.parse_cleartext(50000, 21, b"USER nikolas\r\n"))
+    feed(state, c, src=ME, dst=nas, proto="TCP", sp=50000, dp=21, flags="PA",
+         cred=nw.parse_cleartext(50000, 21, b"PASS " + SECRET.encode() + b"\r\n"))
+    a = next(a for a in state.alerts if a["type"] == "Κωδικός σε καθαρό κείμενο")
+    assert a["actor"] == ME and a["target"] == nas and a["mitre"]["id"] == "T1040"
+    assert "ni***" in a["detail"] and "nikolas" not in a["detail"] and SECRET not in a["detail"]
+    assert state.hosts[ME]["threat"] == 0  # δεν «βάφουμε» κόκκινο το θύμα
+
+
+def test_audit_scores_risky_services_and_leaks(state):
+    c = Clock()
+    assert state.audit()["score"] == 100
+    cam = "192.168.1.30"
+    feed(state, c, src=cam, dst=ME, proto="TCP", sp=23, dp=50000, flags="SA", smac="c0:56:e3:30:30:30")
+    feed(state, c, src=GW, dst=ME, proto="TCP", sp=443, dp=50001, flags="SA")
+    feed(state, c, src=ME, dst=cam, proto="TCP", sp=50000, dp=23, flags="PA", cred={"proto": "Telnet", "field": "session"})
+    au = state.audit()
+    by = {x["id"]: x for x in au["checks"]}
+    assert by["services"]["status"] == "bad" and by["creds"]["status"] == "bad"
+    tel = next(x for x in au["services"] if x["port"] == 23)
+    assert tel["ip"] == cam and tel["risk"] == "high"
+    assert next(x for x in au["services"] if x["port"] == 443)["risk"] == "info"
+    assert au["score"] < 80 and au["grade"] in "BCDF"
