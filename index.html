@@ -27,8 +27,8 @@ main{display:flex;height:calc(100% - 52px)}
 canvas#c{position:absolute;inset:0;width:100%;height:100%;cursor:grab}
 canvas#c:active{cursor:grabbing}
 aside{width:470px;border-left:1px solid var(--line);background:var(--panel);display:flex;flex-direction:column}
-nav{display:grid;grid-template-columns:repeat(6,1fr);border-bottom:1px solid var(--line)}
-nav button{background:none;border:0;color:var(--dim);padding:8px 2px;font:inherit;font-size:12px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
+nav{display:flex;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+nav button{flex:1 0 auto;background:none;border:0;color:var(--dim);padding:6px 5px;font:inherit;font-size:11.5px;cursor:pointer;border-bottom:2px solid transparent;white-space:nowrap}
 nav button:hover{color:var(--txt)}nav button.on{color:#fff;border-color:var(--cyan);background:#ffffff06}
 nav .cnt{background:var(--red);color:#fff;border-radius:8px;padding:0 6px;font-size:10px;margin-left:4px}
 .tab{display:none;flex:1;overflow:auto;padding:10px 12px}.tab.on{display:block}
@@ -132,6 +132,8 @@ a.mitre:hover{border-color:#b388ff}
       <button data-t="audit">🛡 Έλεγχος</button>
       <button data-t="quiz">🎓 Κουίζ</button>
       <button data-t="pentest">🔴 Pentest</button>
+      <button data-t="rules">🧩 Κανόνες</button>
+      <button data-t="ctf">🚩 CTF</button>
     </nav>
     <div class="tab on" id="t-alerts"><div class="empty">Καμία επίθεση ακόμα. Παρακολουθώ… 👀</div></div>
     <div class="tab" id="t-hosts">
@@ -151,6 +153,8 @@ a.mitre:hover{border-color:#b388ff}
     <div class="tab" id="t-audit"></div>
     <div class="tab" id="t-quiz"></div>
     <div class="tab" id="t-pentest"></div>
+    <div class="tab" id="t-rules"></div>
+    <div class="tab" id="t-ctf"></div>
   </aside>
 </main>
 <script>
@@ -323,7 +327,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.datas
 function showTab(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
   if(t==='alerts'){S.unread=0;$('ac').style.display='none'}renderTab()}
-function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest})[tab]()}
+function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,rules:renderRules,ctf:renderCtf})[tab]()}
 function tabHover(){return document.querySelector('.tab.on:hover')}
 
 function eduHTML(type){const e=eduFor(type);if(!e)return'';
@@ -405,7 +409,7 @@ function systemHTML(){const f=S.features;if(!f)return'';const it=f.intel||{};
    <div>🔔 Ειδοποιήσεις: ${f.notify?`${f.notify.macos?'<span class="tag g">macOS</span>':''}${f.notify.telegram?'<span class="tag g">Telegram</span>':''} <span class="sm">από ${esc(f.notify.min_severity)}</span>`:'<span class="sm">ανενεργές (μόνο σε live ή με --notify)</span>'}</div>
    <div>🗄 Ιστορικό: <span class="sm">${esc(f.history===':memory:'?'στη μνήμη (χάνεται στο κλείσιμο)':f.history)}</span></div>
    <div>⚙ Ρυθμίσεις: <span class="sm">${esc(f.config||'προεπιλογές (φτιάξε config.yaml από το config.example.yaml)')}</span> · allowlist ${f.allowlist?.ips||0} IP / ${f.allowlist?.macs||0} MAC / ${f.allowlist?.domains||0} domains</div></div>`}
-const TACTICS=['Reconnaissance','Initial Access','Discovery','Credential Access','Command and Control','Impact'];
+const TACTICS=['Reconnaissance','Initial Access','Discovery','Credential Access','Lateral Movement','Command and Control','Exfiltration','Impact'];
 function mitreGrid(){const by={};for(const a of S.alerts){if(!a.mitre)continue;const t=by[a.mitre.tactic]||(by[a.mitre.tactic]={});
     const k=a.mitre.id;t[k]=t[k]||{m:a.mitre,n:0};t[k].n++}
   return TACTICS.map(tc=>{const t=by[tc]||{};const ks=Object.values(t);
@@ -608,9 +612,10 @@ function setStats(s){S.stats=s;$('pps').textContent=s.pps;$('bps').textContent=f
   c.clearRect(0,0,160,34);c.beginPath();S.spark.forEach((v,i)=>c[i?'lineTo':'moveTo'](i*3,32-v/mx*30));c.strokeStyle='#3ec5ff';c.lineWidth=1.5;c.stroke();
   c.lineTo((S.spark.length-1)*3,34);c.lineTo(0,34);c.fillStyle='#3ec5ff22';c.fill();updStatus()}
 function handle(m){
-  if(m.type==='snapshot'){S.hosts.clear();upsert(m.hosts);S.me=new Set(m.me);S.gw=m.gw;S.home=m.home;S.mode=m.mode;S.alerts=[];
+  if(m.type==='snapshot'){if(S.feedKind!==undefined&&(S.feedKind!==m.feed||S.ctf!==m.ctf)){S.feed=[];S.links.clear();S.sel=null;S.unread=0;$('ac').style.display='none';auditData=null;histData=null;S.feedEx=null}
+    S.feedKind=m.feed;S.ctf=m.ctf;S.hosts.clear();upsert(m.hosts);S.me=new Set(m.me);S.gw=m.gw;S.home=m.home;S.mode=m.mode;S.alerts=[];
     S.features=m.features;m.alerts.slice().reverse().forEach(a=>addAlert(a,true));$('na').textContent=S.alerts.length;
-    $('mode').textContent={demo:'DEMO',pcap:'▶ PCAP'}[m.mode]||'● LIVE';$('mode').className='badge '+(m.mode==='live'?'live':'demo');
+    $('mode').textContent=m.feed==='ctf'?'🚩 CTF':{demo:'DEMO',pcap:'▶ PCAP'}[m.mode]||'● LIVE';$('mode').className='badge '+(m.mode==='live'?'live':'demo');
     $('iface').textContent=`${m.iface} · ${m.me.filter(i=>!i.includes(':'))[0]||m.me[0]||'?'}`;setStats(m.stats);renderTab();return}
   if(m.type==='home'){S.home=m.home;return}
   if(m.type==='features'){S.features=m.features;if(tab==='stats')renderStats();return}
@@ -728,6 +733,83 @@ function drawPentest(){const el=$('t-pentest'),sd=scanData,run=sd.status==='runn
     cveCache[k]={loading:true};drawPentest();fetch('/api/cve?product='+encodeURIComponent(p)+'&version='+encodeURIComponent(v)).then(r=>r.json()).then(j=>{cveCache[k]=j;drawPentest()}).catch(e=>{cveCache[k]={error:String(e)};drawPentest()})});
   el.querySelectorAll('[data-lab]').forEach(b=>b.onclick=()=>post('/api/lab',{kind:b.dataset.lab,variant:b.dataset.v}).then(r=>{if(r.error)alert(r.error);loadLab()}))}
 setInterval(()=>{if(tab!=='pentest')return;if(scanData?.status==='running')loadScan();if(labData?.status==='running')loadLab()},1000);
+
+// ================= 🧩 ΚΑΝΟΝΕΣ =================
+let rulesData=null,ruleEd=null,ruleRes=null;const ruleView={};
+const edBusy=()=>{const a=document.activeElement;return a&&(a.id==='rule-ed'||a.classList.contains('ctf-in')||a.classList.contains('ctf-rule'))};
+function loadRules(){return fetch('/api/rules').then(r=>r.json()).then(j=>{rulesData=j;if(ruleEd==null)ruleEd=j.template;if(tab==='rules'&&!edBusy())drawRules()})}
+function renderRules(){if(!rulesData){$('t-rules').innerHTML='<div class="empty">φόρτωση…</div>';loadRules();return}drawRules()}
+const copyBtn=(id)=>`<button class="b" data-copy="${id}">📋 αντιγραφή</button>`;
+function ruleResHTML(){const r=ruleRes;if(!r)return'';if(r.error)return`<div class="card" style="border-color:#ff3b5c"><b style="color:#ff8da0">✖ ${esc(r.error)}</b></div>`;
+  if(r.saved)return`<div class="card" style="border-color:#3ddc97">💾 Αποθηκεύτηκε στο <code>rules/local.yaml</code> και τρέχει ήδη: ${r.saved.map(esc).join(', ')}</div>`;
+  const nm=Object.values(r.matches).reduce((a,b)=>a+b,0);
+  return `<div class="card"><b style="color:#fff">🧪 Δοκιμή στα τελευταία ${r.packets} πακέτα</b>
+   <div style="margin-top:4px">Ταίριαξαν <b style="color:#fff">${nm}</b> πακέτα · θα έβγαζε <b style="color:${r.alerts.length?'#ffd23f':'#9fb4d0'}">${r.alerts.length}</b> ειδοποίηση(εις)</div>
+   ${r.alerts.map(a=>`<div class="sm" style="margin-top:3px">⚠ ${esc(who(a.actor))} → ${esc(who(a.target))} · ${a.n}× · ${esc(a.detail)}</div>`).join('')}
+   ${r.sample.length?`<table style="margin-top:6px"><thead><tr><th>ώρα</th><th>από → προς</th><th>proto</th></tr></thead><tbody>${r.sample.map(p=>`<tr><td>${fmtT(p.t)}</td><td>${esc(p.src)}${p.sp!=null?':'+p.sp:''} → ${esc(p.dst)}${p.dp!=null?':'+p.dp:''}</td><td>${esc(p.proto)} ${esc(p.flags||'')} ${esc(p.q||'')}</td></tr>`).join('')}</tbody></table>`:'<div class="sm" style="margin-top:4px">Κανένα πακέτο δεν ταίριαξε — δοκίμασε πιο χαλαρά κριτήρια.</div>'}
+   <div class="sm" style="margin-top:4px">Μικρός αριθμός ειδοποιήσεων = καλός κανόνας. Πολλές = πιθανά false positives.</div></div>`}
+function drawRules(){const d=rulesData,el=$('t-rules');
+  el.innerHTML=`<div class="card"><b style="color:#fff">🧩 Detection engineering</b><div class="sm" style="margin-top:3px">Γράψε τον δικό σου κανόνα ανίχνευσης σε YAML, δοκίμασέ τον στην κίνηση που μόλις πέρασε και αποθήκευσέ τον — τρέχει αμέσως μαζί με τους ενσωματωμένους ανιχνευτές. Κάθε κανόνας εξάγεται και σε <b>Sigma</b> (για SIEM: Splunk, Elastic, Sentinel) και <b>Suricata</b> (IDS).${d.enabled?'':' <b style="color:#ff8da0">Οι κανόνες είναι απενεργοποιημένοι στο config.yaml (detectors.custom_rules).</b>'}</div></div>
+  <textarea id="rule-ed" spellcheck="false" rows="15" style="width:100%;box-sizing:border-box;background:#060a12;color:#cfe0f5;border:1px solid var(--line);border-radius:4px;padding:8px;font:12px ui-monospace,Menlo,monospace">${esc(ruleEd)}</textarea>
+  <div style="display:flex;gap:6px;margin:6px 0 8px;flex-wrap:wrap"><button class="b" id="r-test">🧪 Δοκίμασε (${d.recent} πακέτα)</button><button class="b" id="r-save">💾 Αποθήκευση</button><button class="b" id="r-tpl">↺ Πρότυπο</button></div>
+  ${ruleResHTML()}
+  <details><summary>📖 Τι μπορώ να γράψω;</summary><div><div class="kv">${Object.entries(d.help).map(([k,v])=>`<span><code>${esc(k)}</code></span><span>${esc(v)}</span>`).join('')}
+   <span><code>threshold</code></span><span>count / window (s) / by: src|dst / distinct: dport κ.ά. — «τουλάχιστον N μέσα σε W δευτερόλεπτα»</span>
+   <span><code>severity</code></span><span>low, med, high</span><span><code>mitre</code></span><span>π.χ. T1046 (προαιρετικό)</span></div></div></details>
+  ${d.errors.length?`<div class="card" style="border-color:#ff9f43">${d.errors.map(e=>`<div class="sm">⚠ ${esc(e)}</div>`).join('')}</div>`:''}
+  <h3>Ενεργοί κανόνες (${d.rules.length})</h3>
+  ${d.rules.map((r,i)=>{const v=ruleView[r.id];return `<div class="card"><div class="brow"><span><label><input type="checkbox" data-tog="${esc(r.id)}" ${r.enabled?'checked':''}> <b style="color:#fff">${esc(r.title)}</b></label></span><span class="sev ${r.severity}">${r.severity.toUpperCase()}</span></div>
+    <div class="sm" style="margin-top:2px"><code>${esc(r.id)}</code> · ${esc(r.source)} ${r.mitre?'· '+esc(r.mitre):''} · <b style="color:${r.hits?'#ffd23f':'inherit'}">${r.hits} χτυπήματα</b>${r.last_hit?' · τελευταίο '+fmtT(r.last_hit):''}</div>
+    ${r.description?`<div class="sm" style="margin-top:2px">${esc(r.description)}</div>`:''}
+    <div style="display:flex;gap:4px;margin-top:6px;flex-wrap:wrap">${['yaml','sigma','suricata'].map(k=>`<button class="b" data-view="${esc(r.id)}" data-k="${k}" style="${v===k?'border-color:var(--cyan);color:#fff':''}">${{yaml:'YAML',sigma:'Sigma',suricata:'Suricata'}[k]}</button>`).join('')}<button class="b" data-edit="${i}">✎ στον editor</button>${r.source==='local.yaml'?`<button class="b" data-del="${esc(r.id)}">🗑</button>`:''}</div>
+    ${v?`<pre id="rv-${i}" style="margin-top:6px">${esc(r[v])}</pre>${copyBtn('rv-'+i)}`:''}</div>`}).join('')}`;
+  $('rule-ed').oninput=e=>ruleEd=e.target.value;
+  $('r-tpl').onclick=()=>{ruleEd=d.template;ruleRes=null;drawRules()};
+  $('r-test').onclick=()=>post('/api/rules/test',{yaml:ruleEd}).then(r=>{ruleRes=r;drawRules()});
+  $('r-save').onclick=()=>post('/api/rules/save',{yaml:ruleEd}).then(r=>{ruleRes=r.error?r:{saved:r.ids};loadRules()});
+  el.querySelectorAll('[data-tog]').forEach(c=>c.onchange=()=>post('/api/rules/toggle',{id:c.dataset.tog,enabled:c.checked}).then(loadRules));
+  el.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{const id=b.dataset.view;ruleView[id]=ruleView[id]===b.dataset.k?null:b.dataset.k;drawRules()});
+  el.querySelectorAll('[data-edit]').forEach(b=>b.onclick=()=>{ruleEd=d.rules[+b.dataset.edit].yaml;ruleRes=null;drawRules();$('rule-ed').scrollIntoView({block:'center'})});
+  el.querySelectorAll('[data-del]').forEach(b=>b.onclick=()=>{if(confirm('Διαγραφή του κανόνα '+b.dataset.del+' από το rules/local.yaml;'))post('/api/rules/delete',{id:b.dataset.del}).then(r=>{if(r.error)ruleRes=r;loadRules()})});
+  el.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{navigator.clipboard?.writeText($(b.dataset.copy).textContent);b.textContent='✔ αντιγράφηκε'})}
+
+// ================= 🚩 CTF =================
+let ctfData=null;const ctfIn={},ctfMsg={},ctfHint={},ctfRule={};let ctfSolved={};
+try{ctfSolved=JSON.parse(localStorage.getItem('nw-ctf')||'{}')}catch(e){}
+const saveCtf=()=>{try{localStorage.setItem('nw-ctf',JSON.stringify(ctfSolved))}catch(e){}};
+function loadCtf(){return fetch('/api/ctf').then(r=>r.json()).then(j=>{ctfData=j;if(tab==='ctf'&&!edBusy())drawCtf()})}
+function renderCtf(){if(!ctfData){$('t-ctf').innerHTML='<div class="empty">φόρτωση…</div>';loadCtf();return}drawCtf()}
+function drawCtf(){const d=ctfData,el=$('t-ctf');if(!d.levels.length){el.innerHTML='<div class="empty">Δεν βρέθηκαν επίπεδα — τρέξε <code>python tools/make_ctf.py</code></div>';return}
+  const pts=d.levels.reduce((n,lv)=>n+lv.questions.filter(q=>ctfSolved[lv.id+':'+q.id]).reduce((a,q)=>a+q.points,0),0),max=d.levels.reduce((n,lv)=>n+lv.total,0);
+  const act=d.levels.find(l=>l.id===d.active);
+  let h=`<div class="card brow"><span>🚩 <b style="color:#fff">${pts}</b> / ${max} πόντοι</span><span class="sm">${Object.keys(ctfSolved).length} λυμένες</span></div>`;
+  if(act)h+=`<div class="card" style="border-color:#ffd23f;background:#2a2410"><b style="color:#ffd23f">▶ Παίζεις: ${esc(act.title)}</b><div class="sm" style="margin-top:3px">Ο χάρτης και όλες οι καρτέλες δείχνουν τώρα το pcap του επιπέδου. Ερεύνησε: ⚠ Επιθέσεις, 📟 Συσκευές, 🔎 Λεπτομέρειες, 📦 Πακέτα, 🛡 Έλεγχος.</div><button class="b" id="ctf-exit" style="margin-top:6px">← Επιστροφή στο ${esc({live:'live δίκτυο',demo:'demo',pcap:'pcap'}[d.origin]||'κανονικό')}</button></div>`;
+  else h+=`<div class="sm" style="margin-bottom:8px">Κάθε επίπεδο φορτώνει ένα pcap με μια «ιστορία». Ερεύνησέ το με τα εργαλεία του NetWatch σαν αναλυτής SOC και απάντησε στις ερωτήσεις. Η κανονική παρακολούθηση σταματά όσο παίζεις.</div>`;
+  h+=d.levels.map(lv=>{const solved=lv.questions.filter(q=>ctfSolved[lv.id+':'+q.id]).length,on=lv.id===d.active;
+    return `<div class="card" style="${on?'border-color:#ffd23f':''}"><div class="brow"><b style="color:#fff;font-size:13px">${esc(lv.title)}</b><span class="tag ${{'Εύκολο':'g','Μέτριο':'y','Δύσκολο':'r'}[lv.difficulty]||''}">${esc(lv.difficulty)}</span></div>
+      <div style="color:#9fb4d0;margin:4px 0;white-space:normal">${esc(lv.story)}</div>
+      <div class="brow"><span class="sm">${solved}/${lv.questions.length} · ${lv.questions.filter(q=>ctfSolved[lv.id+':'+q.id]).reduce((a,q)=>a+q.points,0)}/${lv.total} πόντοι</span>${on?'<span class="tag y">φορτωμένο</span>':`<button class="b" data-load="${esc(lv.id)}">▶ Φόρτωσε το pcap</button>`}</div>
+      <div class="bar"><i style="width:${100*solved/lv.questions.length}%;background:#3ddc97"></i></div>
+      ${on||solved?lv.questions.map(q=>{const k=lv.id+':'+q.id,ok=ctfSolved[k];
+        return `<div style="border-top:1px solid var(--line);padding:7px 0"><div class="brow"><span style="white-space:normal">${ok?'✅':'❔'} ${esc(q.q)}</span><span class="sm">${q.points}</span></div>
+        ${ok?'':q.type==='rule'?`<textarea class="ctf-rule" data-k="${k}" rows="8" spellcheck="false" placeholder="id: slow-scan&#10;match:&#10;  proto: TCP&#10;  ..." style="width:100%;box-sizing:border-box;margin-top:4px;background:#060a12;color:#cfe0f5;border:1px solid var(--line);border-radius:4px;padding:6px;font:12px ui-monospace,Menlo,monospace">${esc(ctfRule[k]||'')}</textarea><button class="b" data-rule="${k}">🧪 Έλεγχος κανόνα</button>`
+          :`<div style="display:flex;gap:6px;margin-top:4px"><input class="f ctf-in" data-k="${k}" style="margin:0" value="${esc(ctfIn[k]||'')}" placeholder="απάντηση"><button class="b" data-ans="${k}">Υποβολή</button></div>`}
+        ${ok?'':`<button class="b" data-hint="${k}" style="margin-top:4px">💡 hint</button>`}${ctfHint[k]&&!ok?`<div class="sm" style="margin-top:3px">💡 ${esc(q.hint)}</div>`:''}
+        ${ctfMsg[k]&&!ok?`<div class="sm" style="margin-top:3px;white-space:normal">${ctfMsg[k]}</div>`:''}</div>`}).join(''):''}</div>`}).join('');
+  h+=`<button class="b" id="ctf-reset" style="margin-top:4px">μηδενισμός προόδου</button>`;
+  el.innerHTML=h;
+  const ex=$('ctf-exit');if(ex)ex.onclick=()=>post('/api/ctf/exit').then(()=>setTimeout(loadCtf,300));
+  el.querySelectorAll('[data-load]').forEach(b=>b.onclick=()=>{b.disabled=true;b.textContent='φορτώνω…';post('/api/ctf/load',{level:b.dataset.load}).then(r=>{if(r.error)alert(r.error);setTimeout(loadCtf,300)})});
+  el.querySelectorAll('.ctf-in').forEach(i=>{i.oninput=()=>ctfIn[i.dataset.k]=i.value;i.onkeydown=e=>{if(e.key==='Enter')el.querySelector(`[data-ans="${i.dataset.k}"]`).click()}});
+  el.querySelectorAll('.ctf-rule').forEach(t=>t.oninput=()=>ctfRule[t.dataset.k]=t.value);
+  el.querySelectorAll('[data-hint]').forEach(b=>b.onclick=()=>{ctfHint[b.dataset.hint]=!ctfHint[b.dataset.hint];drawCtf()});
+  el.querySelectorAll('[data-ans]').forEach(b=>b.onclick=()=>{const k=b.dataset.ans,[lv,q]=k.split(':');
+    post('/api/ctf/answer',{level:lv,q,answer:ctfIn[k]||''}).then(r=>{if(r.correct){ctfSolved[k]=true;saveCtf()}else ctfMsg[k]=r.error?esc(r.error):'❌ Όχι — ξαναδοκίμασε.';drawCtf()})});
+  el.querySelectorAll('[data-rule]').forEach(b=>b.onclick=()=>{const k=b.dataset.rule,[lv,q]=k.split(':');b.textContent='τρέχω τον κανόνα στο pcap…';
+    post('/api/ctf/rule',{level:lv,q,yaml:ctfRule[k]||''}).then(r=>{if(r.error)ctfMsg[k]='✖ '+esc(r.error);else if(r.correct){ctfSolved[k]=true;saveCtf()}
+      else ctfMsg[k]=r.actors.length?`❌ Ο κανόνας χτύπησε ${r.actors.map(a=>'<b>'+esc(a)+'</b>').join(', ')} (${r.count} ειδοποιήσεις). ${r.actors.length>1?'Έχεις false positives — κάνε τον πιο συγκεκριμένο.':'Δεν είναι ο scanner.'}`:'❌ Ο κανόνας δεν χτύπησε τίποτα σε όλο το pcap — χαλάρωσε τα κριτήρια ή μεγάλωσε το window.';drawCtf()})});
+  $('ctf-reset').onclick=()=>{if(confirm('Μηδενισμός όλης της προόδου στο CTF;')){ctfSolved={};saveCtf();drawCtf()}}}
+setInterval(()=>{if(tab==='rules'&&!edBusy()&&!tabHover())loadRules()},4000);
 setInterval(()=>{if(tab==='feed'&&!$('fpause').checked)renderFeed()},700);
 setInterval(()=>{if(tab==='audit')loadAudit()},3000);
 setInterval(()=>{if(tab==='hist')loadHist()},10000);

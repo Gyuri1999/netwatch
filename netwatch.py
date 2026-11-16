@@ -96,6 +96,20 @@ MITRE = [  # (πρόθεμα τύπου, technique id, όνομα, tactic, αν�
 ]
 
 
+EXTRA_MITRE = {  # τεχνικές που χρησιμοποιούν συχνά οι δικοί σου κανόνες
+    "T1021": ("Remote Services", "Lateral Movement"),
+    "T1021.001": ("Remote Services: Remote Desktop Protocol", "Lateral Movement"),
+    "T1021.002": ("Remote Services: SMB/Windows Admin Shares", "Lateral Movement"),
+    "T1021.004": ("Remote Services: SSH", "Lateral Movement"),
+    "T1048": ("Exfiltration Over Alternative Protocol", "Exfiltration"),
+    "T1041": ("Exfiltration Over C2 Channel", "Exfiltration"),
+    "T1090": ("Proxy", "Command and Control"),
+    "T1190": ("Exploit Public-Facing Application", "Initial Access"),
+    "T1110": ("Brute Force", "Credential Access"),
+    "T1498": ("Network Denial of Service", "Impact"),
+}
+
+
 def mitre_for(typ):
     for prefix, tid, name, tactic, _ in MITRE:
         if typ.startswith(prefix):
@@ -105,6 +119,8 @@ def mitre_for(typ):
 
 
 def detector_for(typ):
+    if typ.startswith("Κανόνας:"):
+        return "custom_rules"
     for prefix, *_rest, det in MITRE:
         if typ.startswith(prefix):
             return det
@@ -112,6 +128,8 @@ def detector_for(typ):
 
 
 # ---------------- ρυθμίσεις (config.yaml) ----------------
+RULES_DIR = os.path.join(HERE, "rules")
+
 DEFAULT_CONFIG = {
     "thresholds": {
         "alert_cooldown": 60,
@@ -130,7 +148,7 @@ DEFAULT_CONFIG = {
     "detectors": {d: True for d in (
         "port_scan", "stealth_scan", "network_sweep", "brute_force", "syn_flood", "icmp_flood",
         "arp_spoofing", "arp_flood", "rogue_dhcp", "dns_spoofing", "inbound", "suspicious_port",
-        "beaconing", "dns_tunnel", "dga", "new_device", "threat_intel", "cleartext_creds")},
+        "beaconing", "dns_tunnel", "dga", "new_device", "threat_intel", "cleartext_creds", "custom_rules")},
     "allowlist": {"ips": [], "macs": [], "domains": []},
     "intel": {
         "enabled": True,
@@ -515,6 +533,12 @@ class NetState:
         self.lab_ips = set()  # «επιτιθέμενοι» του purple-team lab (δεν πάνε σε ιστορικό/ειδοποιήσεις)
         self.scan_info = collections.defaultdict(dict)  # ip → {θύρα: banner/έκδοση/TLS από τον σαρωτή}
         self.scanner = self.lab = None
+        self.recent = collections.deque(maxlen=5000)  # τελευταία πακέτα για δοκιμή κανόνων
+        import rules as _rules
+        self.rules = _rules.RuleEngine(alert=self._rule_alert, ctx=self._rule_ctx)
+        self.feed = mode  # ποια πηγή «τροφοδοτεί» τώρα (live/demo/pcap/ctf)
+        self.feed_token = 0
+        self.ctf_level = None
         self.plain = collections.Counter()  # (client, πρωτόκολλο) → πακέτα χωρίς κρυπτογράφηση
         self.first_t, self.last_t = None, 0.0
         self.min_pkts = self.min_bytes = 0
@@ -668,7 +692,7 @@ class NetState:
     def _allowed_name(self, name):
         return bool(self.allow_domains) and name.lower().endswith(self.allow_domains)
 
-    def alert(self, typ, sev, actor, target, detail, t, key=None, cooldown=None, mark=True):
+    def alert(self, typ, sev, actor, target, detail, t, key=None, cooldown=None, mark=True, mitre=None):
         det = detector_for(typ)
         if det and not self.cfg["detectors"].get(det, True):
             return
@@ -682,7 +706,7 @@ class NetState:
         self.alert_seq += 1
         lab = actor in self.lab_ips
         a = dict(id=self.alert_seq, t=t, type=typ, sev=sev, actor=actor,
-                 target=target, detail=detail, mitre=mitre_for(typ), lab=lab)
+                 target=target, detail=detail, mitre=mitre or mitre_for(typ), lab=lab)
         self.alerts.appendleft(a)
         h = self.host(actor, t)
         if h:
@@ -792,6 +816,12 @@ class NetState:
                 self.detect(P, t)
             except Exception as e:  # never kill capture
                 log("detect error:", e)
+            self.recent.append(P)
+            if self.cfg["detectors"].get("custom_rules", True) and self.rules.rules:
+                try:
+                    self.rules.check(P, t)
+                except Exception as e:
+                    log("rule error:", e)
             x = 1 if (hs and hs["threat"] >= 2 and not hs["me"]) else 0
             if len(self.pending) < 4000:
                 self.pending.append({"s": src, "d": dst, "p": proto, "a": label, "l": L,
@@ -892,6 +922,129 @@ class NetState:
         if from_me and proto in ("TCP", "UDP") and dp in SUSPECT_PORTS and ("S" in fl or proto == "UDP"):
             self.alert("Ύποπτη εξερχόμενη θύρα", "low", dst, src,
                        f"Σύνδεση προς θύρα {dp} ({SUSPECT_PORTS[dp]})", t)
+
+    # --- αλλαγή πηγής κίνησης (CTF) ---
+    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "geo_q", "rdns_pool", "demo_geo", "home",
+            "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors")
+
+    def reset(self, mode, iface, me_ips, gateway, history, feed, notifier=None):
+        """Καθαρίζει όλη την κατάσταση και ξεκινά από την αρχή με νέα πηγή (κρατά συνδέσεις/ρυθμίσεις)."""
+        keep = {k: getattr(self, k) for k in self.KEEP if hasattr(self, k)}
+        with keep["lock"]:
+            self.__init__(mode, iface, me_ips, gateway, geo=keep["geo_enabled"], rdns=keep["rdns_enabled"],
+                          cfg=keep["cfg"], history=history, intel=keep["intel"])
+            for k, v in keep.items():
+                setattr(self, k, v)
+            self.rules.windows.clear()
+            self.feed = feed
+            self.feed_token += 1
+            self.notifier = notifier
+            snap = self.snapshot()
+        self.publish(snap)
+
+    # --- δικοί σου κανόνες (καρτέλα 🧩) ---
+    def _rule_ctx(self):
+        return {"me": self.me, "gw": self.gateway, "kind": ip_kind}
+
+    def _rule_alert(self, rule, actor, target, detail, t):
+        m = next(({"id": tid, "name": nm, "tactic": tac} for _, tid, nm, tac, _ in MITRE if tid == rule.mitre), None)
+        if not m and rule.mitre in EXTRA_MITRE:
+            m = {"id": rule.mitre, "name": EXTRA_MITRE[rule.mitre][0], "tactic": EXTRA_MITRE[rule.mitre][1]}
+        if rule.mitre and not m:
+            m = {"id": rule.mitre, "name": "", "tactic": rule.tactic or "Custom"}
+        if m:
+            m["url"] = "https://attack.mitre.org/techniques/" + m["id"].replace(".", "/") + "/"
+        self.alert("Κανόνας: " + rule.title, rule.severity, actor, target, detail, t,
+                   key=(rule.id, actor), cooldown=rule.cooldown, mitre=m)
+
+    def rules_view(self):
+        import rules as R
+        ctx = self._rule_ctx()
+        out = []
+        for r in self.rules.rules:
+            i = r.info()
+            i.update(hits=self.rules.hits.get(r.id, 0), last_hit=self.rules.last_hit.get(r.id),
+                     sigma=R.to_sigma(r), suricata=R.to_suricata(r, R.sid_for(r.id), ctx))
+            out.append(i)
+        return {"rules": out, "errors": getattr(self, "rule_errors", []), "help": R.FIELD_HELP,
+                "template": R.TEMPLATE, "recent": len(self.recent),
+                "enabled": self.cfg["detectors"].get("custom_rules", True)}
+
+    def test_rules(self, text):
+        """Δοκιμή κανόνα στα τελευταία πακέτα — χωρίς ειδοποιήσεις."""
+        import rules as R
+        rs = R.parse_rules(text, "δοκιμή")
+        if not rs:
+            raise R.RuleError("Κενός κανόνας")
+        with self.lock:
+            pkts = list(self.recent)
+        ctx = self._rule_ctx()
+        fired = {}
+
+        def hit(r, a, tg, d, t):
+            v = fired.setdefault((r.id, a), {"rule": r.id, "actor": a, "target": tg, "detail": d, "t": t, "n": 0})
+            v["n"] += 1
+        eng = R.RuleEngine(rs, ctx=ctx, alert=hit)
+        matches, sample = collections.Counter(), []
+        for P in pkts:
+            for r in rs:
+                if r.matches(P, ctx):
+                    matches[r.id] += 1
+                    if len(sample) < 10:
+                        sample.append({k: P.get(k) for k in ("t", "src", "dst", "proto", "sp", "dp", "flags")} |
+                                      {"q": (P.get("dns_q") or (None,))[0] or P.get("sni") or P.get("http_host")})
+            eng.check(P, P["t"])
+        return {"packets": len(pkts), "matches": dict(matches), "alerts": list(fired.values())[:30],
+                "sample": sample, "rules": [r.id for r in rs]}
+
+    def reload_rules(self):
+        import rules as R
+        rs, errs = R.load_dir(RULES_DIR)
+        self.rules.set_rules(rs)
+        self.rule_errors = errs
+        for e in errs:
+            log("⚠ κανόνας:", e)
+        return rs
+
+    def save_rule(self, text):
+        import rules as R
+        new = R.parse_rules(text, "local.yaml")
+        if not new:
+            raise R.RuleError("Κενός κανόνας")
+        path = os.path.join(RULES_DIR, "local.yaml")
+        cur = []
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                cur = R.parse_rules(f.read(), "local.yaml")
+        others = {r.id: r.source for r in self.rules.rules if r.source != "local.yaml"}
+        for r in new:
+            if r.id in others:
+                raise R.RuleError(f"Το id «{r.id}» υπάρχει ήδη στο {others[r.id]} — διάλεξε άλλο")
+        ids = {r.id for r in new}
+        data = [r.raw for r in cur if r.id not in ids] + [r.raw for r in new]
+        self._write_local(data)
+        return [r.id for r in new]
+
+    def delete_rule(self, rid):
+        import rules as R
+        path = os.path.join(RULES_DIR, "local.yaml")
+        if not os.path.exists(path):
+            raise R.RuleError("Δεν υπάρχουν δικοί σου κανόνες")
+        with open(path, encoding="utf-8") as f:
+            cur = R.parse_rules(f.read(), "local.yaml")
+        if rid not in {r.id for r in cur}:
+            raise R.RuleError("Μόνο κανόνες του local.yaml σβήνονται από εδώ")
+        self._write_local([r.raw for r in cur if r.id != rid])
+
+    def _write_local(self, data):
+        import yaml
+        os.makedirs(RULES_DIR, exist_ok=True)
+        path = os.path.join(RULES_DIR, "local.yaml")
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("# Οι δικοί σου κανόνες (γράφονται από την καρτέλα 🧩 Κανόνες)\n")
+            yaml.safe_dump(data, f, allow_unicode=True, sort_keys=False)
+        chown_to_user(path)
+        self.reload_rules()
 
     # --- κωδικοί που ταξιδεύουν χωρίς κρυπτογράφηση ---
     def _cred(self, P, t):
@@ -1206,7 +1359,8 @@ class NetState:
             return {"type": "snapshot", "mode": self.mode, "iface": self.iface,
                     "me": sorted(self.me), "gw": self.gateway, "home": self.home,
                     "hosts": [self.ser(h) for h in self.hosts.values()],
-                    "alerts": list(self.alerts)[:200], "stats": self._stats(1), "features": self.features()}
+                    "alerts": list(self.alerts)[:200], "stats": self._stats(1), "features": self.features(),
+                    "feed": self.feed, "ctf": self.ctf_level}
 
     def _stats(self, dt):
         return {"pps": round(self.win_pkts / dt, 1), "bps": round(self.win_bytes / dt),
@@ -1505,6 +1659,8 @@ def live_capture(state, iface, bpf):
     parse = make_parser()
 
     def cb(pkt):
+        if state.feed != "live":
+            return
         try:
             P = parse(pkt)
             if P:
@@ -1549,6 +1705,49 @@ def detect_net(iface=None):
             if me:
                 break
     return iface, gw, me
+
+
+# ---------------- CTF ----------------
+def ctf_load(state, level_id, speed=20):
+    import ctf
+    lv = ctf.level(level_id)
+    path = os.path.join(HERE, lv["pcap"])
+    if not os.path.exists(path):
+        raise ValueError(f"Λείπει το {lv['pcap']} — τρέξε: python tools/make_ctf.py")
+    state.reset("pcap", f"CTF · {lv['title']}", [lv["me"]], lv["gw"], History(":memory:"), feed="ctf")
+    state.ctf_level = level_id
+    state.publish(state.snapshot())
+    threading.Thread(target=pcap_replay, args=(state, path, speed), daemon=True).start()
+    log(f"🚩 CTF: φορτώθηκε το επίπεδο «{lv['title']}»")
+
+
+def ctf_exit(state):
+    o = state.origin
+    state.reset(o["mode"], o["iface"], o["me"], o["gw"], o["history"], feed=o["mode"], notifier=o["notifier"])
+    if o.get("seed"):
+        o["seed"]()
+    if o.get("start"):
+        threading.Thread(target=o["start"], daemon=True).start()
+    log("🚩 CTF: επιστροφή στην κανονική παρακολούθηση")
+
+
+def ctf_check_rule(level_id, qid, text):
+    """Τρέχει τον κανόνα του παίκτη σε ένα «καθαρό» NetWatch πάνω στο pcap του επιπέδου."""
+    import ctf
+    import rules as R
+    lv = ctf.level(level_id)
+    rs = R.parse_rules(text, "ctf")
+    if not rs:
+        raise R.RuleError("Κενός κανόνας")
+    s = NetState("pcap", "ctf-check", [lv["me"]], lv["gw"], geo=False, rdns=False)
+    s.rules.set_rules(rs)
+    s.cfg["thresholds"]["alert_cooldown"] = 0
+    pcap_replay(s, os.path.join(HERE, lv["pcap"]), speed=0)
+    hits = [a for a in s.alerts if a["type"].startswith("Κανόνας:")]
+    actors = sorted({a["actor"] for a in hits})
+    return {"correct": ctf.check_rule_actors(level_id, qid, actors), "actors": actors,
+            "alerts": [{"actor": a["actor"], "target": a["target"], "detail": a["detail"]} for a in hits[:10]],
+            "count": len(hits)}
 
 
 def seed_arp(state):
@@ -1596,10 +1795,13 @@ def pcap_replay(state, path, speed=1.0, loop=False, done=None):
     from scapy.all import PcapReader
     parse = make_parser()
     shift, rnd = 0.0, 0
+    token = state.feed_token
     while True:
         wall0, first, last, n = time.time(), None, None, 0
         with PcapReader(path) as rd:
             for pkt in rd:
+                if state.feed_token != token:  # άλλαξε η πηγή (π.χ. φορτώθηκε επίπεδο CTF)
+                    return
                 pt = float(pkt.time)
                 if first is None:
                     first = pt
@@ -1713,10 +1915,13 @@ def demo_run(state):
     macs = {gw: "a4:2b:b0:11:22:01", me: "3c:22:fb:aa:bb:23", "192.168.1.10": "f0:de:f1:10:10:10",
             "192.168.1.15": "ac:1f:74:15:15:15", "192.168.1.40": "00:1e:0b:40:40:40",
             "192.168.1.77": "de:ad:be:ef:77:77", "192.168.1.30": "c0:56:e3:30:30:30"}
-    state.arp_table.update(macs)
-    state.arp_first.update(macs)
-    for ip, m in macs.items():
-        state.mac_ips[m].add(ip)
+    def seed():
+        state.arp_table.update(macs)
+        state.arp_first.update(macs)
+        for ip, m in macs.items():
+            state.mac_ips[m].add(ip)
+    seed()
+    state.demo_seed = seed
     state.home = {"status": "success", "query": "79.130.12.34", "country": "Greece", "countryCode": "GR",
                   "city": "Athens", "regionName": "Attica", "lat": 37.98, "lon": 23.73,
                   "isp": "Demo ISP", "org": "Demo ISP", "as": "AS6799 (demo)"}
@@ -1748,6 +1953,8 @@ def demo_run(state):
     state.cfg["thresholds"]["new_device"]["warmup"] = 30
 
     def emit(**P):
+        if state.feed != "demo":
+            return
         P.setdefault("t", time.time())
         P.setdefault("len", random.randint(60, 1500))
         state.process(P)
@@ -1939,6 +2146,34 @@ def make_handler(state):
                 if u.path == "/api/lab":
                     state.lab.start(str(body.get("kind")), str(body.get("variant")))
                     return self._json({"ok": True})
+                if u.path == "/api/ctf/load":
+                    ctf_load(state, str(body.get("level")))
+                    return self._json({"ok": True})
+                if u.path == "/api/ctf/exit":
+                    ctf_exit(state)
+                    return self._json({"ok": True})
+                if u.path == "/api/ctf/answer":
+                    import ctf
+                    return self._json({"correct": ctf.check(str(body.get("level")), str(body.get("q")),
+                                                            str(body.get("answer") or "")[:200])})
+                if u.path == "/api/ctf/rule":
+                    return self._json(ctf_check_rule(str(body.get("level")), str(body.get("q")),
+                                                     str(body.get("yaml") or "")))
+                if u.path == "/api/rules/test":
+                    return self._json(state.test_rules(str(body.get("yaml") or "")))
+                if u.path == "/api/rules/save":
+                    ids = state.save_rule(str(body.get("yaml") or ""))
+                    log(f"🧩 αποθηκεύτηκε κανόνας: {', '.join(ids)}")
+                    return self._json({"ok": True, "ids": ids})
+                if u.path == "/api/rules/delete":
+                    state.delete_rule(str(body.get("id")))
+                    return self._json({"ok": True})
+                if u.path == "/api/rules/toggle":
+                    r = next((r for r in state.rules.rules if r.id == body.get("id")), None)
+                    if not r:
+                        return self._json({"error": "δεν βρέθηκε"}, 404)
+                    r.enabled = bool(body.get("enabled"))
+                    return self._json({"ok": True})
                 if u.path == "/api/exposure":
                     if state.mode == "demo":
                         return self._json(DEMO_SHODAN)
@@ -1976,6 +2211,16 @@ def make_handler(state):
                 return self._json(st)
             if u.path == "/api/lab":
                 return self._json(state.lab.status() if state.lab else {"status": "off"})
+            if u.path == "/api/rules":
+                return self._json(state.rules_view())
+            if u.path == "/api/ctf":
+                import ctf
+                try:
+                    levels = ctf.public()
+                except OSError:
+                    levels = []
+                return self._json({"levels": levels, "active": state.ctf_level, "feed": state.feed,
+                                   "origin": (state.origin or {}).get("mode") if hasattr(state, "origin") else None})
             if u.path == "/api/cve":
                 import pentest
                 q = parse_qs(u.query)
@@ -2094,6 +2339,8 @@ def main():
             threading.Thread(target=fetch_home, args=(state,), daemon=True).start()
         threading.Thread(target=live_capture, args=(state, iface, args.filter), daemon=True).start()
 
+    state.reload_rules()
+    log(f"Κανόνες: {len(state.rules.rules)} από {RULES_DIR}")
     import pentest
     state.scanner = pentest.LanScanner(sim=demo_scan if mode == "demo" else None)
     state.scanner.on_result = state.scan_result
@@ -2110,6 +2357,11 @@ def main():
         threading.Thread(target=start_replay, daemon=True).start()
 
     threading.Thread(target=state.flusher, daemon=True).start()
+    state.origin = {"mode": mode, "iface": state.iface, "me": sorted(state.me), "gw": state.gateway,
+                    "history": history, "notifier": state.notifier,
+                    "start": start_replay if mode == "pcap" else None,
+                    "seed": getattr(state, "demo_seed", None) if mode == "demo" else
+                    (lambda: seed_arp(state)) if mode == "live" else None}
     srv = None
     for port in range(args.port, args.port + 20):
         try:

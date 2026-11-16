@@ -1,0 +1,56 @@
+# Κανόνες που έρχονται με το NetWatch. Τους δικούς σου γράψ' τους από την καρτέλα 🧩 Κανόνες
+# (αποθηκεύονται στο rules/local.yaml) ή πρόσθεσε νέα αρχεία .yaml σε αυτόν τον φάκελο.
+- id: telnet-connection
+  title: Σύνδεση Telnet
+  severity: med
+  mitre: T1021
+  description: Κάποιος ανοίγει Telnet — ό,τι πληκτρολογεί, μαζί με τον κωδικό, ταξιδεύει χωρίς κρυπτογράφηση
+  match:
+    proto: TCP
+    dport: 23
+    flags: S
+
+- id: smb-to-internet
+  title: SMB προς το Internet
+  severity: high
+  mitre: T1021.002
+  description: Κοινή χρήση αρχείων Windows (SMB) προς δημόσια IP — δεν πρέπει να συμβαίνει ποτέ, πιθανή διαρροή
+  match:
+    src: local
+    dst: public
+    proto: TCP
+    dport: [139, 445]
+    flags: S
+
+- id: remote-desktop-from-internet
+  title: RDP/VNC από το Internet
+  severity: high
+  mitre: T1021.001
+  description: Σύνδεση απομακρυσμένης επιφάνειας εργασίας από το Internet — έλεγξε το port forwarding του router
+  match:
+    src: public
+    dst: local
+    proto: TCP
+    dport: [3389, 5900]
+    flags: S
+
+- id: lan-backdoor-ports
+  title: Συσκευή του LAN σε θύρα backdoor
+  severity: high
+  mitre: T1571
+  description: Μια συσκευή του σπιτιού (όχι μόνο εσύ) συνδέεται σε θύρα που χρησιμοποιούν backdoors/botnets
+  match:
+    src: local
+    dst: public
+    proto: TCP
+    flags: S
+    dport: [1337, 4444, 5555, 6666, 6667, 31337]
+
+- id: suspicious-tld
+  title: Ύποπτο domain (TLD)
+  severity: low
+  mitre: T1071.004
+  description: Ερώτημα DNS για κατάληξη που χρησιμοποιείται δυσανάλογα συχνά σε phishing/malware
+  cooldown: 300
+  match:
+    dns_query: ["*.zip", "*.mov", "*.top", "*.xyz", "*.tk", "*.onion"]

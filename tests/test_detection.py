@@ -540,3 +540,177 @@ def test_post_endpoints_block_cross_site_requests(server):
     assert _post(server + "/api/scan", {"target": "8.8.8.0/24"}, ok)[0] == 400
     assert _post(server + "/api/lab", {"kind": "nope", "variant": "loud"}, ok)[0] == 400
     assert _post(server + "/api/lab", {"kind": "xmas", "variant": "loud"}, ok) == (200, {"ok": True})
+
+
+# ---------------- κανόνες (detection engineering) ----------------
+import rules as R  # noqa: E402
+import ctf  # noqa: E402
+
+
+def P_(**kw):
+    kw.setdefault("t", 1.0)
+    kw.setdefault("len", 60)
+    return kw
+
+
+CTX = {"me": {ME}, "gw": GW, "kind": nw.ip_kind}
+
+
+def test_rule_matching_ip_keywords_ports_and_negation():
+    r = R.parse_rules("""
+id: lan-to-net-high
+match:
+  src: [local, "!192.168.1.1"]
+  dst: public
+  proto: TCP
+  dport: ["4000-4500", 6667]
+  flags: S
+""")[0]
+    ok = P_(src="192.168.1.20", dst="185.1.2.3", proto="TCP", sp=5000, dp=4444, flags="S")
+    assert r.matches(ok, CTX)
+    assert not r.matches({**ok, "src": GW}, CTX)            # αρνητικό
+    assert not r.matches({**ok, "dst": "192.168.1.9"}, CTX)  # όχι public
+    assert not r.matches({**ok, "dp": 443}, CTX)
+    assert not r.matches({**ok, "flags": "SA"}, CTX)
+    me = R.parse_rules("id: from-me\nmatch: {src: me, dns_query: '*.xyz'}")[0]
+    assert me.matches(P_(src=ME, dst=GW, proto="UDP", dns_q=("evil.XYZ", 1)), CTX)
+    assert not me.matches(P_(src=ME, dst=GW, proto="UDP", dns_q=("good.com", 1)), CTX)
+
+
+@pytest.mark.parametrize("text,msg", [
+    ("id: a\nmatch: {proto: TCP}", "id"),
+    ("id: ok-id\nmatch: {colour: red}", "Άγνωστα πεδία στο match"),
+    ("id: ok-id\nmatch: {dport: 70000}", "Θύρα"),
+    ("id: ok-id\nmatch: {src: 'not-an-ip'}", "IP"),
+    ("id: ok-id\nseverity: extreme\nmatch: {proto: TCP}", "severity"),
+    ("id: ok-id\nmatch: {proto: TCP}\nthreshold: {by: port}", "threshold.by"),
+    ("id: ok-id\nmatch: {proto: TCP}\nthreshold: {distinct: password}", "distinct"),
+    ("id: ok-id\n", "match"),
+    ("id: [unclosed", "YAML"),
+])
+def test_rule_validation_errors_are_clear(text, msg):
+    with pytest.raises(R.RuleError, match=msg):
+        R.parse_rules(text)
+
+
+def test_rule_threshold_distinct_counts_unique_values():
+    r = R.parse_rules("id: many-ports\nmatch: {proto: TCP, flags: S}\n"
+                      "threshold: {count: 5, window: 60, by: src, distinct: dport}")[0]
+    fired = []
+    eng = R.RuleEngine([r], ctx=CTX, alert=lambda *a: fired.append(a[1]))
+    for i in range(10):  # ίδια θύρα 10 φορές → τίποτα
+        eng.check(P_(t=i, src=ME, dst="1.2.3.4", proto="TCP", sp=1, dp=443, flags="S"), i)
+    assert not fired
+    for i in range(5):
+        eng.check(P_(t=20 + i, src=EVIL, dst=ME, proto="TCP", sp=1, dp=100 + i, flags="S"), 20 + i)
+    assert fired == [EVIL]
+
+
+def test_rule_exports_to_sigma_and_suricata():
+    import yaml
+    r = R.parse_rules("""
+id: tv-backdoor
+title: TV σε backdoor
+severity: high
+mitre: T1571
+match: {src: 192.168.1.10, dst: public, proto: TCP, dport: [4444, 6667], flags: S}
+threshold: {count: 3, window: 60, by: src}
+""")[0]
+    sig = yaml.safe_load(r.to_sigma())
+    assert sig["level"] == "high" and sig["tags"] == ["attack.t1571"]
+    sel = sig["detection"]["selection"]
+    assert sel["src_ip|cidr"] == "192.168.1.10/32" and sel["dst_port"] == [4444, 6667]
+    assert "count() by src_ip >= 3" in sig["detection"]["condition"]
+    suri = R.to_suricata(r, 9000001)
+    assert suri.startswith("alert tcp 192.168.1.10/32 any -> $EXTERNAL_NET [4444,6667] (")
+    assert "flags:S;" in suri and "track by_src, count 3, seconds 60" in suri and "sid:9000001;" in suri
+    dns = R.parse_rules("id: tld\nmatch: {dns_query: '*.xyz'}")[0]
+    assert 'alert dns' in R.to_suricata(dns, 1) and 'dns.query; content:".xyz"; nocase; endswith;' in R.to_suricata(dns, 1)
+
+
+def test_default_rules_load_and_fire_with_mitre(state):
+    state.reload_rules()
+    assert {r.id for r in state.rules.rules} >= {"telnet-connection", "smb-to-internet"}
+    assert not state.rule_errors
+    feed(state, Clock(), src=ME, dst="192.168.1.30", proto="TCP", sp=50000, dp=23, flags="S")
+    a = next(a for a in state.alerts if a["type"] == "Κανόνας: Σύνδεση Telnet")
+    assert a["mitre"]["id"] == "T1021" and a["mitre"]["tactic"] == "Lateral Movement"
+
+
+def test_rule_test_save_and_delete(state, tmp_path, monkeypatch):
+    monkeypatch.setattr(nw, "RULES_DIR", str(tmp_path))
+    c = Clock()
+    for p in range(1, 8):
+        feed(state, c, src=EVIL, dst=ME, proto="TCP", sp=1, dp=p, flags="S")
+    text = "id: my-scan\nmatch: {proto: TCP, flags: S}\nthreshold: {count: 5, window: 60, distinct: dport}"
+    res = state.test_rules(text)
+    assert res["matches"]["my-scan"] == 7 and res["alerts"][0]["actor"] == EVIL and res["alerts"][0]["n"] == 3
+    assert not any(a["type"].startswith("Κανόνας") for a in state.alerts)  # η δοκιμή δεν βγάζει ειδοποιήσεις
+    assert state.save_rule(text) == ["my-scan"]
+    assert [r.id for r in state.rules.rules] == ["my-scan"]
+    state.save_rule(text.replace("count: 5", "count: 6"))  # ίδιο id → αντικατάσταση
+    assert len(state.rules.rules) == 1 and state.rules.rules[0].threshold["count"] == 6
+    state.delete_rule("my-scan")
+    assert state.rules.rules == []
+
+
+# ---------------- CTF ----------------
+CTF_ANSWERS = {("l1", "q1"): "192.168.1.66", ("l1", "q7"): "T1557.002 ", ("l2", "q1"): "192.168.1.20",
+               ("l2", "q3"): "30s", ("l2", "q4"): "K3JD9FH2LQ.example", ("l3", "q1"): "192.168.1.77",
+               ("l3", "q3"): "445, 22"}
+
+
+def test_ctf_answers_are_hashed_and_checked():
+    raw = open(ctf.CTF_FILE, encoding="utf-8").read()
+    assert "192.168.1.66" not in raw and "k3jd9fh2lq" not in raw  # δεν «προδίδονται»
+    for (lv, q), ans in CTF_ANSWERS.items():
+        assert ctf.check(lv, q, ans), (lv, q)
+    assert not ctf.check("l1", "q1", "192.168.1.1")
+    assert all("answers" not in q for lv in ctf.public() for q in lv["questions"])
+
+
+def test_ctf_generator_is_reproducible(tmp_path):
+    import make_ctf
+    make_ctf.build(str(tmp_path))
+    for name in ("level2-silent-visitor.pcap", "level3-patient-scanner.pcap"):
+        assert open(tmp_path / name, "rb").read() == open(os.path.join(ROOT, "ctf", name), "rb").read()
+    assert json.load(open(tmp_path / "challenges.json")) == ctf.load()
+
+
+def test_ctf_level2_alerts_tell_the_story():
+    lv = ctf.level("l2")
+    s = nw.NetState("pcap", "l2", [lv["me"]], lv["gw"], geo=False, rdns=False)
+    nw.pcap_replay(s, os.path.join(ROOT, lv["pcap"]), speed=0)
+    t = {a["type"].split(" (")[0]: a for a in s.alerts}
+    assert t["DGA domains"]["actor"] == "192.168.1.20"
+    assert t["Beaconing"]["target"] == "192.168.1.20" and "~30s" in t["Beaconing"]["detail"]
+
+
+def test_ctf_level3_is_silent_and_rule_challenge_needs_precision():
+    lv = ctf.level("l3")
+    s = nw.NetState("pcap", "l3", [lv["me"]], lv["gw"], geo=False, rdns=False)
+    s.reload_rules()
+    nw.pcap_replay(s, os.path.join(ROOT, lv["pcap"]), speed=0)
+    assert not s.alerts, [a["type"] for a in s.alerts]  # οι ανιχνευτές δεν βλέπουν τίποτα
+    good = "id: slow-scan\nmatch: {proto: TCP, flags: S}\nthreshold: {count: 10, window: 120, distinct: dport}"
+    assert nw.ctf_check_rule("l3", "rule", good)["correct"]
+    naive = nw.ctf_check_rule("l3", "rule", "id: syn-count\nmatch: {proto: TCP, flags: S}\n"
+                                            "threshold: {count: 15, window: 120}")
+    assert not naive["correct"] and len(naive["actors"]) > 1  # false positives
+    assert not nw.ctf_check_rule("l3", "rule", "id: nothing\nmatch: {dport: 1}")["correct"]
+
+
+def test_ctf_load_and_exit_switch_the_data_source(state, monkeypatch):
+    monkeypatch.setattr(nw, "pcap_replay", lambda st, path, speed=1.0, **k: None)
+    seeded = []
+    state.reload_rules()
+    feed(state, Clock(), src=EVIL, dst=ME, proto="TCP", sp=1, dp=80, flags="FPU")
+    state.origin = {"mode": "test", "iface": "test0", "me": [ME], "gw": GW, "history": state.history,
+                    "notifier": None, "start": None, "seed": lambda: seeded.append(1)}
+    token = state.feed_token
+    nw.ctf_load(state, "l2")
+    assert state.feed == "ctf" and state.ctf_level == "l2" and not state.alerts and state.feed_token == token + 1
+    assert state.rules.rules  # οι κανόνες κρατιούνται
+    nw.ctf_exit(state)
+    assert state.feed == "test" and state.ctf_level is None and seeded == [1]
+    assert state.history.query(hours=24, ref=1_700_000_100)["total_alerts"] == 1  # το ιστορικό κρατήθηκε

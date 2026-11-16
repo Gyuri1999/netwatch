@@ -5,7 +5,9 @@ __pycache__/
 *.pcap
 *.pcapng
 !samples/*.pcap
+!ctf/*.pcap
 netwatch-incident-*.json
 .DS_Store
 data/
 config.yaml
+rules/local.yaml
