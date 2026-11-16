@@ -93,6 +93,10 @@ MITRE = [  # (πρόθεμα τύπου, technique id, όνομα, tactic, αν�
     ("Σύνδεση σε κακόβουλη IP", "T1071", "Application Layer Protocol", "Command and Control", "threat_intel"),
     ("Κίνηση από κακόβουλη IP", "T1595", "Active Scanning", "Reconnaissance", "threat_intel"),
     ("Κωδικός σε καθαρό κείμενο", "T1040", "Network Sniffing", "Credential Access", "cleartext_creds"),
+    ("Evil twin Wi‑Fi", "T1557", "Adversary-in-the-Middle", "Credential Access", "wifi_guard"),
+    ("DNS hijacking στο Wi‑Fi", "T1557", "Adversary-in-the-Middle", "Credential Access", "wifi_guard"),
+    ("TLS interception στο Wi‑Fi", "T1557", "Adversary-in-the-Middle", "Credential Access", "wifi_guard"),
+    ("Ανοιχτό Wi‑Fi", "T1040", "Network Sniffing", "Credential Access", "wifi_guard"),
 ]
 
 
@@ -148,7 +152,7 @@ DEFAULT_CONFIG = {
     "detectors": {d: True for d in (
         "port_scan", "stealth_scan", "network_sweep", "brute_force", "syn_flood", "icmp_flood",
         "arp_spoofing", "arp_flood", "rogue_dhcp", "dns_spoofing", "inbound", "suspicious_port",
-        "beaconing", "dns_tunnel", "dga", "new_device", "threat_intel", "cleartext_creds", "custom_rules")},
+        "beaconing", "dns_tunnel", "dga", "new_device", "threat_intel", "cleartext_creds", "custom_rules", "wifi_guard")},
     "allowlist": {"ips": [], "macs": [], "domains": []},
     "intel": {
         "enabled": True,
@@ -532,7 +536,7 @@ class NetState:
         self.creds, self.cred_users = {}, {}
         self.lab_ips = set()  # «επιτιθέμενοι» του purple-team lab (δεν πάνε σε ιστορικό/ειδοποιήσεις)
         self.scan_info = collections.defaultdict(dict)  # ip → {θύρα: banner/έκδοση/TLS από τον σαρωτή}
-        self.scanner = self.lab = None
+        self.scanner = self.lab = self.wifi = None
         self.recent = collections.deque(maxlen=5000)  # τελευταία πακέτα για δοκιμή κανόνων
         import rules as _rules
         self.rules = _rules.RuleEngine(alert=self._rule_alert, ctx=self._rule_ctx)
@@ -924,7 +928,7 @@ class NetState:
                        f"Σύνδεση προς θύρα {dp} ({SUSPECT_PORTS[dp]})", t)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
-    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "geo_q", "rdns_pool", "demo_geo", "home",
+    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "geo_q", "rdns_pool", "demo_geo", "home",
             "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors")
 
     def reset(self, mode, iface, me_ips, gateway, history, feed, notifier=None):
@@ -2174,6 +2178,14 @@ def make_handler(state):
                         return self._json({"error": "δεν βρέθηκε"}, 404)
                     r.enabled = bool(body.get("enabled"))
                     return self._json({"ok": True})
+                if u.path == "/api/wifi":
+                    if not state.wifi:
+                        return self._json({"error": "Wi‑Fi Guard off"}, 400)
+                    if "trusted" in body:
+                        state.wifi.set_trusted(str(body.get("ssid") or ""), bool(body["trusted"]))
+                    else:
+                        state.wifi.start("manual")
+                    return self._json(state.wifi.status())
                 if u.path == "/api/exposure":
                     if state.mode == "demo":
                         return self._json(DEMO_SHODAN)
@@ -2213,6 +2225,8 @@ def make_handler(state):
                 return self._json(state.lab.status() if state.lab else {"status": "off"})
             if u.path == "/api/rules":
                 return self._json(state.rules_view())
+            if u.path == "/api/wifi":
+                return self._json(state.wifi.status() if state.wifi else {"error": "off"})
             if u.path == "/api/ctf":
                 import ctf
                 try:
@@ -2345,6 +2359,17 @@ def main():
     state.scanner = pentest.LanScanner(sim=demo_scan if mode == "demo" else None)
     state.scanner.on_result = state.scan_result
     state.lab = pentest.Lab(state)
+    import wifiguard
+    state.wifi = wifiguard.Guard(state, sim=wifiguard.demo_check if mode == "demo" else None,
+                                 trusted_path=os.path.join(HERE, "data", "wifi_trusted.json") if mode == "live" else None)
+    state.wifi.on_save = chown_to_user
+    if cfg["detectors"].get("wifi_guard", True):
+        if mode == "live":
+            threading.Thread(target=state.wifi.watch, daemon=True).start()
+        elif mode == "demo":
+            tm = threading.Timer(8, state.wifi.start, args=("startup",))
+            tm.daemon = True
+            tm.start()
     if mode == "live" or args.notify:
         state.notifier = Notifier(cfg["notify"])
     if cfg["intel"].get("enabled", True) and cfg["detectors"].get("threat_intel", True) \

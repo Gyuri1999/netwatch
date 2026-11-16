@@ -130,6 +130,7 @@ a.mitre:hover{border-color:#b388ff}
       <button data-t="tips">💡 Συμβουλές</button>
       <button data-t="hist">🕓 Ιστορικό</button>
       <button data-t="audit">🛡 Έλεγχος</button>
+      <button data-t="wifi">☕ Wi‑Fi</button>
       <button data-t="quiz">🎓 Κουίζ</button>
       <button data-t="pentest">🔴 Pentest</button>
       <button data-t="rules">🧩 Κανόνες</button>
@@ -155,6 +156,7 @@ a.mitre:hover{border-color:#b388ff}
     <div class="tab" id="t-pentest"></div>
     <div class="tab" id="t-rules"></div>
     <div class="tab" id="t-ctf"></div>
+    <div class="tab" id="t-wifi"></div>
   </aside>
 </main>
 <script>
@@ -327,7 +329,7 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>showTab(b.datas
 function showTab(t){tab=t;document.querySelectorAll('nav button').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
   if(t==='alerts'){S.unread=0;$('ac').style.display='none'}renderTab()}
-function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,rules:renderRules,ctf:renderCtf})[tab]()}
+function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,rules:renderRules,ctf:renderCtf,wifi:renderWifi})[tab]()}
 function tabHover(){return document.querySelector('.tab.on:hover')}
 
 function eduHTML(type){const e=eduFor(type);if(!e)return'';
@@ -618,6 +620,7 @@ function handle(m){
     $('mode').textContent=m.feed==='ctf'?'🚩 CTF':{demo:'DEMO',pcap:'▶ PCAP'}[m.mode]||'● LIVE';$('mode').className='badge '+(m.mode==='live'?'live':'demo');
     $('iface').textContent=`${m.iface} · ${m.me.filter(i=>!i.includes(':'))[0]||m.me[0]||'?'}`;setStats(m.stats);renderTab();return}
   if(m.type==='home'){S.home=m.home;return}
+  if(m.type==='wifi'){if(wifiData){wifiData.result=m.result;wifiData.running=false}if(tab==='wifi')renderWifi();return}
   if(m.type==='features'){S.features=m.features;if(tab==='stats')renderStats();return}
   if(m.type==='alert'){addAlert(m.alert);if(tab==='alerts')renderAlerts();return}
   if(m.type==='pkts'){if(m.hosts)upsert(m.hosts);
@@ -816,6 +819,42 @@ setInterval(()=>{if(tab==='hist')loadHist()},10000);
 setInterval(()=>{if(tabHover())return;if(tab==='hosts')renderHosts();else if(tab==='det')renderDet();else if(tab==='devs')renderDevs();else if(tab==='stats')renderStats();else if(tab==='tips')renderTips()},2000);
 function connect(){const es=new EventSource('/events');es.onmessage=e=>handle(JSON.parse(e.data));es.onerror=()=>{es.close();setTimeout(connect,2000)}}
 connect();
+
+// ================= ☕ WI‑FI GUARD =================
+let wifiData=null;
+const SECL={none:'Ανοιχτό',wep:'WEP',wpa_personal:'WPA',wpa2_personal:'WPA2',wpa2_personal_mixed:'WPA/WPA2',wpa3_personal:'WPA3',wpa3_transition:'WPA2/WPA3',wpa2_enterprise:'WPA2 Ent.',wpa3_enterprise:'WPA3 Ent.',owe:'OWE'};
+function loadWifi(){return fetch('/api/wifi').then(r=>r.json()).then(j=>{wifiData=j;if(tab==='wifi')drawWifi();if(j.running)setTimeout(loadWifi,1500)})}
+function renderWifi(){if(!wifiData){$('t-wifi').innerHTML='<div class="empty">φόρτωση…</div>';loadWifi();return}drawWifi()}
+function drawWifi(){const d=wifiData,r=d.result,el=$('t-wifi');const icon={ok:'✅',warn:'⚠️',bad:'❌',info:'ℹ️'};
+  const lv=r?{ok:'#3ddc97',warn:'#ffd23f',bad:'#ff3b5c'}[r.level]:'#6d7f99',w=r&&r.wifi;
+  const btn=`<button class="b" id="wf-run" ${d.running?'disabled':''}>${d.running?'⏳ ελέγχω…':'▶ Έλεγχος τώρα'}</button>`;
+  let h=`<div class="card" style="display:flex;align-items:center;gap:14px">
+    <div style="flex:none;width:76px;height:76px;border-radius:50%;border:5px solid ${lv};display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 0 18px ${lv}55"><div style="color:${lv};font-size:24px;font-weight:700;line-height:1">${r?r.score:'?'}</div><div class="sm">/100</div></div>
+    <div style="flex:1;min-width:0"><b style="color:#fff">${r?esc(r.verdict):'Είμαι ασφαλής σε αυτό το Wi‑Fi;'}</b>
+    <div class="sm" style="margin-top:3px;white-space:normal">${w?`📶 <b style="color:#cfe0f5">${esc(w.ssid||'?')}</b> · ${esc(SECL[w.security]||w.security)}${w.signal!=null?' · '+w.signal+' dBm':''}${w.channel?' · κανάλι '+esc(w.channel):''}`:r?'Δεν είσαι σε Wi‑Fi':'Ελέγχει το δίκτυο που είσαι συνδεδεμένος και τις ρυθμίσεις του Mac σου.'}
+    ${r?`<br>τελευταίος έλεγχος ${new Date(r.t*1000).toLocaleTimeString('el-GR')}${r.reason==='network-change'?' (αυτόματα — νέο δίκτυο)':r.reason==='startup'?' (αυτόματα)':''}${r.demo?' · <span class="tag">προσομοίωση</span>':''}`:''}</div>
+    <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${btn}${w&&w.ssid&&!r.demo?`<button class="b" id="wf-trust">${r.public?'🏠 Είναι δικό μου δίκτυο':'☕ Σήμανση ως δημόσιο'}</button>`:''}</div></div></div>`;
+  if(d.error)h+=`<div class="card" style="color:#ff8da0">${esc(d.error)}</div>`;
+  if(r){h+=`<h3>Έλεγχοι ${r.public?'<span class="tag y">δημόσιο δίκτυο</span>':'<span class="tag g">δικό σου δίκτυο</span>'}</h3>`+r.checks.map(c=>`<div class="card"><div class="brow"><span>${icon[c.status]} <b style="color:#fff">${esc(c.title)}</b></span><span class="sm">${c.weight&&c.status!=='ok'?'−'+c.weight:''}</span></div><div style="color:#9fb4d0;margin-top:3px;white-space:normal">${esc(c.detail)}</div>${c.fix&&c.status!=='ok'?`<div class="sm" style="margin-top:4px;white-space:normal">👉 ${esc(c.fix)}</div>`:''}</div>`).join('');
+    if(w&&w.others&&w.others.length)h+=`<h3>Δίκτυα γύρω σου</h3><table><thead><tr><th>Όνομα</th><th>Ασφάλεια</th><th>Σήμα</th><th>Κανάλι</th></tr></thead><tbody>${w.others.slice().sort((a,b)=>(b.signal||-999)-(a.signal||-999)).map(o=>{const tw=o.ssid===w.ssid;return`<tr${tw?' style="background:#ff3b5c22"':''}><td>${esc(o.ssid||'(κρυφό)')}${tw?' <span class="tag r">ίδιο όνομα!</span>':''}</td><td>${o.security==='none'?'<span class="tag y">ανοιχτό</span>':esc(SECL[o.security]||o.security)}</td><td>${o.signal!=null?o.signal+' dBm':'—'}</td><td class="sm">${esc(o.channel||'')}</td></tr>`}).join('')}</tbody></table>`;
+    if(r.listening&&r.listening.length)h+=`<h3>Τι «ακούει» στο Mac σου (ορατό στο Wi‑Fi)</h3><div class="sm" style="white-space:normal">${r.listening.map(([p,port])=>`<span class="tag">${esc(p)}:${port}</span>`).join(' ')}</div>`}
+  h+=`<h3>Τι βλέπει κάποιος στο ίδιο Wi‑Fi;</h3><table><thead><tr><th>Χρησιμοποιείς</th><th>Βλέπει</th></tr></thead><tbody>
+    <tr><td>HTTP, FTP, Telnet</td><td style="white-space:normal"><span class="tag r">τα πάντα</span> σελίδες, φόρμες, κωδικούς</td></tr>
+    <tr><td>HTTPS</td><td style="white-space:normal"><span class="tag y">ποια sites</span> (DNS + SNI) και πόσα δεδομένα — όχι το περιεχόμενο</td></tr>
+    <tr><td>HTTPS + κρυπτογραφημένο DNS</td><td style="white-space:normal"><span class="tag y">μόνο IP</span> και συνήθως το όνομα (SNI)</td></tr>
+    <tr><td>VPN</td><td style="white-space:normal"><span class="tag g">μόνο ότι μιλάς με VPN</span></td></tr></tbody></table>
+  <h3>☕ Checklist για καφετέρια / αεροδρόμιο / ξενοδοχείο</h3><div class="card" style="white-space:normal;line-height:1.7">
+    1. Ρώτα το προσωπικό το <b>ακριβές όνομα</b> του Wi‑Fi — πρόσεχε «διπλά» δίκτυα.<br>
+    2. Άνοιξε <b>VPN</b> πριν κάνεις οτιδήποτε· αλλιώς χρησιμοποίησε το <b>hotspot του κινητού</b>.<br>
+    3. <b>Firewall + stealth mode</b> ενεργά, <b>Κοινή χρήση</b> (αρχεία/οθόνη/SSH/AirPlay) κλειστή.<br>
+    4. Αν ο browser δείξει <b>προειδοποίηση πιστοποιητικού</b>, σταμάτα — μην πατήσεις «Συνέχεια».<br>
+    5. Στη σελίδα σύνδεσης (captive portal) <b>μην δώσεις</b> κωδικούς από άλλους λογαριασμούς.<br>
+    6. Τράπεζα / πληρωμές: καλύτερα από τα <b>δεδομένα κινητού</b>.<br>
+    7. Μετά: <b>«Ξέχασε αυτό το δίκτυο»</b>, ώστε να μη συνδέεται αυτόματα (ούτε σε ψεύτικο με το ίδιο όνομα).</div>
+  <div class="sm" style="margin-top:8px;white-space:normal">🔎 Ο έλεγχος μόνο διαβάζει — δεν αλλάζει ρυθμίσεις. Για να δουλέψει επικοινωνεί με: captive.apple.com (HTTP), DNS για one.one.one.one / dns.google / dns.quad9.net και ένα ανύπαρκτο .example, και TLS σε www.google.com, github.com, www.cloudflare.com. Σε live mode τρέχει αυτόματα κάθε φορά που αλλάζεις δίκτυο (απενεργοποίηση: <code>detectors: wifi_guard: false</code>).</div>`;
+  el.innerHTML=h;
+  $('wf-run').onclick=()=>{wifiData.running=true;drawWifi();post('/api/wifi').then(j=>{if(j.error){wifiData.error=j.error;wifiData.running=false;drawWifi()}else setTimeout(loadWifi,1200)})};
+  const tb=$('wf-trust');if(tb)tb.onclick=()=>post('/api/wifi',{ssid:w.ssid,trusted:r.public}).then(j=>{if(!j.error)wifiData=j;drawWifi()})}
 </script>
 </body>
 </html>

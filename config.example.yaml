@@ -35,6 +35,9 @@ detectors:
   dga: true
   new_device: true
   threat_intel: true
+  cleartext_creds: true
+  custom_rules: true
+  wifi_guard: true             # auto-check every new Wi‑Fi (contacts captive.apple.com, public DNS names, google/github/cloudflare)
 
 # Never alert on these
 allowlist:
