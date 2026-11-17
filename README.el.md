@@ -1,6 +1,17 @@
-# ◉ NetWatch
+<h1><img src="docs/logo.svg" width="38" align="top" alt=""> NetWatch</h1>
 
 Ζωντανός χάρτης της κίνησης του δικτύου σου + ανίχνευση επιθέσεων + OSINT για κάθε IP.
+
+**▶ [Online demo](https://gyuri1999.github.io/netwatch/?lang=el)** (προσομοίωση, τρέχει στον browser) · **📚 [Ακαδημία](https://gyuri1999.github.io/netwatch/academy.html?lang=el)**
+
+![NetWatch demo](docs/demo.gif)
+
+| | |
+|---|---|
+| <img src="docs/dashboard.png" alt="Αρχική τεχνικού"> **Αρχική τεχνικού** | <img src="docs/destinations.png" alt="Πού στέλνει πακέτα μια συσκευή"> **Πού στέλνει πακέτα μια συσκευή** |
+| <img src="docs/route.png" alt="Διαδρομή"> **Διαδρομή βήμα-βήμα** | <img src="docs/wireshark.png" alt="Wireshark"> **Σημειώσεις Wireshark** |
+
+<sub>Περισσότερες εικόνες στο [README.md](README.md#screenshots). Βγαίνουν από το demo με το [`tools/shots/make_shots.sh`](tools/shots/make_shots.sh).</sub>
 
 ## Εκκίνηση
 

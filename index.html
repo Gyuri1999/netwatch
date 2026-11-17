@@ -4,6 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>NetWatch</title>
+<meta name="description" content="Network monitor &amp; IDS for the home lab: live map, technician toolkit, Wireshark notes, IoT/MQTT security and a CCNA academy.">
+<meta name="theme-color" content="#060a12">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%20fill%3D%22none%22%20stroke-linecap%3D%22round%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%226%22%20fill%3D%22%23060a12%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%228.5%22%20stroke%3D%22%233ec5ff%22%20stroke-opacity%3D%22.45%22%20stroke-width%3D%221.6%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%225%22%20stroke%3D%22%233ec5ff%22%20stroke-opacity%3D%22.7%22%20stroke-width%3D%221.6%22/%3E%3Cpath%20d%3D%22M12%2012%2018%206%22%20stroke%3D%22%233ec5ff%22%20stroke-width%3D%222%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%222%22%20fill%3D%22%233ec5ff%22/%3E%3Ccircle%20cx%3D%2216%22%20cy%3D%228.6%22%20r%3D%221.3%22%20fill%3D%22%23ff3b5c%22/%3E%3C/svg%3E">
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script src="/i18n.js"></script>
@@ -289,6 +292,9 @@ tr.r:hover td{background:#ffffff06}
 @media (max-width:600px){body.v-page #pagehead{padding:16px 16px 4px}body.v-page .tab{padding:14px 12px 40px}}
 .ctitle{display:inline-flex;align-items:center;gap:8px;color:var(--head);font-weight:600}.ctitle .ico{color:var(--cyan)}
 .hbtn .ico{width:14px;height:14px;opacity:.85}
+body.quiet #toasts,body.quiet #flash{display:none}
+.ksp{display:block;width:100%;height:24px;margin-top:8px;opacity:.95}
+.flow{margin:10px 0 4px;padding:10px 12px;background:#070c15;border-radius:10px}.flow text.fl{fill:#d4dfee;font-size:11px;font-family:var(--sans)}
 </style>
 </head>
 <body>
@@ -386,7 +392,7 @@ const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const flag=cc=>cc&&cc.length===2?String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt())):'';
 const fmtB=b=>b<1024?b+' B':b<1048576?(b/1024).toFixed(1)+' KB':b<1073741824?(b/1048576).toFixed(1)+' MB':(b/1073741824).toFixed(2)+' GB';
-const fmtT=t=>new Date(t*1000).toLocaleTimeString('el-GR');
+const fmtT=t=>new Date(t*1000).toLocaleTimeString(window.I18N&&I18N.lang==='en'?'en-GB':'el-GR');
 const fmtDur=s=>s<60?Math.round(s)+'s':s<3600?Math.round(s/60)+' λεπτά':(s/3600).toFixed(1)+' ώρες';
 const hash=s=>{let h=2166136261;for(const c of s)h=Math.imul(h^c.charCodeAt(0),16777619);return h>>>0};
 const hname=h=>h?(h.names&&h.names[0])||h.rdns||'':'';
@@ -1833,13 +1839,13 @@ function renderHomeTech(){const el=$('t-home');hlLoad();if(!scanData)loadScan();
   const real=S.alerts.filter(a=>!a.lab&&!a.benign&&!a.selftest),hi1=real.filter(a=>a.sev==='high'&&now-a.t<3600).length,med1=real.filter(a=>a.sev==='med'&&now-a.t<3600).length;
   const T=hlData&&hlData.targets||[],up=T.filter(x=>x.up).length,down=T.filter(x=>x.up===false);
   const sc=scanData||{},d=sc.diff,dn=d?d.new_ports.length+d.new_hosts.length:0,pub=[...S.hosts.values()].filter(h=>h.kind==='public').length;
-  const kpi=(go,v,l,c)=>`<div class="kpi" data-go="${go}"><b data-count style="color:${c||'#fff'}">${v}</b><span>${l}</span></div>`;
+  const kpi=(go,v,l,c,sp)=>`<div class="kpi" data-go="${go}"><b data-count style="color:${c||'#fff'}">${v}</b><span>${l}</span>${sp?ksp(KH[sp],c&&c!=='#fff'?c:'#3ec5ff'):''}</div>`;
   let h=(MODE?'':chooserHTML())+`<div class="kpis tk">`+
-    kpi('devs',devs.length,newD?`συσκευές · ${newD} νέες`:'συσκευές στο LAN',newD?'#ffd23f':'')+
-    kpi('alerts',hi1,`σοβαρές την τελευταία ώρα${med1?` · ${med1} μέτριες`:''}`,hi1?'#ff3b5c':med1?'#ffd23f':'#3ddc97')+
-    kpi('health',T.length?`${up}/${T.length}`:'—',down.length?`homelab · εκτός: ${down.map(x=>x.name).join(', ')}`:'homelab πάνω',down.length?'#ff3b5c':'#3ddc97')+
+    kpi('devs',devs.length,newD?`συσκευές · ${newD} νέες`:'συσκευές στο LAN',newD?'#ffd23f':'','devs')+
+    kpi('alerts',hi1,`σοβαρές την τελευταία ώρα${med1?` · ${med1} μέτριες`:''}`,hi1?'#ff3b5c':med1?'#ffd23f':'#3ddc97','hi')+
+    kpi('health',T.length?`${up}/${T.length}`:'—',down.length?`homelab · εκτός: ${down.map(x=>x.name).join(', ')}`:'homelab πάνω',down.length?'#ff3b5c':'#3ddc97','lab')+
     kpi('pentest',sc.finished?ago(now-sc.finished):'—',sc.finished?`από τη σάρωση${dn?` · ${dn} αλλαγές`:''}`:'καμία σάρωση ακόμα',dn?'#ffd23f':'')+
-    kpi('map',pub,'servers στο Internet τώρα')+`</div>`;
+    kpi('map',pub,'servers στο Internet τώρα','','pub')+`</div>`;
   h+=`<div class="card"><div class="brow"><b class="ctitle">${ico('pb')}Γρήγορο εργαλείο</b><span class="sm kbdhint">ή <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd> από οπουδήποτε</span></div>
     <div class="frow" style="margin-top:6px"><input class="f" id="qt-in" value="${esc(PTIN.qt||'')}" placeholder="IP, όνομα, URL ή MAC — π.χ. 192.168.1.17" spellcheck="false" autocomplete="off">
     ${[['ping','health','ping'],['dns','det','dns'],['ports','block','θύρες'],['http','map','http/tls'],['names','devs','ονόματα'],['wol','pb','WoL']].map(([t,i,l])=>`<button class="b hbtn" data-qt="${t}">${ico(i)}<span>${l}</span></button>`).join('')}</div>
@@ -1864,23 +1870,52 @@ const UNENC={21:'FTP',23:'Telnet',80:'HTTP',110:'POP3',143:'IMAP',1883:'MQTT',59
 function trackOut(it){const a=S.hosts.get(it.s);if(!a||a.kind!=='local'||!it.d||/^(224\.|239\.|255\.|ff0)/i.test(it.d)||it.d.endsWith('.255'))return;
   let m=S.out.get(it.s);if(!m){m=new Map();S.out.set(it.s,m)}
   let o=m.get(it.d);if(!o){if(m.size>300)return;o={b:0,pk:0,ports:new Set(),first:Date.now()/1000};m.set(it.d,o)}
-  o.b+=it.l||0;o.pk++;o.last=Date.now()/1000;if(it.dp&&o.ports.size<8)o.ports.add(it.dp);if(it.n)o.n=it.n;if(it.x)o.x=1;o.p=it.a||it.p}
+  o.b+=it.l||0;o.pk++;o.last=Date.now()/1000;if(it.dp&&o.ports.size<8)o.ports.add(it.dp);if(it.n)o.n=it.n;o.p=it.a||it.p}
 function outHTML(h){const m=S.out.get(h.ip),rows=m?[...m.entries()].sort((a,b)=>b[1].b-a[1].b):[];
   const pub=rows.filter(([d])=>S.hosts.get(d)?.kind==='public'),lan=rows.filter(([d])=>S.hosts.get(d)?.kind==='local');
-  const ctry=new Set(pub.map(([d])=>S.hosts.get(d)?.geo?.countryCode).filter(Boolean)),bad=rows.filter(([,o])=>o.x).length,unenc=rows.filter(([,o])=>[...o.ports].some(p=>UNENC[p])).length;
+  const ctry=new Set(pub.map(([d])=>S.hosts.get(d)?.geo?.countryCode).filter(Boolean)),susp=d=>(S.hosts.get(d)?.threat||0)>=1,bad=rows.filter(([d])=>susp(d)).length,unenc=rows.filter(([,o])=>[...o.ports].some(p=>UNENC[p])).length;
   let x=`<h3>🛰 Πού στέλνει πακέτα αυτή η συσκευή</h3><div class="card" style="white-space:normal">`;
   x+=`<div class="frow" style="margin-bottom:6px"><button class="b" data-ofilter="${esc(h.ip)}">🦈 Δες μόνο τα πακέτα της</button><button class="b" data-omap="${esc(h.ip)}">🗺 Στον χάρτη</button></div>`;
   if(!rows.length){x+=h.me?'<div class="sm">Δεν έχω δει ακόμα κίνηση από εσένα σε αυτή τη συνεδρία.</div>':
     `<div class="sm">Δεν βλέπω ακόμα πακέτα <b>από</b> αυτή τη συσκευή προς άλλους — μόνο broadcast/ARP.</div>`+seeHowHTML()}
   else{x+=`<div class="sm">Από τότε που άνοιξες τη σελίδα: <b>${pub.length}</b> servers στο Internet σε <b>${ctry.size}</b> χώρες · <b>${lan.length}</b> συσκευές στο LAN${bad?` · <b style="color:#ff3b5c">${bad} ύποπτοι προορισμοί</b>`:''}${unenc?` · <b style="color:#ffd23f">${unenc} χωρίς κρυπτογράφηση</b>`:''}</div>`;
+    x+=flowHTML(h,rows);
     x+=`<div style="margin-top:6px;overflow-x:auto"><table><thead><tr><th>Προορισμός</th><th>θύρες</th><th>δεδομένα</th><th></th></tr></thead><tbody>`+rows.slice(0,25).map(([d,o])=>{const dh=S.hosts.get(d),g=dh?.geo,pu=dh?.kind==='public';
       const ue=[...o.ports].filter(p=>UNENC[p]);
-      return`<tr${o.x?' style="background:#ff3b5c14"':''}><td><span data-sel="${esc(d)}" style="cursor:pointer">${pu?flag(g?.countryCode):'🏠'} <b style="color:#fff" data-noi18n>${esc(o.n||(dh&&hname(dh))||d)}</b></span><div class="sm"><span data-noi18n>${esc(d)}</span>${g?.isp?' · '+esc(g.isp):''}${o.x?' · <span style="color:#ff3b5c">⚠ ύποπτο</span>':''}</div></td>
+      return`<tr${susp(d)?' style="background:#ff3b5c14"':''}><td><span data-sel="${esc(d)}" style="cursor:pointer">${pu?flag(g?.countryCode):'🏠'} <b style="color:#fff" data-noi18n>${esc(o.n||(dh&&hname(dh))||d)}</b></span><div class="sm"><span data-noi18n>${esc(d)}</span>${g?.isp?' · '+esc(g.isp):''}${susp(d)?' · <span style="color:#ff3b5c">⚠ ύποπτο</span>':''}</div></td>
         <td class="sm">${[...o.ports].join(', ')||'—'}${ue.length?`<div style="color:#ffd23f">🔓 ${ue.map(p=>UNENC[p]).join(', ')}</div>`:''}</td><td class="sm">${fmtB(o.b)}<div>${o.pk} πακ. · ${fmtDur(Date.now()/1000-o.last)} πριν</div></td>
         <td style="white-space:nowrap">${pu?`<button class="b" data-oroute="${esc(d)}" title="Από πού περνά και ποιος βλέπει τι">🛣</button>`:''}<button class="b" data-ofilter="${esc(h.ip)}|${esc(d)}" title="Μόνο αυτή η συνομιλία στα πακέτα">🦈</button></td></tr>`}).join('')+'</tbody></table></div>';
     if(rows.length>25)x+=`<div class="sm">…και ${rows.length-25} ακόμα</div>`;
     if(!h.me)x+='<details style="margin-top:6px"><summary class="sm" style="cursor:pointer">Γιατί μπορεί να μη βλέπω όλη την κίνησή της;</summary>'+seeHowHTML()+'</details>'}
   return x+'</div>'}
+// ---- ροή «συσκευή → χώρα → υπηρεσία» (απλό Sankey σε SVG) ----
+function svcOf(o){const ps=[...o.ports];for(const p of ps)if(UNENC[p])return UNENC[p];for(const p of ps){const pi=window.portInfo&&portInfo(p);if(pi)return pi[0]}return ps.length?'θύρα '+ps[0]:'άλλο'}
+function flowHTML(h,rows){const pub=rows.filter(([d])=>S.hosts.get(d)?.kind==='public');if(pub.length<2)return'';
+  const top=(m,n)=>{const e=[...m.entries()].sort((a,b)=>b[1]-a[1]);if(e.length<=n)return e;const rest=e.slice(n-1).reduce((a,x)=>a+x[1],0);return e.slice(0,n-1).concat([['…',rest]])};
+  const C=new Map(),V=new Map(),CV=new Map(),cName={};
+  for(const [d,o] of pub){const g=S.hosts.get(d).geo||{},c=g.countryCode||'??',v=svcOf(o),b=Math.max(o.b,1);cName[c]=g.country||c;
+    C.set(c,(C.get(c)||0)+b);V.set(v,(V.get(v)||0)+b);CV.set(c+'|'+v,(CV.get(c+'|'+v)||0)+b)}
+  const cs=top(C,6),vs=top(V,6),ck=new Set(cs.map(x=>x[0])),vk=new Set(vs.map(x=>x[0]));
+  const cK=c=>ck.has(c)?c:'…',vK=v=>vk.has(v)?v:'…',L=new Map();
+  for(const [k,b] of CV){const [c,v]=k.split('|'),kk=cK(c)+'|'+vK(v);L.set(kk,(L.get(kk)||0)+b)}
+  const tot=cs.reduce((a,x)=>a+x[1],0),W=640,PAD=8,H=Math.max(150,Math.max(cs.length,vs.length)*34),X=[10,290,570],NW=12;
+  const lay=list=>{const gap=8,avail=H-PAD*2-gap*(list.length-1);let y=PAD;return new Map(list.map(([k,b])=>{const hh=Math.max(4,b/tot*avail);const r=[k,{y,h:hh,b,o:0,i:0}];y+=hh+gap;return r}))};
+  const nc=lay(cs),nv=lay(vs),av=H-PAD*2-8*(cs.length-1),src={y:PAD+(H-PAD*2-av)/2,h:av,o:0};
+  const enc=v=>!Object.values(UNENC).includes(v),col=v=>v==='…'?'#7d8ca5':enc(v)?'#3ec5ff':'#ffd23f';
+  const curve=(x0,y0,x1,y1,w,c,t)=>`<path d="M${x0},${y0} C${(x0+x1)/2},${y0} ${(x0+x1)/2},${y1} ${x1},${y1}" stroke="${c}" stroke-opacity=".28" stroke-width="${Math.max(1,w).toFixed(1)}" fill="none"><title>${esc(t)}</title></path>`;
+  let p='';
+  for(const [c,n] of nc){const w=n.h,y0=src.y+src.o+w/2;src.o+=w;p+=curve(X[0]+NW,y0,X[1],n.y+n.h/2,w,'#3ec5ff',`${cName[c]||c}: ${fmtB(n.b)}`)}
+  // χώρα → υπηρεσία: πάχος ανάλογο, με «στοίβαγμα» στις δύο άκρες
+  const links=[...L.entries()].map(([k,b])=>{const [c,v]=k.split('|');return{c,v,b}}).sort((a,b)=>nc.get(a.c).y-nc.get(b.c).y||nv.get(a.v).y-nv.get(b.v).y);
+  for(const l of links){const a=nc.get(l.c),z=nv.get(l.v);if(!a||!z)continue;const wa=l.b/a.b*a.h,wz=l.b/z.b*z.h;
+    const y0=a.y+a.o+wa/2,y1=z.y+z.i+wz/2;a.o+=wa;z.i+=wz;p+=curve(X[1]+NW,y0,X[2],y1,Math.min(wa,wz),col(l.v),`${cName[l.c]||l.c} → ${l.v}: ${fmtB(l.b)}`)}
+  p+=`<rect x="${X[0]}" y="${src.y}" width="${NW}" height="${src.h}" rx="3" fill="#3ec5ff"/>`;
+  for(const [c,n] of nc)p+=`<rect x="${X[1]}" y="${n.y}" width="${NW}" height="${n.h}" rx="3" fill="#8fd9ff"/><text x="${X[1]+NW+6}" y="${n.y+n.h/2}" dominant-baseline="middle" class="fl">${c==='…'?'…':flag(c)} ${esc(c==='…'?'άλλες':cName[c]||c)}</text>`;
+  for(const [v,n] of nv)p+=`<rect x="${X[2]}" y="${n.y}" width="${NW}" height="${n.h}" rx="3" fill="${col(v)}"/><text x="${X[2]-6}" y="${n.y+n.h/2}" dominant-baseline="middle" text-anchor="end" class="fl">${v==='…'?'άλλες':esc(v)}${enc(v)||v==='…'?'':' 🔓'}</text>`;
+  return`<div class="flow"><div class="sm" style="display:flex;justify-content:space-between;margin-bottom:4px"><span>${esc(hname(h)||h.ip)}</span><span>χώρα</span><span>υπηρεσία</span></div>
+    <svg viewBox="0 0 ${W} ${H}" width="100%" style="max-height:${H}px" role="img" aria-label="Ροή κίνησης ανά χώρα και υπηρεσία">${p}</svg>
+    <div class="sm" style="margin-top:2px">Πάχος = δεδομένα. <span style="color:#3ec5ff">■</span> κρυπτογραφημένο · <span style="color:#ffd23f">■</span> χωρίς κρυπτογράφηση 🔓</div></div>`}
+
 function seeHowHTML(){return`<div class="sm" style="margin-top:6px;line-height:1.6">Ο υπολογιστής σου «ακούει» μόνο τα δικά του πακέτα και ό,τι στέλνεται σε όλους (broadcast). Το Wi‑Fi και ο switch στέλνουν την κίνηση κάθε συσκευής <b>μόνο</b> στον router. Για να τη δεις:<br>
   ① <b>Τρέξε το NetWatch εκεί που περνά όλη η κίνηση</b> — στον router (OpenWrt), ή σε VM/LXC του Proxmox: η γέφυρα <code>vmbr0</code> βλέπει όλα τα VM.<br>
   ② <b>Port mirroring (SPAN)</b> σε managed switch: αντιγράφει την κίνηση μιας θύρας στη θύρα του υπολογιστή σου (CCNA: <code>monitor session 1 source interface Gi0/1</code> → <code>destination interface Gi0/2</code>).<br>
@@ -1898,6 +1933,20 @@ function routeBox(from,to){const o=pktBox(),fh=S.hosts.get(from);routeIp=to;
     const tb=o.querySelector('#rt-trace');if(tb)tb.onclick=()=>{const ip=tb.dataset.ip;traceCache[ip]={loading:true};draw();
       post('/api/trace',{ip}).then(j=>{traceCache[ip]=j;if(o.isConnected)draw()}).catch(e=>{traceCache[ip]={error:String(e)};draw()})}};
   draw()}
+
+// ---- sparklines για τους αριθμούς της αρχικής: δείγμα κάθε 5″, τελευταία 5 λεπτά ----
+const KH={devs:[],hi:[],lab:[],pub:[]};
+function khSample(){const now=Date.now()/1000,push=(k,v)=>{KH[k].push(v);if(KH[k].length>60)KH[k].shift()};
+  push('devs',[...S.hosts.values()].filter(h=>h.kind==='local'&&!h.me&&!h.ip.includes(':')).length);
+  push('hi',S.alerts.filter(a=>!a.lab&&!a.benign&&!a.selftest&&a.sev!=='low'&&now-a.t<3600).length);
+  const T=hlData&&hlData.targets||[],ms=T.map(x=>x.ms).filter(x=>x!=null);push('lab',ms.length?ms.reduce((a,b)=>a+b,0)/ms.length:null);
+  push('pub',[...S.hosts.values()].filter(h=>h.kind==='public').length)}
+setInterval(khSample,5000);setTimeout(khSample,1500);
+function ksp(a,col){const v=a.map((x,i)=>[i,x]).filter(p=>p[1]!=null);if(v.length<2)return'<div class="ksp"></div>';
+  const mn=Math.min(...v.map(p=>p[1])),mx=Math.max(...v.map(p=>p[1])),r=mx-mn,W=100,H=24,n=Math.max(1,a.length-1);
+  const pts=v.map(([i,x])=>[(i/n*W).toFixed(1),(r?H-2-(x-mn)/r*(H-4):H/2).toFixed(1)]),id='g'+Math.random().toString(36).slice(2,7);
+  return`<svg class="ksp" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="${col}" stop-opacity=".28"/><stop offset="1" stop-color="${col}" stop-opacity="0"/></linearGradient></defs>
+    <path d="M${pts[0][0]},${H} L${pts.map(p=>p.join(',')).join(' L')} L${pts[pts.length-1][0]},${H}Z" fill="url(#${id})"/><polyline points="${pts.map(p=>p.join(',')).join(' ')}" fill="none" stroke="${col}" stroke-width="1.5" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`}
 
 // ================= ⌘K: παλέτα εντολών =================
 const fold=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
@@ -1965,6 +2014,11 @@ function drawWs(){const el=$('t-ws'),en=window.I18N&&I18N.lang==='en',W=window.W
 
 // αρχική οθόνη: όπου ήσουν την προηγούμενη φορά (αλλιώς η Αρχική)
 (()=>{let v='page',t='home';try{[v,t]=(localStorage.getItem('nw-view')||'page|home').split('|')}catch(e){}
+  // links κατευθείαν σε οθόνη: ?tab=pentest · ?tab=map · ?mode=tech|learn · ?quiet=1 (χωρίς popups, για screenshots)
+  const q=new URLSearchParams(location.search),qt=q.get('tab');
+  if(q.get('mode')==='tech'||q.get('mode')==='learn')setMode(q.get('mode'));
+  if(q.get('quiet'))document.body.classList.add('quiet');
+  if(qt){if(qt==='map'||qt==='lan')[v,t]=[qt,'alerts'];else if($('t-'+qt))[v,t]=['page',qt]}
   if(!['page','map','lan'].includes(v)||!$('t-'+t))[v,t]=['page','home'];
   setView(v);showTab(v==='page'?t:v)})();
 </script>

@@ -1,6 +1,8 @@
-# ◉ NetWatch
+<h1><img src="docs/logo.svg" width="38" align="top" alt=""> NetWatch</h1>
 
 **A live network-traffic map and intrusion-detection sensor in a single Python file.** Every packet on your network becomes an animated arc on a world map. NetWatch watches for scans, brute force, man-in-the-middle attacks, DoS, **C2 beaconing, DNS tunneling, DGA malware** and **known-bad IPs from threat-intel feeds**. It maps each alert to **MITRE ATT&CK**, keeps a SQLite history, can notify you on macOS or Telegram, and gives you OSINT on every IP it sees.
+
+**▶ [Live online demo](https://gyuri1999.github.io/netwatch/)** (simulated traffic, runs in the browser) · **📚 [Academy](https://gyuri1999.github.io/netwatch/academy.html)**
 
 ![NetWatch demo](docs/demo.gif)
 
@@ -8,7 +10,7 @@
 ![Python](https://img.shields.io/badge/python-3.9%2B-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-> 🇬🇷 Ελληνική τεκμηρίωση: [README.el.md](README.el.md). The UI is in Greek.
+> 🇬🇷 Ελληνική τεκμηρίωση: [README.el.md](README.el.md). The UI is in English and Greek (🇬🇧 EN / 🇬🇷 ΕΛ button).
 
 ---
 
@@ -72,16 +74,18 @@
 | 📄 **Incident report** | Exports alerts and attacker profiles as JSON with one click, and the map as a PNG. |
 | 📚 **Built-in training** | Each alert explains *what it is, how it works, the risk and what to do*. Clicking a packet explains it in plain words. There are also a protocol/port glossary and context-aware security tips. |
 
-<p>
-  <img src="docs/dashboard.png" width="100%" alt="Dashboard">
-</p>
-<p>
-  <img src="docs/analysis.png" width="49%" alt="Attacker analysis">
-  <img src="docs/stats.png" width="49%" alt="Statistics and MITRE ATT&CK coverage">
-</p>
-<p>
-  <img src="docs/academy.png" width="60%" alt="Academy: animated MQTT sniffing lesson">
-</p>
+## Screenshots
+
+| | |
+|---|---|
+| <img src="docs/dashboard.png" alt="Technician home: KPIs, quick tools, alerts, homelab"> **Technician home**: devices, alerts, homelab, last scan, quick tools | <img src="docs/home-learn.png" alt="Learning home: guided steps"> **Learning home**: seven guided questions, each with a plain answer |
+| <img src="docs/map.png" alt="Live world map with alerts"> **Live map**: every connection as an arc, alerts in a side drawer | <img src="docs/lan.png" alt="Home network map"> **Home network**: devices grouped by type, live links |
+| <img src="docs/destinations.png" alt="Where a device sends packets"> **Where a device sends packets**: names, countries, ports, unencrypted traffic | <img src="docs/route.png" alt="Hop-by-hop route"> **Route**: hop by hop with traceroute, and who sees what |
+| <img src="docs/analysis.png" alt="Attacker analysis"> **Attacker analysis**: verdict, targeted services, OSINT | <img src="docs/stats.png" alt="Statistics"> **Statistics**: protocols, traffic, MITRE ATT&CK |
+| <img src="docs/wireshark.png" alt="Wireshark notes"> **Wireshark notes**: 167 filters and commands, many run live | <img src="docs/tools.png" alt="Technician tools"> **Technician tools** with explanations in learning mode |
+| <img src="docs/palette.png" alt="Command palette"> **⌘K palette**: `ping`, `dig`, `nc`, `nmap`, Wireshark filters | <img src="docs/academy.png" alt="Academy lesson"> **Academy**: CCNA and IoT security lessons with animations |
+
+<sub>All screenshots come from demo mode (simulated traffic) and are regenerated with [`tools/shots/make_shots.sh`](tools/shots/make_shots.sh).</sub>
 
 ## Quick start
 

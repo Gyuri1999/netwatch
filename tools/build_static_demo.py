@@ -46,8 +46,17 @@ def main():
     with open(os.path.join(ROOT, "index.html"), encoding="utf-8") as f:
         html = f.read()
     html = re.sub(r'(<script\b[^>]*\bsrc=")/(?!/)', r"\1", html)
-    inject = ('<script src="demo-data.js"></script>\n<script src="demo-shim.js"></script>\n'
-              '<meta name="description" content="NetWatch — online demo με προσομοιωμένη κίνηση δικτύου">\n')
+    inject = '<script src="demo-data.js"></script>\n<script src="demo-shim.js"></script>\n'
+    # προεπισκόπηση link (LinkedIn, Viber, Slack…): θέλει απόλυτο URL — στο GitHub Actions το ξέρουμε από το repo
+    repo = os.environ.get("GITHUB_REPOSITORY", "")
+    if "/" in repo and os.path.isfile(os.path.join(ROOT, "docs", "og.png")):
+        owner, name = repo.split("/", 1)
+        site = f"https://{owner.lower()}.github.io/{name}/"
+        inject += (f'<meta property="og:title" content="NetWatch — network monitor & IDS for the home lab">\n'
+                   f'<meta property="og:description" content="Live online demo (simulated traffic): live map, technician toolkit, Wireshark notes, IoT/MQTT security, CCNA academy.">\n'
+                   f'<meta property="og:type" content="website">\n<meta property="og:url" content="{site}">\n'
+                   f'<meta property="og:image" content="{site}og.png">\n<meta property="og:image:width" content="1200">\n'
+                   f'<meta property="og:image:height" content="630">\n<meta name="twitter:card" content="summary_large_image">\n')
     i = html.find("<script")
     if i < 0:
         sys.exit("Δεν βρέθηκε <script> στο index.html")
@@ -90,6 +99,8 @@ def main():
     rep = os.path.join(args.rec, "report.html")
     if os.path.isfile(rep):
         shutil.copy2(rep, os.path.join(out, "report.html"))
+    if os.path.isfile(os.path.join(ROOT, "docs", "og.png")):
+        shutil.copy2(os.path.join(ROOT, "docs", "og.png"), out)
     open(os.path.join(out, ".nojekyll"), "w").close()
 
     total = sum(os.path.getsize(p) for p in glob.glob(os.path.join(out, "**"), recursive=True) if os.path.isfile(p))

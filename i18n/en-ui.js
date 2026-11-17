@@ -1141,7 +1141,15 @@ I18N.add({
   "ως DNS δείχνει τι ονόματα ζητά κάθε συσκευή.": "as DNS shows which names each device asks for.",
   "Όχι ARP spoofing σε δίκτυο που δεν είναι δικό σου — είναι επίθεση MITM.": "No ARP spoofing on a network that isn't yours — it's a MITM attack.",
   "Από πού περνούν τα πακέτα αυτής της συσκευής και ποιος βλέπει τι σε κάθε βήμα.": "Where this device's packets pass and who sees what at each step.",
-  "συσκευές στο LAN ·": "devices on the LAN ·"
+  "συσκευές στο LAN ·": "devices on the LAN ·",
+  "χώρα": "country",
+  "υπηρεσία": "service",
+  "άλλες": "others",
+  "άλλο": "other",
+  "Πάχος = δεδομένα.": "Thickness = data.",
+  "κρυπτογραφημένο ·": "encrypted ·",
+  "χωρίς κρυπτογράφηση 🔓": "unencrypted 🔓",
+  "Ροή κίνησης ανά χώρα και υπηρεσία": "Traffic flow by country and service"
  },
  "patterns": [
   [
@@ -3239,6 +3247,10 @@ I18N.add({
   [
    "^…και (\\d+) ακόμα$",
    "…and $1 more"
+  ],
+  [
+   "^θύρα (\\d+) 🔓$",
+   "port $1 🔓"
   ]
  ]
 });
