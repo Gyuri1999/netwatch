@@ -68,7 +68,7 @@ def build(state, days=7, now=None):
     sc = "#1f9d61" if (score or 0) >= 80 else "#d99a00" if (score or 0) >= 60 else "#d6334f"
     period = f"{time.strftime('%d/%m/%Y', time.localtime(since))} – {time.strftime('%d/%m/%Y %H:%M', time.localtime(now))}"
     out = [f"""<!doctype html><html lang="el"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>NetWatch — αναφορά</title><style>
+<title>NetWatch — αναφορά</title><script src="i18n.js"></script><style>
 :root{{--bg:#fff;--fg:#14202e;--mut:#5d6b7c;--line:#dde3ea;--card:#f6f8fb;--acc:#2b7fff}}
 @media (prefers-color-scheme:dark){{:root{{--bg:#0b1220;--fg:#e3ecf7;--mut:#8ea3bd;--line:#1f3352;--card:#111b2e;--acc:#4c95ff}}}}
 @media print{{:root{{--bg:#fff;--fg:#14202e;--mut:#5d6b7c;--line:#dde3ea;--card:#f6f8fb;--acc:#2b7fff}} .noprint{{display:none}}}}

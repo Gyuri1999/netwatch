@@ -7,8 +7,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends tcpdump whois i
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY *.py index.html edu.js config.example.yaml ./
+COPY *.py index.html edu.js wireshark.js i18n.js academy.html manifest.webmanifest sw.js config.example.yaml ./
 COPY academy ./academy
+COPY i18n ./i18n
 COPY samples ./samples
 COPY rules ./rules
 COPY ctf ./ctf

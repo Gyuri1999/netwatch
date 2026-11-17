@@ -28,7 +28,7 @@ iconutil -c icns "$ICONSET" -o "$OUT/Contents/Resources/NetWatch.icns"
 echo "▸ αρχεία NetWatch"
 cp macapp/Info.plist "$OUT/Contents/Info.plist"
 rsync -a --exclude '__pycache__' --exclude '*.md' ./*.py \
-  index.html edu.js academy config.example.yaml requirements.txt rules ctf samples "$OUT/Contents/Resources/netwatch/"
+  index.html edu.js wireshark.js i18n.js i18n academy academy.html manifest.webmanifest sw.js config.example.yaml requirements.txt rules ctf samples "$OUT/Contents/Resources/netwatch/"
 rm -f "$OUT/Contents/Resources/netwatch/rules/local.yaml"
 
 echo "▸ υπογραφή (ad-hoc)"

@@ -35,8 +35,11 @@ class NetState:
         self.services = collections.defaultdict(dict)  # ip → {θύρα που «ακούει": t}
         self.creds, self.cred_users = {}, {}
         self.lab_ips = set()  # «επιτιθέμενοι» του purple-team lab (δεν πάνε σε ιστορικό/ειδοποιήσεις)
+        # «Αυτό το έκανα εγώ»: δοκιμές σου που δεν πρέπει να μπερδεύονται με πραγματικές επιθέσεις
+        self.own_tool = {"until": 0.0, "why": None}  # σάρωση/εργαλείο του NetWatch από αυτόν τον υπολογιστή
+        self.test_ips = {}  # ip → {"until": t, "why": …}: «κάνω δοκιμή από τη συσκευή Χ» (π.χ. nmap από Kali VM)
         self.scan_info = collections.defaultdict(dict)  # ip → {θύρα: banner/έκδοση/TLS από τον σαρωτή}
-        self.scanner = self.lab = self.wifi = self.privacy = self.apps = self.honeypot = self.blocker = self.iot = self.sensor = self.mqtt = self.agent = self.hass = self.baseline = None
+        self.scanner = self.lab = self.wifi = self.privacy = self.apps = self.honeypot = self.blocker = self.iot = self.sensor = self.mqtt = self.agent = self.hass = self.baseline = self.playbooks = self.health = None
         self._app_rdns = {}
         self.vpn_iface = None  # live: η διεπαφή του VPN όταν περνά όλη την κίνηση (utun…)
         self.leak_dns = collections.deque(maxlen=50)
@@ -178,7 +181,17 @@ class NetState:
             "act": list(h["act"]),
             "ja3": [[j, c, sorted(h["ja3_sni"].get(j, ()))[:6]] for j, c in h["ja3"].most_common(8)],
             "intel": h["intel"],
+            **self._dtype(h),
         }
+
+    def _dtype(self, h):
+        """Τύπος/κατασκευαστής για τις τοπικές συσκευές (εικονίδιο και όνομα στον χάρτη του LAN)."""
+        if h["kind"] != "local":
+            return {}
+        import devtype
+        t, icon, label, v = devtype.classify(h["mac"], sorted(h["names"]) + ([h["rdns"]] if h.get("rdns") else []),
+                                             list(h["ports"]), gw=h["gw"], me=h["me"])
+        return {"dtype": t, "dicon": icon, "dlabel": label, "vendor": v}
 
     def recheck_intel(self):
         with self.lock:
@@ -219,6 +232,42 @@ class NetState:
     def _allowed_name(self, name):
         return bool(self.allow_domains) and name.lower().endswith(self.allow_domains)
 
+    # ---------- «δική σου δοκιμή» ή «κάποιος άλλος»; ----------
+    OWN_TOOL_GRACE = 20  # δευτερόλεπτα μετά το τέλος ενός εργαλείου που αργούν να φτάσουν τα πακέτα του
+
+    def note_own_tool(self, why, seconds=None):
+        """Το καλούν ο σαρωτής / τα εργαλεία τεχνικού όσο τρέχουν: ό,τι «βγαίνει» από εσένα τώρα είναι δοκιμή σου."""
+        until = time.time() + (seconds or self.OWN_TOOL_GRACE)
+        if until > self.own_tool["until"]:
+            self.own_tool = {"until": until, "why": why}
+
+    def test_from(self, ip, minutes, why=None):
+        """Δηλώνεις «για Ν λεπτά κάνω δοκιμή από αυτή τη συσκευή». minutes=0 → σταματά."""
+        if not minutes:
+            self.test_ips.pop(ip, None)
+            return
+        self.test_ips[ip] = {"until": time.time() + minutes * 60, "why": (why or "δοκιμή σου από αυτή τη συσκευή")[:80]}
+
+    def selftest_status(self, now=None):
+        now = now or time.time()
+        self.test_ips = {ip: v for ip, v in self.test_ips.items() if v["until"] > now}
+        return {"test_ips": [{"ip": ip, **v} for ip, v in self.test_ips.items()],
+                "own_tool": self.own_tool if self.own_tool["until"] > now else None}
+
+    def _selftest(self, actor, t):
+        """→ γιατί αυτή η ειδοποίηση είναι δική σου δοκιμή, ή None (= την προκάλεσε κάποιος άλλος)."""
+        now = max(t, time.time()) if self.mode == "live" else t
+        x = self.test_ips.get(actor)
+        if x and now <= x["until"]:
+            return x["why"]
+        if actor in self.me:
+            sc = self.scanner.state if self.scanner and isinstance(getattr(self.scanner, "state", None), dict) else {}
+            if sc.get("status") == "running" or (sc.get("finished") and time.time() - sc["finished"] < self.OWN_TOOL_GRACE):
+                return "η σάρωση του NetWatch (🔴 Pentest) από αυτόν τον υπολογιστή"
+            if time.time() <= self.own_tool["until"]:
+                return self.own_tool["why"]
+        return None
+
     def alert(self, typ, sev, actor, target, detail, t, key=None, cooldown=None, mark=True, mitre=None, benign=None):
         det = detector_for(typ)
         if det and not self.cfg["detectors"].get(det, True):
@@ -236,6 +285,9 @@ class NetState:
                  target=target, detail=detail, mitre=mitre or mitre_for(typ), lab=lab)
         if benign:  # γνωστή αθώα εξήγηση (π.χ. το δικό σου Tor): φαίνεται, αλλά δεν «χρωματίζει» τίποτα
             a["benign"], mark = benign, False
+        mine = None if lab else self._selftest(actor, t)
+        if mine:  # η δική σου δοκιμή: φαίνεται (για να δεις τι πιάνει η άμυνα), αλλά δεν είναι συναγερμός
+            a["selftest"], mark = mine, False
         self.alerts.appendleft(a)
         h = self.host(actor, t)
         if h:
@@ -247,12 +299,20 @@ class NetState:
         if lab:
             log(f"🧪 LAB {typ}: {actor} → {target}")
             return
+        if mine:
+            log(f"🧪 ΔΟΚΙΜΗ ΣΟΥ {typ}: {actor} → {target} ({mine})")
+            return  # ούτε ιστορικό, ούτε ειδοποιήσεις, ούτε playbooks/Home Assistant
         try:
             self.history.add_alert(a, self.mode)
         except Exception as e:
             log("history error:", e)
         if self.notifier and not benign:
             self.notifier(a)
+        if self.playbooks and not benign and not lab:
+            try:
+                self.playbooks.on_alert(a)
+            except Exception as e:
+                log("playbooks:", e)
         if self.hass and not benign and not lab:
             try:
                 self.hass.on_alert(a)
@@ -363,6 +423,11 @@ class NetState:
                                      "sp": sp, "dp": dp, "x": x,
                                      "f": P.get("flags") or {1: "who-has", 2: "is-at"}.get((P.get("arp") or {}).get("op"), ""),
                                      "t": round(t, 3)})
+                nm = (P.get("dns_q") or (None,))[0] or P.get("sni") or P.get("http_host")
+                if nm:  # για φίλτρα τύπου Wireshark: dns.qry.name, tls…server_name, http.host
+                    self.pending[-1]["n"] = str(nm)[:120]
+                    self.pending[-1]["nk"] = "dns" if P.get("dns_q") else "sni" if P.get("sni") else "http"
+
 
     def _vpn_leak(self, P, t):
         """Το VPN είναι ενεργό, άρα στη φυσική κάρτα (en0) θα έπρεπε να βλέπουμε ΜΟΝΟ το κρυπτογραφημένο τούνελ."""
@@ -486,8 +551,8 @@ class NetState:
                        key=f"{dst}:{dp}" if benign else None, cooldown=3600 if benign else None, benign=benign)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
-    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
-            "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors")
+    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
+            "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors", "own_tool", "test_ips")
 
     def reset(self, mode, iface, me_ips, gateway, history, feed, notifier=None):
         """Καθαρίζει όλη την κατάσταση και ξεκινά από την αρχή με νέα πηγή (κρατά συνδέσεις/ρυθμίσεις)."""
@@ -692,7 +757,7 @@ class NetState:
                     f"Δεν είδα επικίνδυνες υπηρεσίες ({len(services)} υπηρεσίες συνολικά).",
                     "Το NetWatch βλέπει μόνο υπηρεσίες που χρησιμοποιήθηκαν· για πλήρη εικόνα κάνε σάρωση με nmap.")
 
-            recent = [a for a in self.alerts if now - a["t"] < 3600 and not a.get("lab")]
+            recent = [a for a in self.alerts if now - a["t"] < 3600 and not a.get("lab") and not a.get("selftest")]
             attacks = [a for a in recent if not a["type"].startswith(("Κωδικός σε καθαρό", "Νέα συσκευή"))]
             hi = [a for a in attacks if a["sev"] == "high"]
             if attacks:
@@ -958,7 +1023,7 @@ class NetState:
     def status(self):
         """Μικρή περίληψη για την εφαρμογή του Mac (εικονίδιο στη γραμμή μενού)."""
         with self.lock:
-            al = [a for a in self.alerts if not a.get("lab") and not a.get("benign")]
+            al = [a for a in self.alerts if not a.get("lab") and not a.get("benign") and not a.get("selftest")]
             by = collections.Counter(a["sev"] for a in al)
             last = al[0] if al else None
             out = {"mode": self.mode, "feed": self.feed, "iface": self.iface, "alerts": len(al),

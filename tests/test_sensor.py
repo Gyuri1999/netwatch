@@ -58,3 +58,13 @@ def test_canary_event_alerts_on_the_toucher():
     assert typ == "Καναρίνι ESP32" and sev == "high" and actor == "192.168.30.66" and "root" in detail
     b.handle("netwatch/sensor/canary-a1b2c3/event", '{"type":"canary","port":80,"src":"not-an-ip"}')
     assert st.alerts[1][2] == "192.168.1.1"  # χωρίς έγκυρη IP → όχι ψεύτικος δράστης
+
+
+def test_ota_events():
+    import sensor
+    bad = sensor.to_alert({"type": "ota", "id": "canary-a1", "result": "rejected", "reason": "bad signature", "version": "1.3.0", "fw": "1.2.0"})
+    assert bad[0] == "OTA απορρίφθηκε" and bad[1] == "high" and "bad signature" in bad[2]
+    ok = sensor.to_alert({"type": "ota", "id": "canary-a1", "result": "updated", "reason": "1.1.0 -> 1.2.0", "fw": "1.2.0"})
+    assert ok[:2] == ("OTA ενημέρωση", "low")
+    assert sensor.to_alert({"type": "ota", "id": "x", "result": "error", "reason": "timeout"}) is None
+    assert sensor.to_alert({"type": "ota", "id": "x", "result": "up_to_date"}) is None

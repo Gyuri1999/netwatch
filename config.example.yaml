@@ -54,6 +54,8 @@ intel:
   abuseipdb_key: ""             # optional: free key from https://www.abuseipdb.com/account/api
   # feeds: [...]                # override the default list (Feodo Tracker, Spamhaus DROP, FireHOL level1)
 
+lang: el                        # el | en — language of notifications (macOS / Telegram / ntfy). The web UI has its own 🇬🇧 EN button.
+
 notify:                         # live mode (or --notify)
   min_severity: high            # low | med | high
   cooldown: 30                  # seconds between notifications of the same type
@@ -96,10 +98,29 @@ academy_terminal: true
 #   binary_sensor.netwatch_attack, sensor.netwatch_last_alert, _alerts_hour, _devices, _score
 # and every alert is also published as JSON on netwatch/alerts (use it as an MQTT trigger).
 # Use a SEPARATE broker user from mqtt_guard, with ACL:
-#   user netwatch-ha / topic write homeassistant/# / topic readwrite netwatch/ha/# / topic write netwatch/alerts
+#   user netwatch-ha / topic readwrite homeassistant/# / topic readwrite netwatch/ha/# / topic write netwatch/alerts
+#   / topic write netwatch/playbook/#   (full walkthrough: docs/homelab-setup.md)
 # homeassistant:
 #   host: 192.168.1.17
 #   port: 1883
 #   username: netwatch-ha
 #   password: ""
 #   # ca_file: ~/iot-ca/ca.crt
+
+# ⚡ Automatic responses ("when X → do Y"). Nothing runs automatically unless you write it here.
+# Actions: block (firewall, expires after block_minutes), notify (forces a notification), mqtt (netwatch/playbook/<name>,
+# e.g. to trigger a Home Assistant scene). Never blocks you, the router or the allowlist; max_per_hour caps actions.
+# playbooks:
+#   - name: Canary → block
+#     when: {type: "Καναρίνι ESP32"}       # alert type prefix (string or list); optional sev: high, local: true
+#     do: [block, notify]
+#     block_minutes: 60
+#     dry_run: true                         # start with true: it only logs what it WOULD do
+
+# 🩺 Homelab health (TCP / HTTP / ping every 60 s, TLS expiry for tls: true). The router and your configured broker are
+# checked automatically.
+# health:
+#   - {name: Proxmox, host: 192.168.1.16, port: 8006, tls: true}
+#   - {name: MQTT broker, host: 192.168.1.17, port: 1883}
+#   - {name: Home Assistant, url: "http://192.168.1.30:8123/"}
+#   - {name: ESP32 garden, host: 192.168.1.20, ping: true}

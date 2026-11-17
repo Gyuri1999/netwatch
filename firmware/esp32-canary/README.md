@@ -61,6 +61,7 @@
 | `canary_types.h` | struct/enum (σε header για να μη σκοντάφτουν τα αυτόματα prototypes του Arduino) |
 | `secrets.example.h` | πρότυπο όλων των ρυθμίσεων |
 | `secrets.h` | **οι δικές σου** ρυθμίσεις, αγνοείται από το git (`.gitignore`) |
+| `../common/` | κοινή βιβλιοθήκη `NetWatchSignedOta` για το (προαιρετικό) υπογεγραμμένο OTA |
 
 ```bash
 cp secrets.example.h secrets.h   # και συμπλήρωσε το secrets.h
@@ -110,6 +111,27 @@ arduino-cli monitor -p /dev/cu.usbserial-0001 -c baudrate=115200
 
 (`arduino-cli board list` δείχνει τη σωστή θύρα.)
 
+### Υπογεγραμμένο OTA (προαιρετικό)
+
+Με `OTA_ENABLE 1` στο `secrets.h` το καναρίνι ρωτά στην εκκίνηση και κάθε 6 ώρες τον OTA
+server σου για νέο firmware, και εγκαθιστά **μόνο** υπογεγραμμένη (ECDSA P-256), **αυστηρά
+νεότερη** έκδοση, με rollback αν το νέο firmware δεν συνδεθεί στο MQTT σε 5 λεπτά. Κλειδιά,
+server και workflow: [`../../tools/ota/README.md`](../../tools/ota/README.md).
+
+Ο κώδικας είναι στην κοινή βιβλιοθήκη `../common` (`NetWatchSignedOta`), οπότε η
+μεταγλώττιση θέλει `--library`:
+
+```bash
+arduino-cli compile --fqbn esp32:esp32:esp32 --library ../common .
+# νέα έκδοση για OTA: ανέβασε το FW_VERSION στο .ino, και μετά
+arduino-cli compile --fqbn esp32:esp32:esp32 --library ../common --output-dir /tmp/canary-build .
+python3 ../../tools/ota/ota_sign.py /tmp/canary-build/esp32-canary.ino.bin --version <FW_VERSION> --device-class canary
+```
+
+Στο Arduino IDE: `ln -s "$(cd ../common && pwd)" ~/Documents/Arduino/libraries/NetWatchSignedOta`.
+Με `OTA_ENABLE 0` (προεπιλογή) η βιβλιοθήκη δεν χρειάζεται και τίποτα δεν αλλάζει.
+Partition scheme: το προεπιλεγμένο (δύο OTA partitions)· **όχι** «Huge APP».
+
 ### Arduino IDE
 
 1. Boards Manager: εγκατάσταση **esp32 by Espressif** (3.x).
@@ -120,7 +142,7 @@ arduino-cli monitor -p /dev/cu.usbserial-0001 -c baudrate=115200
 Στην εκκίνηση θα δεις κάτι σαν:
 
 ```text
- NetWatch Canary v1.0.0  id=canary-a1b2c3
+ NetWatch Canary v1.1.0  id=canary-a1b2c3
 [wifi] connected, ip 192.168.20.37 rssi -58 hostname camera-salon
 [mdns] camera-salon.local: _http._tcp:80 _telnet._tcp:23
 [trap] listening on 23 (telnet), 80 (http), 8080 (http)
@@ -170,7 +192,7 @@ Sentinel (ο χρήστης `netwatch` διαβάζει `netwatch/sensor/#`). Δ
 **`netwatch/sensor/<id>/status`** (retained, QoS 1, κάθε 30 s και αμέσως μετά από κάθε σύνδεση):
 
 ```json
-{"id":"canary-a1b2c3","online":true,"fw":"1.0.0","uptime":123,"heap":190000,"rssi":-58,"ip":"192.168.20.37","canary_hits":3,"suppressed":1,"kind":"canary"}
+{"id":"canary-a1b2c3","online":true,"fw":"1.1.0","uptime":123,"heap":190000,"rssi":-58,"ip":"192.168.20.37","canary_hits":3,"suppressed":1,"kind":"canary"}
 ```
 
 LWT (retained) στο ίδιο topic: `{"online":false}`.
@@ -192,6 +214,18 @@ LWT (retained) στο ίδιο topic: `{"online":false}`.
 - `user`: Telnet: η γραμμή `login:`· HTTP: **μόνο** το όνομα από το
   `Authorization: Basic` (αποκωδικοποιείται ως το `:` και σταματά). Αλλιώς `""`.
 - `t` = uptime (s) τη στιγμή της σύνδεσης.
+
+**Υπογεγραμμένο OTA** (μόνο με `OTA_ENABLE 1`), στο ίδιο event topic:
+
+```json
+{"type":"ota","id":"canary-a1b2c3","result":"up_to_date","reason":"running 1.1.0","version":"1.1.0","fw":"1.1.0","t":12}
+{"type":"ota","id":"canary-a1b2c3","result":"updated","reason":"1.1.0 -> 1.2.0","version":"1.2.0","fw":"1.2.0","t":41}
+{"type":"ota","id":"canary-a1b2c3","result":"rejected","reason":"bad signature","version":"1.3.0","fw":"1.2.0","t":21650}
+```
+
+`result` ∈ `up_to_date`, `updated` (το στέλνει το **νέο** firmware αφού περάσει το self-test),
+`rejected` (λόγος ασφαλείας: υπογραφή, sha256, rollback, κατηγορία, αποτυχημένο self-test → **ερεύνησέ το**),
+`error` (δίκτυο/server/ρυθμίσεις· ξαναδοκιμάζει σε 6 ώρες). Το `fw` του heartbeat δείχνει την έκδοση που τρέχει.
 
 ## 9. Όρια και σχεδιαστικές επιλογές
 

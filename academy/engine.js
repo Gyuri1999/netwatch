@@ -2,7 +2,8 @@
 // Το περιεχόμενο (academy/*.js) καλεί ACADEMY.track({...}). Δες τη μορφή στο academy/FORMAT.md.
 (function () {
   'use strict';
-  const A = window.ACADEMY = { tracks: [], scenes: {}, _loaded: false };
+  const CFG = window.ACADEMY_CFG || {};  // standalone (academy.html / GitHub Pages): { standalone, base, filesUrl }
+  const A = window.ACADEMY = { tracks: [], scenes: {}, _loaded: false, standalone: !!CFG.standalone, base: CFG.base || '/academy/', filesUrl: CFG.filesUrl || '/api/academy' };
   // ίδιο id σε δύο αρχεία (π.χ. ccna-1.js, ccna-2.js) → ενώνονται οι ενότητες, ταξινομημένες κατά `order`
   A.track = t => { const o = A.tracks.find(x => x.id === t.id);
     if (!o) { A.tracks.push(t); t.modules = t.modules || []; }
@@ -218,11 +219,11 @@
       case 'warn': return `<div class="ac-box ac-warn">⚠️ ${md(b.md)}</div>`;
       case 'exam': return `<div class="ac-box ac-exam">🎯 <b>Για την εξέταση:</b> ${md(b.md)}</div>`;
       case 'table': return `<table class="ac-table"><thead><tr>${b.head.map(h => `<th>${inline(h)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr>${r.map(c => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-      case 'code': return `<div class="ac-code"><div class="ac-codeh"><span>${E(b.title || b.lang || 'κώδικας')}</span><span class="sm">${E(b.lang || '')}</span><span>${b.lang === 'bash' ? `<button class="b" data-term="${id}">▶ Τερματικό</button> ` : ''}<button class="b" data-copy="${id}">📋 Αντιγραφή</button></span></div><pre id="cp-${id}">${hl(b.code, b.lang)}</pre><div class="ac-termh" id="tm-${id}"></div>${b.explain ? `<div class="ac-explain">${md(b.explain)}</div>` : ''}</div>`;
+      case 'code': return `<div class="ac-code"><div class="ac-codeh"><span>${E(b.title || b.lang || 'κώδικας')}</span><span class="sm">${E(b.lang || '')}</span><span>${b.lang === 'bash' && !A.standalone ? `<button class="b" data-term="${id}">▶ Τερματικό</button> ` : ''}<button class="b" data-copy="${id}">📋 Αντιγραφή</button></span></div><pre id="cp-${id}">${hl(b.code, b.lang)}</pre><div class="ac-termh" id="tm-${id}"></div>${b.explain ? `<div class="ac-explain">${md(b.explain)}</div>` : ''}</div>`;
       case 'anim': return `<div class="ac-animh" data-anim="${id}"></div>${b.caption ? `<div class="sm" style="margin:-4px 0 10px">${inline(b.caption)}</div>` : ''}`;
       case 'cli': return `<div class="ac-blockt">🖥 ${E(b.title || 'Lab στον προσομοιωτή IOS')}</div><div data-cli="${id}"></div>`;
       case 'subnet': return `<div class="ac-blockt">🧮 Εξάσκηση subnetting</div><div data-subnet="${id}"></div>`;
-      case 'netwatch': return `<div class="ac-box ac-nw">🛰 <b>Δες το στο NetWatch:</b> ${md(b.md)}<button class="b" data-gotab="${E(b.tab)}">Άνοιγμα →</button></div>`;
+      case 'netwatch': return `<div class="ac-box ac-nw">🛰 <b>Δες το στο NetWatch:</b> ${md(b.md)}${A.standalone ? '' : `<button class="b" data-gotab="${E(b.tab)}">Άνοιγμα →</button>`}</div>`;
       case 'quiz': {
         const done = P.quiz[id];
         return `<div class="ac-quiz" data-quiz="${id}"><div class="ac-q">❓ ${inline(b.q)}</div>${b.opts.map((o, i) => `<button class="b ac-opt${done != null ? (i === b.ok ? ' ok' : i === done ? ' bad' : '') : ''}" data-i="${i}" ${done != null ? 'disabled' : ''}>${inline(o)}</button>`).join('')}<div class="ac-why">${done != null ? (done === b.ok ? '✅ ' : '❌ ') + md(b.why || '') : ''}</div></div>`;
@@ -235,9 +236,12 @@
   let view = { track: null };
   function load(cb) {
     if (A._loaded) return cb();
-    fetch('/api/academy').then(r => r.json()).then(j => {
+    // Στα αγγλικά: τα μαθήματα από το academy/en/ (ίδια id, ίδια πρόοδος). Αν λείπουν, μένουν τα ελληνικά.
+    const en = window.I18N && I18N.lang === 'en';
+    const tryEn = en ? fetch(A.base + 'en/files.json').then(r => r.ok ? r.json() : null).catch(() => null) : Promise.resolve(null);
+    tryEn.then(j => j && j.files && j.files.length ? (A.base = A.base + 'en/', A.lang = 'en', j) : fetch(A.filesUrl).then(r => r.json())).then(j => {
       let left = j.files.length; if (!left) { A._loaded = true; return cb(); }
-      j.files.forEach(f => { const s = document.createElement('script'); s.async = false; s.src = '/academy/' + f; s.onload = s.onerror = () => { if (--left === 0) { A._loaded = true; cb(); } }; document.head.appendChild(s); });
+      j.files.forEach(f => { const s = document.createElement('script'); s.async = false; s.src = A.base + f; s.onload = s.onerror = () => { if (--left === 0) { A._loaded = true; cb(); } }; document.head.appendChild(s); });
     }).catch(() => { A._loaded = true; cb(); });
   }
   A.render = function (el) {
@@ -250,6 +254,12 @@
           return `<div class="card ac-track" data-track="${E(t.id)}" style="cursor:pointer;white-space:normal"><div style="display:flex;justify-content:space-between;gap:8px"><b style="color:#fff;font-size:13px">${E(t.title)}</b><span class="tag">${E(t.level || '')}</span></div>
           <div class="sm" style="margin:4px 0 6px">${E(t.desc || '')}</div>${bar(p)}<div class="sm" style="margin-top:3px">${t.modules.length} ενότητες · ${ls.length} μαθήματα · ${p}% ολοκληρωμένο</div></div>`; }).join('');
       el.querySelectorAll('[data-track]').forEach(c => c.onclick = () => { view.track = c.dataset.track; A.render(el); });
+      const dt = A.tracks.filter(t => decksOf(t).length || examPool(t).length >= 5);
+      if (!A.standalone) el.firstElementChild.insertAdjacentHTML('beforeend', `<div class="sm" style="margin-top:6px">📱 Θες την Ακαδημία στο κινητό, και offline; Άνοιξε την <a href="academy.html" target="_blank" style="color:#3ec5ff">αυτόνομη έκδοση</a> (στο GitHub Pages εγκαθίσταται ως εφαρμογή: Κοινοποίηση → «Προσθήκη στην οθόνη Αφετηρίας»).</div>`);
+      if (dt.length) {
+        el.firstElementChild.insertAdjacentHTML('afterend', `<div class="card ac-dhome" style="white-space:normal"><div><b style="color:#fff">⏱ Το 10λεπτο της ημέρας</b><div class="sm">🔥 σερί ${streakN()} ${streakN() === 1 ? 'μέρα' : 'μέρες'}${P.streak.best ? ' · ρεκόρ ' + P.streak.best : ''}</div></div>${dt.map(t => `<button class="b" data-daily="${E(t.id)}">${dayState(t).done ? '✅' : '▶'} ${E(t.short || t.title.split(/[—:(]/)[0].trim())}</button>`).join('')}</div>`);
+        el.querySelectorAll('[data-daily]').forEach(b => b.onclick = () => openDaily(A.tracks.find(t => t.id === b.dataset.daily), () => A.render(el)));
+      }
       return;
     }
     const all = lessonsOf(t), nextL = all.find(l => !P.done[l.id]);
@@ -306,7 +316,7 @@
   A.deck = d => { const i = A.decks.findIndex(x => x.id === d.id); if (i >= 0) A.decks[i] = d; else A.decks.push(d); };
   P.cards = P.cards || {}; P.exams = P.exams || []; P.newDay = P.newDay || {};
   const DAY = 864e5, BOX_DAYS = [0, 1, 3, 7, 14, 30], NEW_PER_DAY = 20;
-  const today = () => new Date().toISOString().slice(0, 10);
+  const today = () => new Date().toLocaleDateString('sv');  // YYYY-MM-DD σε τοπική ώρα (όχι UTC: η μέρα αλλάζει τα μεσάνυχτα Ελλάδας)
   const domainOf = m => ((m && m.exam) || '').match(/^(\d\.0)/)?.[1] || null;
   const WEIGHTS = { '1.0': 20, '2.0': 20, '3.0': 25, '4.0': 10, '5.0': 15, '6.0': 10 };
   const DNAME = { '1.0': 'Network Fundamentals', '2.0': 'Network Access', '3.0': 'IP Connectivity', '4.0': 'IP Services', '5.0': 'Security Fundamentals', '6.0': 'Automation' };
@@ -325,7 +335,9 @@
     const dueN = ds.reduce((a, d) => a + dueCards(d).all.length, 0);
     const days = P.examDate ? Math.ceil((new Date(P.examDate) - new Date(today())) / DAY) : null;
     const last = P.exams.filter(x => x.track === t.id).slice(-1)[0];
+    const s = dayState(t);
     return `<div class="ac-tools">
+      <div class="card ac-tool" data-tool="daily"><b>⏱ 10′ σήμερα</b><span class="ac-big">${s.done ? '✓' : '🔥' + streakN()}</span><span class="sm">${s.done ? 'έγινε για σήμερα' : 'κάρτες + κουίζ' + (/ccna/i.test(t.id) ? ' + subnetting' : '')}</span></div>
       ${ds.length ? `<div class="card ac-tool" data-tool="cards"><b>🃏 Κάρτες</b><span class="ac-big">${dueN}</span><span class="sm">για σήμερα · κατάκτηση ${mastery(ds.flatMap(d => d.cards))}%</span></div>` : ''}
       <div class="card ac-tool" data-tool="plan"><b>📅 Πρόγραμμα</b><span class="ac-big">${days == null ? '—' : days < 0 ? '✓' : days}</span><span class="sm">${days == null ? 'βάλε ημερομηνία εξέτασης' : days < 0 ? 'η εξέταση πέρασε' : 'μέρες ως την εξέταση'}</span></div>
       ${quizzes.length >= 20 ? `<div class="card ac-tool" data-tool="exam"><b>⏱ Διαγώνισμα</b><span class="ac-big">${last ? last.score + '%' : '—'}</span><span class="sm">${last ? 'τελευταίο · ' + new Date(last.t).toLocaleDateString('el-GR') : quizzes.length + ' ερωτήσεις στην τράπεζα'}</span></div>` : ''}
@@ -340,7 +352,7 @@
     return `<div class="card" style="white-space:normal"><b style="color:#fff">Πού είσαι ανά τομέα της εξέτασης</b><div style="margin-top:6px">${rows}</div><div class="sm" style="margin-top:4px">🃏 = κάρτες που ξέρεις σταθερά · ⏱ = σωστές στο τελευταίο διαγώνισμα. Ο πιο «κοντός» τομέας με το μεγαλύτερο βάρος είναι αυτός που διαβάζεις πρώτα.</div></div>`;
   }
   function bindTools(el, t, rerender) {
-    el.querySelectorAll('[data-tool]').forEach(c => c.onclick = () => ({ cards: () => openCards(t, rerender), plan: () => openPlan(t, rerender), exam: () => openExamSetup(t, rerender) })[c.dataset.tool]());
+    el.querySelectorAll('[data-tool]').forEach(c => c.onclick = () => ({ daily: () => openDaily(t, rerender), cards: () => openCards(t, rerender), plan: () => openPlan(t, rerender), exam: () => openExamSetup(t, rerender) })[c.dataset.tool]());
   }
   function panel(title, html, onClose) {
     let ov = $('ac-overlay'); if (!ov) { ov = document.createElement('div'); ov.id = 'ac-overlay'; document.body.appendChild(ov); }
@@ -351,9 +363,81 @@
     return { ov, body: ov.querySelector('.ac-body'), close };
   }
 
+  // ---------- ⏱ 10′ σήμερα ----------
+  P.daily = P.daily || {}; P.streak = P.streak || { n: 0, last: null, best: 0 }; P.quizFix = P.quizFix || {};
+  Object.keys(P.daily).sort().slice(0, -14).forEach(k => delete P.daily[k]);  // κρατάμε 2 εβδομάδες
+  const DAILY_CARDS = 12;
+  const yday = () => new Date(Date.now() - DAY).toLocaleDateString('sv');
+  const streakN = () => (P.streak.last === today() || P.streak.last === yday()) ? P.streak.n : 0;
+  const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+  function pickDaily(pool, n) {  // πρώτα όσες έπεσες έξω, μετά από μαθήματα που έχεις κάνει, μετά οτιδήποτε
+    const wrong = pool.filter(q => P.quiz[q.key] != null && P.quiz[q.key] !== q.ok && !P.quizFix[q.key]);
+    const seen = pool.filter(q => !wrong.includes(q) && P.done[q.lesson]);
+    const rest = pool.filter(q => !wrong.includes(q) && !seen.includes(q));
+    return [...shuffle(wrong), ...shuffle(seen), ...shuffle(rest)].slice(0, n);
+  }
+  function dayState(t) {
+    const d = P.daily[today()] = P.daily[today()] || {};
+    if (!d[t.id]) { d[t.id] = { qs: pickDaily(examPool(t), 5).map(q => q.key) }; save(); }
+    return d[t.id];
+  }
+  function dailySteps(t, s) {
+    const ds = decksOf(t), due = Math.min(DAILY_CARDS, ds.reduce((a, x) => a + dueCards(x).all.length, 0));
+    return [
+      ds.length && { id: 'cards', ico: '🃏', title: due ? `Κάρτες της ημέρας — ${due}` : 'Κάρτες — καμία για σήμερα 👌', ok: !!s.cards || !due, min: 4 },
+      s.qs.length && { id: 'quiz', ico: '❓', title: `${s.qs.length} γρήγορες ερωτήσεις`, ok: !!s.quiz, sub: s.quiz ? `${s.quiz.ok}/${s.quiz.n} σωστές` : 'πρώτα όσες είχες πει λάθος', min: 3 },
+      /ccna/i.test(t.id) && { id: 'subnet', ico: '🧮', title: 'Ένα subnetting από μνήμης', ok: !!s.subnet, sub: 'χωρίς κομπιουτεράκι', min: 3 },
+    ].filter(Boolean);
+  }
+  function openDaily(t, onClose) {
+    const s = dayState(t), pool = examPool(t);
+    const W = panel('⏱ 10′ σήμερα · ' + E(t.title), '', onClose);
+    const days = n => n + (n === 1 ? ' μέρα' : ' μέρες');
+    function list() {
+      const st = dailySteps(t, s), all = st.every(x => x.ok);
+      if (all && !s.done) {
+        s.done = true;
+        if (P.streak.last !== today()) { P.streak.n = streakN() + 1; P.streak.last = today(); P.streak.best = Math.max(P.streak.best || 0, P.streak.n); }
+        save();
+      }
+      W.body.innerHTML = `<h2 class="ac-title">⏱ Το 10λεπτο της ημέρας</h2>
+        <div class="sm" style="margin-bottom:10px">Λίγο κάθε μέρα νικάει το «πολύ» μία φορά την εβδομάδα. 🔥 Σερί: <b>${days(streakN())}</b>${P.streak.best ? ' · ρεκόρ ' + days(P.streak.best) : ''}</div>` +
+        st.map(x => `<div class="card ac-dstep${x.ok ? ' ok' : ''}" data-step="${x.id}"><span class="ac-dico">${x.ok ? '✅' : x.ico}</span><span style="flex:1"><b>${E(x.title)}</b>${x.sub ? `<div class="sm">${E(x.sub)}</div>` : ''}</span><span class="sm">${x.ok ? 'έγινε' : '~' + x.min + '′ →'}</span></div>`).join('') +
+        (all ? `<div class="ac-box ac-goal">🎉 <b>Τελείωσες για σήμερα!</b> Σερί ${days(streakN())}. Τα ξαναλέμε αύριο.</div>` : '');
+      W.body.querySelectorAll('[data-step]').forEach(c => c.onclick = () => ({
+        cards: () => openCards(t, () => { s.cards = true; save(); openDaily(t, onClose); }, DAILY_CARDS), quiz, subnet })[c.dataset.step]());
+    }
+    function quiz() {
+      const qs = s.qs.map(k => pool.find(q => q.key === k)).filter(Boolean); let i = 0, ok = 0;
+      const one = () => {
+        if (i >= qs.length) { s.quiz = { ok, n: qs.length }; save(); return list(); }
+        const q = qs[i], l = lessonsOf(t).find(x => x.id === q.lesson);
+        W.body.innerHTML = `<div class="sm">Ερώτηση ${i + 1} από ${qs.length}</div><div class="ac-quiz"><div class="ac-q">❓ ${inline(q.q)}</div>${q.opts.map((o, j) => `<button class="b ac-opt" data-i="${j}">${inline(o)}</button>`).join('')}<div class="ac-why"></div></div>
+          <button class="b" data-nx style="display:none">${i + 1 < qs.length ? 'Επόμενη →' : 'Τέλος ✔'}</button>`;
+        W.body.querySelectorAll('.ac-opt').forEach(b => b.onclick = () => {
+          const j = +b.dataset.i, good = j === q.ok;
+          if (good) { ok++; P.quizFix[q.key] = true; save(); }
+          W.body.querySelectorAll('.ac-opt').forEach((x, k) => { x.disabled = true; if (k === q.ok) x.classList.add('ok'); else if (k === j) x.classList.add('bad'); });
+          W.body.querySelector('.ac-why').innerHTML = (good ? '✅ ' : '❌ ') + md(q.why || '') + (l ? `<div class="sm">📖 από το μάθημα «${E(l.title)}»</div>` : '');
+          const nx = W.body.querySelector('[data-nx]'); nx.style.display = ''; nx.onclick = () => { i++; one(); };
+        });
+      };
+      one();
+    }
+    function subnet() {
+      W.body.innerHTML = `<div class="sm" style="margin-bottom:6px">Λύσε μία διεύθυνση με το μυαλό (ή χαρτί) και πάτα ✔ Έλεγχος.</div><div data-sub></div><button class="b" data-back style="margin-top:10px">← Πίσω στη λίστα</button>`;
+      const h = W.body.querySelector('[data-sub]'); Subnet(h);
+      h.addEventListener('click', e => { if (e.target.closest('[data-a="chk"]')) { s.subnet = true; save(); } });
+      W.body.querySelector('[data-back]').onclick = list;
+    }
+    list();
+  }
+  A.openDaily = id => load(() => { const t = A.tracks.find(x => x.id === id) || A.tracks.find(x => decksOf(x).length); if (t) openDaily(t); });
+
   // ---------- 🃏 κάρτες ----------
-  function openCards(t, onClose) {
+  function openCards(t, onClose, limit) {
     const ds = decksOf(t); let queue = ds.flatMap(d => { const x = dueCards(d); return x.all.map(c => ({ c, d })); });
+    if (limit) queue = queue.slice(0, limit);  // το 10λεπτο: οι πιο «καθυστερημένες» πρώτα, όχι όλη η στοίβα
     const total = queue.length; let flipped = false, done = 0, again = 0;
     const W = panel('🃏 Κάρτες · ' + E(t.title), '', onClose);
     const lessonTitle = id => { const l = lessonsOf(t).find(l => l.id === id); return l ? l.title : null; };
@@ -466,11 +550,13 @@
     }
     show();
   }
-  A._test = { pickExam, examPool, dueCards, domainOf };
+  A._test = { pickExam, examPool, dueCards, domainOf, pickDaily, dayState, dailySteps, streakN };
 
   // ---------- στυλ ----------
   const css = document.createElement('style');
   css.textContent = `
+  .ac-dstep{display:flex;gap:12px;align-items:center;cursor:pointer;white-space:normal}.ac-dstep.ok{opacity:.65}.ac-dico{font-size:22px}
+  .ac-dhome{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ac-dhome>div{flex:1;min-width:160px}
   #ac-overlay{position:fixed;inset:0;z-index:200;background:#000b;display:none;align-items:center;justify-content:center;padding:18px}
   .ac-win{width:min(980px,100%);height:100%;background:var(--panel,#0b111c);border:1px solid var(--line,#1c2638);border-radius:12px;display:flex;flex-direction:column;box-shadow:0 20px 60px #000c}
   .ac-top{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line,#1c2638)}
@@ -511,6 +597,7 @@
   .ac-foot{display:flex;justify-content:space-between;gap:8px;margin-top:24px;padding-top:12px;border-top:1px solid #1f3352}.ac-done{border-color:#3ddc97}
   .ac-li{display:flex;gap:6px;align-items:baseline;padding:4px 6px;border-radius:5px;cursor:pointer;font-size:12px}.ac-li:hover{background:#ffffff08}.ac-li span:first-of-type{flex:1}
   #ac-overlay th{position:static;text-transform:none}#ac-overlay td{white-space:normal;max-width:none;overflow:visible;text-overflow:clip}
-  @media (max-width:700px){.ac-body{padding:12px}.ac-row span{width:120px}}`;
+  @media (max-width:700px){.ac-body{padding:12px}.ac-row span{width:120px}}
+  @media (max-width:640px){#ac-overlay{padding:0}.ac-win{border-radius:0;border:0;padding-top:env(safe-area-inset-top)}.ac-body{padding:12px 14px calc(40px + env(safe-area-inset-bottom));font-size:14.5px}.ac-tools{grid-template-columns:1fr 1fr}.ac-opt{padding:10px 12px;font-size:14px}}`;
   document.head.appendChild(css);
 })();

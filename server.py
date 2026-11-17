@@ -67,9 +67,29 @@ def make_handler(state):
                     target = str(body.get("target") or state.default_scan_target())
                     with state.lock:
                         known = {ip: h["mac"] for ip, h in state.hosts.items() if h.get("mac") and h["kind"] == "local"}
-                    state.scanner.start(target, known)
-                    log(f"🔴 σάρωση LAN: {target}")
+                    profile = str(body.get("profile") or "quick")
+                    ports = str(body.get("ports") or "")[:4000] or None
+                    state.scanner.start(target, known, profile=profile, ports=ports, udp=bool(body.get("udp")))
+                    log(f"🔴 σάρωση LAN: {target} ({profile}{' + UDP' if body.get('udp') else ''})")
                     return self._json({"ok": True})
+                if u.path == "/api/selftest":  # «για Ν λεπτά κάνω δοκιμή από αυτή τη συσκευή»
+                    from core import ip_kind
+                    ip = str(body.get("ip") or "").strip()[:64]
+                    try:
+                        minutes = float(body.get("minutes") if body.get("minutes") is not None else 30)
+                    except (TypeError, ValueError):
+                        raise ValueError("Μη έγκυρα λεπτά")
+                    if not re.fullmatch(r"[0-9a-fA-F:.]+", ip or "-") or ip_kind(ip) != "local" or ip in ("0.0.0.0", "::"):
+                        raise ValueError("Μόνο IP του τοπικού δικτύου (π.χ. 192.168.1.20)")
+                    if not 0 <= minutes <= 240:
+                        raise ValueError("Λεπτά: από 0 έως 240")
+                    why = str(body.get("why") or "").strip()[:80] or None
+                    state.test_from(ip, minutes, why)
+                    log(f"🧪 δοκιμή από {ip} για {minutes:g}′" if minutes else f"🧪 τέλος δοκιμής από {ip}")
+                    return self._json(state.selftest_status())
+                if u.path == "/api/netkit":  # 🧰 εργαλεία τεχνικού (ping, DNS, θύρες, HTTP, WoL, ονόματα)
+                    import netkit
+                    return self._json(netkit.run_tool(body, sim=state.mode == "demo", state=state))
                 if u.path == "/api/lab":
                     state.lab.start(str(body.get("kind")), str(body.get("variant")))
                     return self._json({"ok": True})
@@ -121,6 +141,12 @@ def make_handler(state):
                         return self._json({"ok": False, "blocked": True, "out": "Το τερματικό είναι κλειστό (academy_terminal: false στο config)."})
                     import shellrun
                     return self._json(shellrun.run(str(body.get("cmd", ""))[:500]))
+                if u.path == "/api/playbooks":  # αναίρεση μιας αυτόματης ενέργειας
+                    if not state.playbooks:
+                        return self._json({"error": "Διαθέσιμο μόνο σε Live/Demo."}, 400)
+                    if body.get("undo"):
+                        state.playbooks.undo(int(body["undo"]))
+                    return self._json(state.playbooks.status())
                 if u.path == "/api/notify":  # δοκιμαστική ειδοποίηση σε macOS / Telegram / ntfy
                     from storage import Notifier
                     n = state.notifier or Notifier(state.cfg.get("notify") or {})
@@ -187,20 +213,37 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path == "/edu.js":
-                with open(os.path.join(HERE, "edu.js"), "rb") as f:
+            if u.path in ("/edu.js", "/wireshark.js"):
+                with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
-            if u.path.startswith("/academy/") and u.path.endswith(".js"):
-                name = os.path.basename(u.path)  # μόνο αρχεία του φακέλου academy/, χωρίς ../
-                fp = os.path.join(HERE, "academy", name)
+            if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
+                name = os.path.basename(u.path)
+                fp = os.path.join(HERE, "i18n.js") if u.path == "/i18n.js" else os.path.join(HERE, "i18n", name)
                 if re.fullmatch(r"[\w.-]+\.js", name) and os.path.isfile(fp):
                     with open(fp, "rb") as f:
                         return self._send(200, f.read(), "text/javascript; charset=utf-8")
                 return self._send(404, b"not found", "text/plain")
-            if u.path == "/api/academy":
-                d = os.path.join(HERE, "academy")
+            if u.path.startswith("/academy/") and u.path.endswith(".js"):
+                name = os.path.basename(u.path)  # μόνο αρχεία του academy/ ή academy/en/, χωρίς ../
+                sub = "en" if u.path == "/academy/en/" + name else ""
+                fp = os.path.join(HERE, "academy", sub, name)
+                if re.fullmatch(r"[\w.-]+\.js", name) and os.path.isfile(fp):
+                    with open(fp, "rb") as f:
+                        return self._send(200, f.read(), "text/javascript; charset=utf-8")
+                return self._send(404, b"not found", "text/plain")
+            if u.path in ("/api/academy", "/academy/files.json", "/academy/en/files.json"):
+                en = u.path.startswith("/academy/en/") or parse_qs(u.query).get("lang", [""])[0] == "en"
+                d = os.path.join(HERE, "academy", "en") if en else os.path.join(HERE, "academy")
                 files = sorted(f for f in os.listdir(d) if f.endswith(".js") and f != "engine.js") if os.path.isdir(d) else []
                 return self._json({"files": files})
+            if u.path in ("/academy.html", "/manifest.webmanifest", "/sw.js"):  # η Ακαδημία ως εφαρμογή κινητού (PWA)
+                ct = {".html": "text/html; charset=utf-8", ".webmanifest": "application/manifest+json",
+                      ".js": "text/javascript; charset=utf-8"}[os.path.splitext(u.path)[1]]
+                with open(os.path.join(HERE, u.path[1:]), "rb") as f:
+                    return self._send(200, f.read(), ct)
+            if re.fullmatch(r"/academy/icon(-\d+)?\.(png|svg)", u.path) and os.path.isfile(os.path.join(HERE, "academy", os.path.basename(u.path))):
+                with open(os.path.join(HERE, "academy", os.path.basename(u.path)), "rb") as f:
+                    return self._send(200, f.read(), "image/svg+xml" if u.path.endswith(".svg") else "image/png")
             if u.path == "/api/whois":
                 ip = parse_qs(u.query).get("ip", [""])[0]
                 return self._send(200, json.dumps({"ip": ip, "text": whois(ip)}).encode(), "application/json")
@@ -212,9 +255,39 @@ def make_handler(state):
                 ref = state.last_t if state.mode == "pcap" and state.last_t else None
                 return self._send(200, json.dumps(state.history.query(hours, ref)).encode(), "application/json")
             if u.path == "/api/scan":
-                st = state.scan_view()
+                import pentest
+                st = pentest.apply_findings(state.scan_view())
                 st["default_target"] = state.default_scan_target()
                 return self._json(st)
+            if u.path == "/api/scan/export":  # ⬇️ η τελευταία σάρωση σε CSV / JSON / Markdown
+                import pentest
+                fmt = parse_qs(u.query).get("fmt", ["csv"])[0]
+                scan = None
+                if state.scanner and state.scanner.status().get("status") == "done":
+                    scan = pentest.apply_findings(state.scan_view())
+                elif state.scanner:
+                    scan = state.scanner.last_result()
+                try:
+                    body, ctype, fname = pentest.export_scan(scan, fmt)
+                except ValueError as e:
+                    return self._json({"error": str(e)}, 400 if scan else 404)
+                self.send_response(200)
+                self.send_header("Content-Type", ctype)
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Content-Disposition", f'attachment; filename="{fname}"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if u.path == "/api/selftest":
+                return self._json(state.selftest_status())
+            if u.path == "/api/netkit/iface":
+                import netkit
+                try:
+                    return self._json(netkit.iface_info(sim=state.mode == "demo"))
+                except Exception as e:
+                    return self._json({"error": str(e)[:200]}, 502)
             if u.path == "/api/lab":
                 return self._json(state.lab.status() if state.lab else {"status": "off"})
             if u.path == "/api/rules":
@@ -240,6 +313,10 @@ def make_handler(state):
                 except ValueError:
                     days = 7
                 return self._send(200, report.build(state, days).encode(), "text/html; charset=utf-8")
+            if u.path == "/api/health":
+                return self._json(state.health.status() if state.health else {"targets": []})
+            if u.path == "/api/playbooks":
+                return self._json(state.playbooks.status() if state.playbooks else {"playbooks": [], "errors": [], "runs": []})
             if u.path == "/api/hass":
                 return self._json(state.hass.status() if state.hass else {"configured": False})
             if u.path == "/api/mqtt":

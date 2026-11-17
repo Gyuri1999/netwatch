@@ -1,5 +1,5 @@
 // =============================================================================
-//  NetWatch Sentinel  v1.0.0
+//  NetWatch Sentinel  v1.1.0
 // -----------------------------------------------------------------------------
 //  Μικρός ΠΑΘΗΤΙΚΟΣ ασύρματος αισθητήρας ασφαλείας για ESP32.
 //  Αναφέρει στο NetWatch (μέσω MQTT over TLS) τα εξής:
@@ -36,10 +36,22 @@
 #include "secrets.h"       // ΔΕΝ είναι στο git, βλ. secrets.example.h
 #include "sentinel_types.h" // struct/enum του firmware
 
+// Υπογεγραμμένο OTA: προαιρετικό. Ένα παλιό secrets.h χωρίς OTA_ENABLE
+// συνεχίζει να μεταγλωττίζεται (OTA ανενεργό).
+#ifndef OTA_ENABLE
+#define OTA_ENABLE 0
+#endif
+#if OTA_ENABLE
+// Από τη βιβλιοθήκη firmware/common (NetWatchSignedOta). Μεταγλώττιση με
+//   arduino-cli compile --library ../common ...   (βλ. README)
+#include <signed_ota.h>
+#endif
+
 // -----------------------------------------------------------------------------
 //  Σταθερές & προεπιλογές (αν δεν ορίζονται στο secrets.h)
 // -----------------------------------------------------------------------------
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.1.0"      // ΙΔΙΑ με το --version του tools/ota/ota_sign.py
+#define OTA_DEVICE_CLASS "sentinel"
 
 #ifndef SNIFF_SECONDS
 #define SNIFF_SECONDS 22
@@ -52,6 +64,12 @@
 #endif
 #ifndef SCAN_INTERVAL_S
 #define SCAN_INTERVAL_S 60
+#endif
+#ifndef OTA_INTERVAL_H
+#define OTA_INTERVAL_H 6      // έλεγχος για νέο firmware: στην εκκίνηση + κάθε τόσες ώρες
+#endif
+#ifndef OTA_SELFTEST_S
+#define OTA_SELFTEST_S 300    // νέο firmware: αν δεν συνδεθεί στο MQTT μέσα σε τόσα s -> rollback
 #endif
 
 static const uint8_t  FIRST_CHANNEL        = 1;
@@ -560,6 +578,48 @@ static void saveCounters() {
   g_countersDirty = false;
 }
 
+// -----------------------------------------------------------------------------
+//  Υπογεγραμμένο OTA (μόνο με OTA_ENABLE 1, βλ. tools/ota/README.md)
+// -----------------------------------------------------------------------------
+//  Τρέχει ΜΕΣΑ στη φάση online, αφού σταλούν heartbeat και γεγονότα:
+//    - το self-test του νέου firmware = "συνδέθηκα σε Wi-Fi ΚΑΙ σε MQTT/TLS"
+//    - έλεγχος στην πρώτη φάση online και μετά κάθε OTA_INTERVAL_H ώρες.
+//      ΜΠΛΟΚΑΡΕΙ όσο κατεβαίνει firmware (η φάση online μακραίνει για λίγο,
+//      άρα και το "τυφλό" διάστημα του sniff). Αν εγκατασταθεί νέο: restart.
+//    - αποτέλεσμα στο event topic: {"type":"ota","result":"updated|up_to_date|
+//      rejected|error","reason":"..."}
+// -----------------------------------------------------------------------------
+#if OTA_ENABLE
+static uint32_t g_lastOtaMs = 0;
+static bool     g_firstOta = true;
+
+static void publishOta(const SignedOtaStatus &st) {
+  char reason[sizeof st.reason * 2];
+  char ver[sizeof st.version * 2];
+  jsonEscape(st.reason, reason, sizeof reason);
+  jsonEscape(st.version, ver, sizeof ver);
+  char buf[400];
+  snprintf(buf, sizeof buf,
+           "{\"type\":\"ota\",\"id\":\"%s\",\"result\":\"%s\",\"reason\":\"%s\",\"version\":\"%s\","
+           "\"fw\":\"%s\",\"t\":%lu}",
+           g_id, signedOtaResultName(st.result), reason, ver, FW_VERSION, (unsigned long)uptimeS());
+  if (mqttPublish(g_topicEvent, buf, /*retain=*/false)) Serial.printf("[mqtt] event  -> %s\n", buf);
+}
+
+static void otaOnline() {
+  signedOtaMarkHealthy();   // Wi-Fi + MQTT/TLS δουλεύουν: το self-test πέρασε
+  SignedOtaStatus report;
+  if (signedOtaTakeReport(report)) publishOta(report);
+
+  if (!due(g_lastOtaMs, (uint32_t)OTA_INTERVAL_H * 3600UL, g_firstOta)) return;
+  g_lastOtaMs = millis();
+  g_firstOta = false;
+  mqttFlush();   // πρώτα να φύγουν τα γεγονότα, μετά το (αργό) κατέβασμα
+  signedOtaCheck(OTA_BASE_URL, OTA_DEVICE_CLASS, FW_VERSION, MQTT_CA_PEM, OTA_PUBKEY_PEM);
+  publishOta(signedOtaLastStatus());
+}
+#endif
+
 static void onlinePhase() {
   // (α) Σάρωση για evil twin: γίνεται ΠΡΙΝ τη σύνδεση, ώστε να μη διακόψει
   //     την ενεργή σύνδεση (η σάρωση αλλάζει κανάλια).
@@ -603,6 +663,10 @@ static void onlinePhase() {
   if (g_dropped) Serial.printf("[queue] %lu events dropped so far (queue full)\n",
                                (unsigned long)g_dropped);
 
+#if OTA_ENABLE
+  otaOnline();
+#endif
+
   // (ε) Περιμένουμε τα PUBACK και κλείνουμε ομαλά.
   mqttFlush();
   Serial.printf("[cycle] sent %d events, %u still queued, heap %lu\n",
@@ -635,6 +699,10 @@ void setup() {
                 g_brokerUri, PROTECTED_SSID, EXPECTED_SECURITY,
                 (unsigned)(sizeof(ALLOWED_BSSIDS) / sizeof(ALLOWED_BSSIDS[0])));
 
+#if OTA_ENABLE
+  signedOtaBegin(FW_VERSION);   // διαβάζει NVS: προηγήθηκε update ή rollback;
+#endif
+
   // Μετρητές από τη flash
   g_prefs.begin("sentinel", /*readOnly=*/false);
   g_deauthTotal = g_prefs.getULong("deauth", 0);
@@ -659,6 +727,9 @@ void setup() {
 }
 
 void loop() {
+#if OTA_ENABLE
+  signedOtaSelfTestTick(OTA_SELFTEST_S);   // νέο firmware που δεν "υγιαίνει" -> rollback
+#endif
   sniffPhase();    // ~SNIFF_SECONDS: εναλλαγή καναλιών, μέτρηση deauth
   onlinePhase();   // ~5-8 s: scan (κάθε ~60 s), σύνδεση, δημοσίευση
 }

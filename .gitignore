@@ -15,3 +15,12 @@ rules/local.yaml
 # macOS app build
 build/
 dist/
+
+# στατικό online demo (GitHub Pages) — χτίζεται στο CI
+dist-pages/
+
+# δική σου CA για τον broker (tools/mosquitto-tls.sh) — το ca.key δεν μπαίνει ΠΟΤΕ στο git
+iot-ca/
+# κλειδιά υπογραφής OTA
+*.pem
+*.key

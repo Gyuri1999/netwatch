@@ -59,6 +59,17 @@ def to_alert(ev):
                 f"{' — δοκίμασε χρήστη «' + user + '»' if user else ''}{' — έστειλε: ' + data if data else ''}. "
                 "Κανείς νόμιμος δεν έχει λόγο να συνδεθεί εκεί: η συσκευή σκανάρει ή δοκιμάζει κωδικούς.",
                 f"canary:{sid}:{src}", src)
+    if t == "ota":  # αποτέλεσμα υπογεγραμμένου OTA (firmware/common/signed_ota)
+        res, why = clean_txt(ev.get("result"), 12), clean_txt(ev.get("reason"), 80)
+        ver, fw = clean_txt(ev.get("version"), 16), clean_txt(ev.get("fw"), 16)
+        if res == "rejected":  # κακή υπογραφή / sha256 / rollback: κάποιος πείραξε τον OTA server ή το δίκτυο
+            return ("OTA απορρίφθηκε", "high",
+                    f"Ο {sid} αρνήθηκε ενημέρωση firmware {ver or '?'} ({why or 'χωρίς λόγο'}) και μένει στην {fw or '?'}. "
+                    "Αν δεν έκανες εσύ κάτι λάθος στην υπογραφή, κάποιος σερβίρει πειραγμένο firmware: έλεγξε τον OTA server.",
+                    f"ota:{sid}:{ver}")
+        if res == "updated":
+            return ("OTA ενημέρωση", "low", f"Ο {sid} ενημερώθηκε και επιβεβαίωσε ότι δουλεύει: {why or fw}.", f"ota:{sid}:{fw}")
+        return None  # up_to_date / error (δίκτυο) — φαίνονται στην κατάσταση, όχι ειδοποίηση
     if t in ("evil_twin", "rogue_ap"):
         ssid, sec, bssid = clean_txt(ev.get("ssid"), 32), clean_txt(ev.get("security"), 12), clean_mac(ev.get("bssid"))
         if t == "evil_twin":

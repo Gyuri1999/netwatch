@@ -141,8 +141,15 @@ def main():
     state.reload_rules()
     log(f"Κανόνες: {len(state.rules.rules)} από {RULES_DIR}")
     import pentest
-    state.scanner = pentest.LanScanner(sim=demo_scan if mode == "demo" else None)
-    state.scanner.on_result = state.scan_result
+    state.scanner = pentest.LanScanner(sim=demo_scan if mode == "demo" else None,
+                                       scan_dir=os.path.join(HERE, "data", "scans") if mode == "live" else None)
+    state.scanner.on_save = chown_to_user
+    import netkit
+
+    def scan_done(hosts):
+        state.scan_result(hosts)
+        netkit.merge_names(state, {h["ip"]: h.get("names") or [] for h in hosts})  # ονόματα → χάρτης
+    state.scanner.on_result = scan_done
     state.lab = pentest.Lab(state)
     import wifiguard
     state.wifi = wifiguard.Guard(state, sim=wifiguard.demo_check if mode == "demo" else None,
@@ -181,6 +188,31 @@ def main():
                                        learn=baseline.LEARN if mode == "live" else 60) if mode != "pcap" else None
     if state.baseline:
         threading.Thread(target=state.baseline.run, daemon=True).start()
+    import health
+    auto = [{"name": "Router", "host": state.gateway, "ping": True}] if state.gateway else []
+    for key, hk, pk in (("mqtt_guard", "host", "port"), ("sensor", "mqtt_host", "mqtt_port")):
+        c = cfg.get(key) or {}
+        if c.get(hk):
+            auto.append({"name": "MQTT broker", "host": c[hk], "port": int(c.get(pk) or (1883 if key == "mqtt_guard" else 8883)),
+                         "tls": int(c.get(pk) or 0) == 8883})
+    hcfg = cfg.get("health")
+    if mode == "demo" and not hcfg:
+        hcfg = [{"name": "Proxmox", "host": "192.168.1.16", "port": 8006, "tls": True}, {"name": "MQTT broker", "host": "192.168.1.17", "port": 1883},
+                {"name": "Home Assistant", "url": "http://192.168.1.30:8123/"}, {"name": "ESP32 κήπου", "host": "192.168.1.20", "ping": True}]
+        auto = []
+    state.health = health.Health(state, hcfg, auto if mode == "live" else [], sim=mode == "demo") if mode != "pcap" else None
+    if state.health:
+        threading.Thread(target=state.health.run_forever, daemon=True).start()
+    import playbooks
+    pb_cfg = cfg.get("playbooks")
+    if mode == "demo" and not pb_cfg:  # παράδειγμα για να φαίνεται η καρτέλα (το μπλοκ στο demo είναι εικονικό)
+        pb_cfg = [{"name": "Παγίδα/καναρίνι → μπλόκαρε 30′", "when": {"type": ["Παγίδα", "Καναρίνι ESP32"]}, "do": ["block"], "block_minutes": 30},
+                  {"name": "Σοβαρή επίθεση από το LAN → κινητό", "when": {"sev": "high", "local": True}, "do": ["notify"], "dry_run": True}]
+    state.playbooks = playbooks.Playbooks(state, pb_cfg) if mode != "pcap" else None
+    if state.playbooks:
+        threading.Thread(target=state.playbooks.run_forever, daemon=True).start()
+        for err in state.playbooks.errors:
+            log("⚡ playbook:", err)
     import hass
     state.hass = hass.HomeAssistant(state, cfg.get("homeassistant"), sim=False) if mode != "pcap" else None
     if state.hass:
@@ -205,7 +237,7 @@ def main():
             tm.daemon = True
             tm.start()
     if mode == "live" or args.notify:
-        state.notifier = Notifier(cfg["notify"])
+        state.notifier = Notifier({**cfg["notify"], "lang": cfg.get("lang", "el")})
     if cfg["intel"].get("enabled", True) and cfg["detectors"].get("threat_intel", True) \
             and not args.no_intel and mode != "demo":
         intel_thread = threading.Thread(target=intel.load, args=(state.recheck_intel,), daemon=True)

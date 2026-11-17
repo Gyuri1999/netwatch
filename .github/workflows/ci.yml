@@ -48,12 +48,20 @@ jobs:
           arduino-cli config init
           arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
           arduino-cli core update-index
-          arduino-cli core install esp32:esp32
-      - name: Compile NetWatch Sentinel
+          arduino-cli core install esp32:esp32@3.3.10   # καρφωμένο: το signed OTA θέλει mbedtls 3.x
+      # Η κοινή βιβλιοθήκη firmware/common (signed OTA) δίνεται με --library.
+      # Κάθε sketch χτίζεται δύο φορές: OTA_ENABLE 0 (προεπιλογή) και OTA_ENABLE 1.
+      - name: Compile NetWatch Sentinel (OTA off / on)
         run: |
           cp firmware/esp32-sentinel/secrets.example.h firmware/esp32-sentinel/secrets.h
-          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings default firmware/esp32-sentinel
-      - name: Compile NetWatch Canary
+          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all firmware/esp32-sentinel
+          sed -i 's/^#define OTA_ENABLE 0/#define OTA_ENABLE 1/' firmware/esp32-sentinel/secrets.h
+          grep -q '^#define OTA_ENABLE 1' firmware/esp32-sentinel/secrets.h
+          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all --library firmware/common firmware/esp32-sentinel
+      - name: Compile NetWatch Canary (OTA off / on)
         run: |
           cp firmware/esp32-canary/secrets.example.h firmware/esp32-canary/secrets.h
-          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings default firmware/esp32-canary
+          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all firmware/esp32-canary
+          sed -i 's/^#define OTA_ENABLE 0/#define OTA_ENABLE 1/' firmware/esp32-canary/secrets.h
+          grep -q '^#define OTA_ENABLE 1' firmware/esp32-canary/secrets.h
+          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all --library firmware/common firmware/esp32-canary

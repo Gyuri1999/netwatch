@@ -203,9 +203,11 @@ class Notifier:
         threading.Thread(target=self._send, args=(a,), daemon=True).start()
 
     def _send(self, a):
-        title = f"NetWatch — {a['type']}"
+        from i18n import tr
+        lang = self.cfg.get("lang", "el")  # config.yaml → lang: en
+        title = f"NetWatch — {tr(a['type'], lang)}"
         mac_only = a.get("_mac_only")
-        body = f"{a['actor']} → {a['target']}: {a['detail']}"
+        body = f"{a['actor']} → {a['target']}: {tr(a['detail'], lang)}"
         if self.cfg.get("macos") and sys.platform == "darwin":
             cmd = ["osascript", "-e", "on run argv", "-e",
                    'display notification (item 2 of argv) with title (item 1 of argv) sound name "Basso"',
@@ -253,7 +255,8 @@ class Notifier:
     def test(self):
         """Στέλνει δοκιμαστική ειδοποίηση σε όλα τα κανάλια· επιστρέφει τι πέτυχε."""
         out = {}
-        title, body = "NetWatch — δοκιμή", "Αν το βλέπεις, οι ειδοποιήσεις δουλεύουν. 👍"
+        title, body = (("NetWatch — test", "If you can see this, notifications work. 👍") if self.cfg.get("lang") == "en"
+                       else ("NetWatch — δοκιμή", "Αν το βλέπεις, οι ειδοποιήσεις δουλεύουν. 👍"))
         if self.channels()["macos"]:
             self._send({"type": "δοκιμή", "sev": "low", "actor": "NetWatch", "target": "εσύ", "detail": body, "_mac_only": True})
             out["macos"] = "ok"

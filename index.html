@@ -6,7 +6,9 @@
 <title>NetWatch</title>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="/i18n.js"></script>
 <script src="/edu.js"></script>
+<script src="/wireshark.js"></script>
 <script src="/academy/engine.js"></script>
 <style>
 :root{--bg:#05080f;--panel:#0b111c;--panel2:#101828;--line:#1c2638;--txt:#cfe0f5;--dim:#6d7f99;
@@ -95,9 +97,103 @@ a.mitre{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;backgro
 a.mitre:hover{border-color:#b388ff}
 .tactic{display:inline-block;vertical-align:top;width:calc(50% - 4px);margin:0 4px 8px 0;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px}
 .tactic.hit{border-color:#4a2f7a;background:#1a1030}
+/* ===== Κίνηση: σύντομη, με «φρένο» (ease-out), μόνο transform/opacity· τίποτα αν ζητάς λιγότερη κίνηση ===== */
+:root{--ease:cubic-bezier(.2,.8,.2,1);--t1:120ms;--t2:220ms}
+@keyframes nw-rise{from{opacity:0;transform:translateY(8px)}}
+@keyframes nw-fade{from{opacity:0}}
+@keyframes nw-pop{0%{transform:scale(.96);opacity:0}100%{transform:none;opacity:1}}
+@keyframes nw-flash{from{background:#ff3b5c30;box-shadow:0 0 0 1px #ff3b5c88}}
+@keyframes nw-shimmer{to{background-position:-200% 0}}
+.tab.enter{animation:nw-fade var(--t2) var(--ease)}
+.tab.enter .card,.tab.enter .kpi,.tab.enter .hgo,.tab.enter .wsi{animation:nw-rise 320ms var(--ease) both}
+.tab.enter .hgrid>:nth-child(2),.tab.enter>:nth-child(2){animation-delay:30ms}.tab.enter .hgrid>:nth-child(3),.tab.enter>:nth-child(3){animation-delay:60ms}
+.tab.enter .hgrid>:nth-child(4),.tab.enter>:nth-child(4){animation-delay:90ms}.tab.enter .hgrid>:nth-child(5),.tab.enter>:nth-child(5){animation-delay:120ms}
+.tab.enter .hgrid>:nth-child(n+6),.tab.enter>:nth-child(n+6){animation-delay:150ms}
+.tab.enter .kpi:nth-child(2){animation-delay:40ms}.tab.enter .kpi:nth-child(3){animation-delay:80ms}.tab.enter .kpi:nth-child(4){animation-delay:120ms}.tab.enter .kpi:nth-child(5){animation-delay:160ms}
+#pagehead.enter h2,#pagehead.enter div{animation:nw-rise 260ms var(--ease) both}
+.b,.seg button,#rail button,.hgo,.mcard,.kpi,.wsi{transition:background-color var(--t1),border-color var(--t1),color var(--t1),transform var(--t1),box-shadow var(--t1)}
+.b:active,.seg button:active,#rail button:active,.hgo:active,.kpi:active{transform:scale(.97)}
+.hgo:hover,.kpi[data-go]:hover{transform:translateY(-1px)}
+.al.new{animation:nw-flash 1.4s var(--ease)}
+.nkres.fresh{animation:nw-rise 260ms var(--ease)}
+.skel{height:10px;border-radius:5px;margin-top:8px;background:linear-gradient(90deg,#14203a 25%,#223457 45%,#14203a 65%);background-size:200% 100%;animation:nw-shimmer 1.1s linear infinite}
+.cmdk-box{animation:nw-pop 160ms var(--ease)}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:1ms!important;animation-delay:0s!important;animation-iteration-count:1!important;transition-duration:1ms!important}}
+/* ===== Τεχνικός / Μαθαίνω ===== */
+.hbtn{white-space:nowrap}#cmdk-btn{font-size:11px;color:var(--dim)}
+body.mode-tech .tab .card{padding:9px 11px;margin-bottom:9px}body.mode-tech .learn{display:none}
+.learn{margin-top:8px;padding:7px 9px;border-left:3px solid #b388ff;background:#b388ff10;border-radius:4px;white-space:normal;color:#d9c8ff;font-size:12px}
+.kpis.tk .kpi{cursor:pointer;min-width:120px;flex:1 1 120px}.kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column}
+.kpi b{font-size:22px;color:#fff;font-variant-numeric:tabular-nums}.kpi span{font-size:10.5px;color:var(--dim)}.kpi[data-go]:hover{border-color:#3ec5ff88}
+.qrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chooser{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
+.chooser button{text-align:left;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;color:var(--txt);font:inherit;cursor:pointer;white-space:normal}
+.chooser button:hover{border-color:var(--cyan)}.chooser b{display:block;color:#fff;font-size:14px;margin-bottom:3px}
+kbd{border:1px solid #2d3b55;border-bottom-width:2px;border-radius:4px;padding:0 4px;font:inherit;font-size:11px;color:#fff;background:#0b111c}
+/* palette */
+.cmdk{position:fixed;inset:0;z-index:200;background:#02050acc;display:flex;align-items:flex-start;justify-content:center;padding-top:12vh}
+.cmdk[hidden]{display:none}.cmdk-box{width:min(640px,92vw);background:var(--panel);border:1px solid #2d3b55;border-radius:12px;box-shadow:0 30px 80px #000c;overflow:hidden}
+#cmdk-in{width:100%;background:transparent;border:0;border-bottom:1px solid var(--line);color:#fff;font:inherit;font-size:14px;padding:14px 16px;outline:none}
+#cmdk-list{max-height:52vh;overflow:auto;padding:6px}.cmdk-it{display:flex;gap:10px;align-items:baseline;padding:8px 10px;border-radius:7px;cursor:pointer}
+.cmdk-it b{color:#fff;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:60%}.cmdk-it span{color:var(--dim);font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cmdk-it.on{background:#3ec5ff1f;box-shadow:inset 3px 0 0 var(--cyan)}.cmdk-hint{padding:6px 12px;border-top:1px solid var(--line)}
+/* wireshark */
+.wsi{border:1px solid var(--line);border-radius:8px;padding:8px 10px;background:var(--panel2);display:flex;flex-direction:column;gap:4px;white-space:normal}
+.wsi code{color:#9be7ff;word-break:break-word;font-size:12px}.wsi .sm{color:#a9b9d0}.wsi .row{display:flex;gap:4px;flex-wrap:wrap;margin-top:2px}
+.wsg{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:8px}.chips{display:flex;gap:4px;flex-wrap:wrap;margin:8px 0}
+.chips button{background:var(--panel2);border:1px solid var(--line);color:var(--txt);border-radius:14px;padding:3px 10px;font:inherit;font-size:11.5px;cursor:pointer}.chips button.on{border-color:var(--cyan);background:#3ec5ff1c;color:#fff}
+#fflt.ok{border-color:#3ddc9788}#fflt.bad{border-color:#ff3b5c99}
+@media (max-width:600px){#cmdk-btn,.kbdhint,#mode-btn .ml{display:none}.chooser{grid-template-columns:1fr}.wsg{grid-template-columns:1fr}}
+/* ===== Διάταξη: πλευρικό μενού + μία οθόνη τη φορά (όχι όλα στριμωγμένα μαζί) =====
+   🗺 Χάρτης / 🏠 Δίκτυο σπιτιού: ο χάρτης σε όλη την οθόνη + στενό συρτάρι δεξιά (επιθέσεις / λεπτομέρειες / πακέτα).
+   Όλες οι άλλες ενότητες: ολόκληρη σελίδα, με τίτλο και περιεχόμενο σε άνετο πλάτος. */
+#rail{width:212px;flex:none;border-right:1px solid var(--line);background:#070c16;overflow-y:auto;padding:8px 6px 16px;transition:width .15s}
+#rail .rg{margin:14px 10px 4px;color:var(--dim);font-size:10px;letter-spacing:.08em;text-transform:uppercase;white-space:nowrap}
+#rail button{display:flex;align-items:center;gap:9px;width:100%;background:none;border:0;color:var(--txt);font:inherit;font-size:12px;padding:6px 9px;border-radius:7px;cursor:pointer;text-align:left;white-space:nowrap;position:relative}
+#rail button:hover{background:#ffffff0a;color:#fff}
+#rail button.on{background:#3ec5ff1c;color:#fff;box-shadow:inset 3px 0 0 var(--cyan)}
+#rail .ic{width:20px;text-align:center;flex:none;font-size:14px}
+#rail .lb{overflow:hidden;text-overflow:ellipsis}
+#rail .cnt{margin-left:auto;background:var(--red);color:#fff;border-radius:8px;padding:0 6px;font-size:10px}
+#rail .mini{margin:10px 0 0;color:var(--dim);justify-content:center}
+body.rail-mini #rail{width:54px}body.rail-mini #rail .lb,body.rail-mini #rail .rg{display:none}
+body.rail-mini #rail .rg+button{margin-top:10px}body.rail-mini #rail .cnt{position:absolute;top:0;right:0;margin:0}
+.railbtn{display:none;background:none;border:1px solid var(--line);color:var(--txt);border-radius:6px;font-size:16px;padding:2px 8px;cursor:pointer}
+#pagehead{display:none}
+body.v-page #viz{display:none}
+body.v-page aside{flex:1;width:auto;border-left:0;background:var(--bg)}
+body.v-page nav{display:none}
+body.v-page #pagehead{display:block;padding:18px 28px 4px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,#0b1424,var(--bg))}
+#pagehead h2{margin:0 auto;max-width:1040px;font-size:18px;color:#fff;font-weight:700}
+#pagehead div{margin:3px auto 10px;max-width:1040px;color:var(--dim)}
+body.v-page .tab{padding:16px 28px 40px}
+body.v-page .tab.on>*{max-width:1040px;margin-left:auto;margin-right:auto}
+body.v-page .tab .card{padding:12px 14px;margin-bottom:12px;border-radius:10px}
+body.v-page .tab h3{margin-top:26px}
+.seg{display:flex;gap:4px;flex-wrap:wrap;margin:4px 0 12px;padding:4px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.seg button{flex:1 1 auto;background:none;border:0;color:var(--dim);font:inherit;font-size:12px;padding:7px 10px;border-radius:7px;cursor:pointer;white-space:nowrap}
+.seg button:hover{color:#fff}.seg button.on{background:#3ec5ff22;color:#fff;box-shadow:inset 0 0 0 1px #3ec5ff66}
+.frow{display:flex;gap:6px;flex-wrap:wrap;align-items:center}.frow .f{margin:0;flex:1 1 140px;min-width:0}
+.kpis{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:12px;align-items:stretch}.kpis>div{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:8px 14px;display:flex;flex-direction:column}
+.kpis b{font-size:20px;color:#fff}.kpis span{font-size:10.5px;color:var(--dim)}.kpis .exp{flex-direction:row;align-items:center;gap:6px;margin-left:auto}.kpis .exp a{text-decoration:none}
+.nkres{margin-top:8px;padding-top:8px;border-top:1px dashed var(--line)}
+.kvs{display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:2px 12px;margin-top:4px}.kv{display:flex;flex-direction:column}.kv span{font-size:10px;color:var(--dim)}.kv b{color:#fff;font-weight:600;word-break:break-all}
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:4px;margin-top:6px}.pp{border:1px solid var(--line);border-radius:6px;padding:4px 6px;font-size:11px}.pp span{display:block;color:var(--dim);font-size:10px}
+.pp.open{border-color:#3ddc9788;background:#3ddc9712}.pp.open b{color:#3ddc97}.pp.filtered{opacity:.7}.pp.closed{opacity:.5}
+.hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(400px,1fr));gap:0 12px}.hgrid>.card{margin-bottom:12px}
+@media (max-width:600px){.hgrid{grid-template-columns:1fr}.tab .card{overflow-x:auto}.tab td{word-break:break-word}.tab table{display:block;overflow-x:auto;max-width:100%}}
+.hal{margin-top:7px;padding:6px 8px;border-left:3px solid var(--dim);background:#ffffff05;border-radius:4px;white-space:normal}.hal.high{border-left-color:var(--red)}.hal.med{border-left-color:var(--orange)}.hal.low{border-left-color:var(--yellow)}
+.hgo{display:flex;gap:10px;align-items:center;margin-top:8px;padding:8px 10px;border:1px solid var(--line);border-radius:8px;cursor:pointer;white-space:normal}.hgo:hover{border-color:#3ec5ff88;background:#3ec5ff0a}.hgo>span{font-size:20px}.hgo b{color:#fff}
+body.v-map aside,body.v-lan aside{width:400px}
+#legend{cursor:pointer;user-select:none}#legend .lgh{color:var(--dim);font-size:11px}#legend:not(.open) .lgb{display:none}#legend.open .lgh{display:block;margin-bottom:4px}
 /* Στενό παράθυρο: ο χάρτης πάνω, ο πίνακας με τις καρτέλες από κάτω (όχι κρυμμένος). Το 🗺 τον κρύβει/δείχνει. */
 .mapbtn{display:none}
 @media (max-width:900px){
+  .railbtn{display:block}
+  #rail{position:fixed;z-index:90;top:52px;bottom:0;left:0;width:240px;transform:translateX(-105%);transition:transform .18s;box-shadow:12px 0 30px #000a}
+  body.rail-open #rail{transform:none}body.rail-mini #rail{width:240px}body.rail-mini #rail .lb,body.rail-mini #rail .rg{display:revert}
+  #rail .mini{display:none}
+  body.v-page .tab{padding:12px 14px 30px}body.v-page #pagehead{padding:12px 14px 2px}
+  body.v-map aside,body.v-lan aside{width:auto}
   main{flex-direction:column}
   #viz{flex:none;height:40%;min-height:180px}
   aside{width:auto;flex:1;min-height:0;border-left:0;border-top:1px solid var(--line)}
@@ -118,6 +214,7 @@ a.mitre:hover{border-color:#b388ff}
 </head>
 <body>
 <header>
+  <button class="railbtn" id="rail-btn" title="Μενού">☰</button>
   <div class="logo">◉ NETWATCH</div>
   <span id="mode" class="badge live">LIVE</span>
   <div class="chip"><span>interface / εγώ</span><b id="iface" style="font-size:12px">—</b></div>
@@ -127,8 +224,12 @@ a.mitre:hover{border-color:#b388ff}
   <div class="chip"><span>επιθέσεις</span><b id="na" style="color:var(--red)">0</b></div>
   <canvas id="spark" width="160" height="34"></canvas>
   <div id="status" class="st-ok">✓ Όλα καλά</div>
+  <button class="b hbtn" id="cmdk-btn" title="Γρήγορη εντολή ή αναζήτηση (Ctrl/⌘ + K)">⌘K</button>
+  <button class="b hbtn" id="mode-btn"></button>
+  <button class="b" data-langswitch></button>
 </header>
 <main>
+  <div id="rail"></div>
   <section id="viz">
     <canvas id="c"></canvas>
     <div id="flash"></div>
@@ -143,18 +244,18 @@ a.mitre:hover{border-color:#b388ff}
       <button id="zatk" title="Ζουμ στους επιτιθέμενους">🎯</button>
       <button id="zreset" title="Όλος ο κόσμος">⟲</button>
       <button id="zlan" title="Εμφάνιση/απόκρυψη LAN">▣</button>
+      <button id="zlanbig" title="Μεγάλος χάρτης του σπιτιού: όλες οι συσκευές, σε ομάδες">⤢</button>
       <button id="zshot" title="Αποθήκευση εικόνας του χάρτη (PNG)">📸</button>
     </div>
   </section>
   <aside>
     <nav>
-      <button data-t="home" class="on">🧭 Αρχική</button>
       <button data-t="alerts">⚠ Επιθέσεις<span class="cnt" id="ac" style="display:none">0</span></button>
-      <span id="curtab" class="curtab"></span>
+      <button data-t="det">🔎 Λεπτομέρειες</button>
+      <button data-t="feed">📦 Πακέτα</button>
       <button id="map-btn" class="mapbtn" title="Απόκρυψη/εμφάνιση χάρτη">🗺</button>
-      <button id="menu-btn" class="menu-btn" title="Όλες οι ενότητες">☰ Ενότητες</button>
-      <div id="menu" class="menu"></div>
     </nav>
+    <div id="pagehead"><h2 id="ph-t"></h2><div id="ph-d"></div></div>
     <div class="tab" id="t-alerts"><div class="empty">Καμία επίθεση ακόμα. Παρακολουθώ… 👀</div></div>
     <div class="tab" id="t-hosts">
       <input class="f" id="hf" placeholder="φίλτρο: IP, domain, χώρα, ISP…">
@@ -163,6 +264,8 @@ a.mitre:hover{border-color:#b388ff}
     <div class="tab" id="t-devs"></div>
     <div class="tab" id="t-stats"></div>
     <div class="tab feed" id="t-feed">
+      <div class="frow" style="margin-bottom:6px"><input class="f" id="fflt" spellcheck="false" autocomplete="off" placeholder="🦈 φίλτρο Wireshark, π.χ. tcp.port == 443 && ip.addr == 192.168.1.0/24"><button class="b" id="fflt-x" title="Καθάρισε το φίλτρο">✕</button><button class="b" id="fflt-ws" title="Σημειώσεις Wireshark">🦈</button></div>
+      <div class="sm" id="fflt-st" style="margin:-2px 0 6px"></div>
       <div class="sm" style="margin-bottom:6px">Κάνε κλικ σε ένα πακέτο για να σου εξηγήσω τι κάνει. <label><input type="checkbox" id="fpause"> παύση</label> <label><input type="checkbox" id="fbad"> μόνο επιθέσεις</label></div>
       <table><thead><tr><th>ώρα</th><th>proto</th><th>από → προς</th><th>len</th></tr></thead><tbody id="fb"></tbody></table>
     </div>
@@ -175,11 +278,14 @@ a.mitre:hover{border-color:#b388ff}
     <div class="tab" id="t-iot"></div>
     <div class="tab" id="t-sensor"></div>
     <div class="tab" id="t-mqtt"></div>
+    <div class="tab" id="t-pb"></div>
+    <div class="tab" id="t-health"></div>
     <div class="tab" id="t-tips"></div>
     <div class="tab" id="t-hist"></div>
     <div class="tab" id="t-audit"></div>
     <div class="tab" id="t-quiz"></div>
     <div class="tab" id="t-pentest"></div>
+    <div class="tab" id="t-ws"></div>
     <div class="tab" id="t-rules"></div>
     <div class="tab" id="t-ctf"></div>
     <div class="tab" id="t-wifi"></div>
@@ -187,13 +293,16 @@ a.mitre:hover{border-color:#b388ff}
     <div class="tab" id="t-priv"></div>
   </aside>
 </main>
+<div id="cmdk" class="cmdk" hidden><div class="cmdk-box"><input id="cmdk-in" spellcheck="false" autocomplete="off" placeholder="Πήγαινε σε ενότητα ή γράψε εντολή: ping 192.168.1.1 · dns github.com · ports 192.168.1.17 1883 · filter dns"><div id="cmdk-list"></div><div class="sm cmdk-hint">↑ ↓ επιλογή · Enter εκτέλεση · Esc κλείσιμο</div></div></div>
 <script>
+let view='page';  // 'page' = μία ενότητα σε όλη την οθόνη · 'map' = παγκόσμιος χάρτης · 'lan' = χάρτης του σπιτιού
 const COLORS={HTTPS:'#3ec5ff',HTTP:'#4d7cff',QUIC:'#b388ff',DNS:'#3ddc97',ICMP:'#ffd23f',ICMPv6:'#ffd23f',ARP:'#ff9f43',
   mDNS:'#2fb48a',SSDP:'#ff6ad5',DHCP:'#ffffff',NTP:'#9be7ff',SSH:'#ff7b9c',TCP:'#5fa8d3',UDP:'#ff6ad5'};
 const LEG=[['HTTPS/TLS','#3ec5ff'],['HTTP','#4d7cff'],['QUIC','#b388ff'],['DNS','#3ddc97'],['UDP άλλο','#ff6ad5'],['ICMP','#ffd23f'],['ARP','#ff9f43'],['Επίθεση','#ff3b5c']];
-document.getElementById('legend').innerHTML=LEG.map(([n,c])=>`<div><i style="background:${c};box-shadow:0 0 6px ${c}"></i>${n}</div>`).join('')+'<div class="sm" style="margin-top:4px">ροδέλα = zoom · σύρε = μετακίνηση</div>';
+document.getElementById('legend').innerHTML='<span class="lgh">◧ Υπόμνημα</span><div class="lgb">'+LEG.map(([n,c])=>`<div><i style="background:${c};box-shadow:0 0 6px ${c}"></i>${n}</div>`).join('')+'<div class="sm" style="margin-top:4px">ροδέλα = zoom · σύρε = μετακίνηση</div></div>';
+document.getElementById('legend').onclick=e=>e.currentTarget.classList.toggle('open');
 
-const S={hosts:new Map(),alerts:[],home:null,me:new Set(),gw:null,sel:null,feed:[],links:new Map(),stats:{},spark:[],hist:[],unread:0,mode:'live',showLan:true,openEdu:new Set(),feedEx:null};
+const S={hosts:new Map(),alerts:[],home:null,me:new Set(),gw:null,sel:null,feed:[],links:new Map(),out:new Map(),stats:{},spark:[],hist:[],unread:0,mode:'live',showLan:true,openEdu:new Set(),feedEx:null};
 const $=id=>document.getElementById(id);
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const flag=cc=>cc&&cc.length===2?String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt())):'';
@@ -215,7 +324,7 @@ const zoom=d3.zoom().scaleExtent([1,60]).on('zoom',e=>{ZT=e.transform;mapDirty=t
 d3.select(cv).call(zoom);
 function resize(){
   const r=cv.getBoundingClientRect();DPR=window.devicePixelRatio||1;W=r.width;H=r.height;if(W<50||H<50)return;
-  if(!S.lanUser)S.showLan=W>=390&&H>=330;  /* LAN κουτί 330×270 */  // το LAN κουτί δεν χωράει σε μικρό χάρτη (το ▣ το ξαναφέρνει)
+  if(!S.lanUser)S.showLan=view==='lan';  /* LAN κουτί 330×270 */  // το LAN κουτί δεν χωράει σε μικρό χάρτη (το ▣ το ξαναφέρνει)
   cv.width=W*DPR;cv.height=H*DPR;proj=d3.geoNaturalEarth1().fitExtent([[20,20],[W-20,H-20]],{type:'Sphere'});
   zoom.extent([[0,0],[W,H]]).translateExtent([[-W*.1,-H*.1],[W*1.1,H*1.1]]);
   mapImg=document.createElement('canvas');mapImg.width=W*DPR;mapImg.height=H*DPR;mapDirty=true;
@@ -239,7 +348,8 @@ function P(lon,lat){const p=proj([lon,lat]);return p?ZT.apply(p):null}
 $('zin').onclick=()=>d3.select(cv).transition().duration(400).call(zoom.scaleBy,2);
 $('zout').onclick=()=>d3.select(cv).transition().duration(400).call(zoom.scaleBy,.5);
 $('zreset').onclick=()=>d3.select(cv).transition().duration(600).call(zoom.transform,d3.zoomIdentity);
-$('zlan').onclick=()=>{S.showLan=!S.showLan;S.lanUser=true};
+$('zlan').onclick=()=>{if(view==='lan')return showTab('map');S.showLan=!S.showLan;S.lanUser=true;if(!S.showLan)LAN.big=false};
+$('zlanbig').onclick=()=>showTab(view==='lan'?'map':'lan');
 // στενό παράθυρο: κουμπί 🗺 για όλη την οθόνη στις καρτέλες (θυμάται την επιλογή)
 try{if(localStorage.getItem('nw-mapoff')==='1')document.body.classList.add('mapoff')}catch(e){}
 $('map-btn').onclick=()=>{const off=document.body.classList.toggle('mapoff');try{localStorage.setItem('nw-mapoff',off?'1':'0')}catch(e){}};
@@ -254,15 +364,26 @@ $('zhome').onclick=()=>{const g=S.home||{lat:37.98,lon:23.73};zoomTo([[g.lon,g.l
 $('zatk').onclick=()=>{const l=[...S.hosts.values()].filter(h=>h.threat>=2&&h.geo).map(h=>[h.geo.lon,h.geo.lat]);
   if(!l.length){toastInfo('Δεν υπάρχουν επιτιθέμενοι από το Internet με γνωστή τοποθεσία.');return}
   const g=S.home||{lat:37.98,lon:23.73};l.push([g.lon,g.lat]);zoomTo(l,10)};
-function focusHost(ip){const h=S.hosts.get(ip);if(h?.geo)zoomTo([[h.geo.lon,h.geo.lat]],12)}
+function focusHost(ip){if(view==='page'){showTab('map');setTimeout(()=>focusHost(ip),120);return}const h=S.hosts.get(ip);if(h?.geo)zoomTo([[h.geo.lon,h.geo.lat]],12)}
 
-const LAN={w:330,h:270,max:12};
-function lanBox(){return{x:16,y:H-LAN.h-16,w:LAN.w,h:LAN.h}}
-function homePt(){const g=S.home||{lat:37.98,lon:23.73};return P(g.lon,g.lat)}
+const LAN={w:330,h:270,max:12,big:false};
+// μεγάλη όψη (⤢): όλο το πλαίσιο του χάρτη γίνεται «τοπολογία» του σπιτιού, με όλες τις συσκευές σε ομάδες
+function lanBox(){return LAN.big?{x:10,y:10,w:W-58,h:H-20}:{x:16,y:H-LAN.h-16,w:LAN.w,h:LAN.h}}
+function homePt(){if(S.showLan&&LAN.big&&LP.inet)return LP.inet;const g=S.home||{lat:37.98,lon:23.73};return P(g.lon,g.lat)}
 const isV6=ip=>ip.includes(':'),octet=ip=>isV6(ip)?'IPv6':'.'+ip.split('.').pop();
+// ονόματα που δίνεις εσύ (✏️ στις λεπτομέρειες) — μένουν σε αυτόν τον browser, κλειδί η MAC
+let NAMES={};try{NAMES=JSON.parse(localStorage.getItem('nw-names')||'{}')}catch(e){}
+const aliasOf=h=>h&&(NAMES[h.mac||h.ip]||NAMES[h.ip])||'';
+function setAlias(ip){const h=S.hosts.get(ip);if(!h)return;const k=h.mac||h.ip;
+  const v=prompt('Όνομα για τη συσκευή '+ip+(h.vendor?' ('+h.vendor+')':'')+' — κενό για διαγραφή:',aliasOf(h)||'');if(v==null)return;
+  if(v.trim())NAMES[k]=v.trim().slice(0,32);else delete NAMES[k];try{localStorage.setItem('nw-names',JSON.stringify(NAMES))}catch(e){}
+  if(tab==='det')renderDet()}
+const vshort=v=>!v||v==='τυχαία MAC'?'':v.replace(/[,.]?\s*\b(inc|ltd|co|corp|corporation|gmbh|llc|limited|incorporated|technologies|technology|electronics|international|trading|foundation|server solutions|communications?)\b.*$/i,'').trim().split(/\s+/).slice(0,2).join(' ').slice(0,14);
 // Μία κουκκίδα ανά ΣΥΣΚΕΥΗ: οι IPv6 διευθύνσεις (fe80::…) «κολλάνε» στη συσκευή με την ίδια MAC,
-// όλα τα broadcast/multicast γίνονται ένας κόμβος «όλοι», οι συσκευές μπαίνουν σε σταθερό κύκλο.
-let LP={alias:new Map(),pos:new Map(),devs:[],more:0,v6:new Map()};
+// όλα τα broadcast/multicast γίνονται ένας κόμβος «όλοι».
+const LGROUPS=[['net','🌐 Δίκτυο',['router']],['pc','💻 Υπολογιστές & servers',['computer','vm','nas']],['mob','📱 Κινητά & tablet',['phone']],
+  ['iot','🔌 IoT',['esp','pi','iot','camera']],['home','📺 Σπίτι',['tv','speaker','console','printer']],['unk','❔ Άγνωστες',['unknown']]];
+let LP={alias:new Map(),pos:new Map(),devs:[],more:0,v6:new Map(),cards:new Map(),groups:[]};
 function lanPlan(){
   const b=lanBox(),cx=b.x+b.w/2,cy=b.y+b.h/2+2,me=[...S.me].find(i=>!isV6(i))||[...S.me][0];
   const v4=new Map();for(const h of S.hosts.values())if(h.kind==='local'&&!isV6(h.ip)&&h.mac&&!v4.has(h.mac))v4.set(h.mac,h.ip);
@@ -275,12 +396,45 @@ function lanPlan(){
     alias.set(h.ip,a);
     if(a!==h.ip){if(!v6.has(a))v6.set(a,[]);v6.get(a).push(h.ip)}
     else if(!h.me&&!h.gw)devs.push(h)}
+  const pos=new Map(),cards=new Map();
+  if(LAN.big){
+    const top=b.y+58,inet=[cx,top],gwp=[cx,top+62],mep=[Math.min(b.x+b.w-110,cx+190),top+62],bcp=[Math.max(b.x+110,cx-190),top+62];
+    const groups=LGROUPS.map(([id,t,types])=>({id,t,devs:devs.filter(h=>types.includes(h.dtype||'unknown')).sort((x,y)=>ipNum(x.ip)-ipNum(y.ip))})).filter(g=>g.devs.length);
+    // οι ομάδες «ρέουν» σε πλέγμα: όσες στήλες χωράνε (≥150px), και οι υπόλοιπες σε νέα σειρά από κάτω
+    const ch=32,gap=6,ncol=Math.max(1,Math.min(groups.length,Math.floor((b.w-16)/158))),colW=(b.w-16)/ncol,cw=Math.min(220,colW-10);
+    // πρώτα δοκίμασε όλες τις ομάδες σε μία σειρά, όπου μια μεγάλη ομάδα πιάνει όσες στήλες χρειάζεται
+    const rows1=Math.max(1,Math.floor((b.y+b.h-14-(top+112)-30)/(ch+gap))),span=groups.map(g=>Math.ceil(g.devs.length/rows1));
+    if(span.reduce((a,x)=>a+x,0)<=ncol){
+      let spare=ncol-span.reduce((a,x)=>a+x,0),ci=0;const y=top+112;
+      while(spare>0&&groups.length){const i=span.indexOf(Math.max(...span));if(groups[i].devs.length/span[i]<4)break;span[i]++;spare--}  // απλώσε τη μεγαλύτερη
+      const shown=[];
+      groups.forEach((g,gi)=>{const sp=span[gi],per=Math.ceil(g.devs.length/sp);g.x=b.x+8+ci*colW+(colW-cw)/2;g.w=sp*colW-(colW-cw);g.y=y;g.more=0;
+        g.devs.forEach((h,k)=>{const c=Math.floor(k/per),r=k%per,x=b.x+8+(ci+c)*colW+(colW-cw)/2,cy2=y+22+r*(ch+gap);
+          cards.set(h.ip,[x,cy2,cw,ch]);pos.set(h.ip,[x+14,cy2+ch/2,1]);shown.push(h)});ci+=sp});
+      LP={alias,pos,devs:shown,more:0,v6,me,cx,cy,b,cards,groups,inet,gwp,mep,bcp,big:1};return}
+    const grow=[];for(let i=0;i<groups.length;i+=ncol)grow.push(groups.slice(i,i+ncol));
+    // σε σειρά με κενές στήλες, η μεγαλύτερη ομάδα «απλώνεται» σε περισσότερες στήλες (όχι μία ψηλή λίστα)
+    grow.forEach(r=>{r.forEach(g=>g.sp=1);let spare=ncol-r.length;while(spare>0){const g=r.reduce((m,x)=>x.devs.length/x.sp>m.devs.length/m.sp?x:m);if(g.devs.length/g.sp<4)break;g.sp++;spare--}});
+    const per=g=>Math.ceil(g.devs.length/g.sp);
+    const avail=b.y+b.h-14-(top+112),need=grow.map(r=>22+Math.max(...r.map(per))*(ch+gap)+8),tot=need.reduce((a,x)=>a+x,0);
+    let shown=[],more=0,y=top+112;
+    grow.forEach((r,ri)=>{const hgt=tot<=avail?need[ri]:Math.max(22+ch+gap,Math.floor(avail*need[ri]/tot)),rows=Math.max(1,Math.floor((hgt-30)/(ch+gap)));
+      let ci=0;
+      r.forEach(g=>{const x0=b.x+8+ci*colW+(colW-cw)/2;g.x=x0;g.w=g.sp*colW-(colW-cw);g.y=y;
+        const cap=rows*g.sp,fit=g.devs.length>cap?cap-1:g.devs.length;g.more=g.devs.length-fit;more+=g.more;
+        const pc=g.more>0?rows:Math.ceil(fit/g.sp)||1;g.moreXY=[b.x+8+(ci+Math.floor(fit/pc))*colW+(colW-cw)/2+4,y+22+(fit%pc)*(ch+gap)+12];
+        g.devs.slice(0,fit).forEach((h,k)=>{const c=Math.floor(k/pc),x=b.x+8+(ci+c)*colW+(colW-cw)/2,cy2=y+22+(k%pc)*(ch+gap);cards.set(h.ip,[x,cy2,cw,ch]);pos.set(h.ip,[x+14,cy2+ch/2,1]);shown.push(h)});
+        ci+=g.sp});
+      y+=hgt});
+    LP={alias,pos,devs:shown,more,v6,me,cx,cy,b,cards,groups,inet,gwp,mep,bcp,big:1};return}
   devs.sort((x,y)=>(y.threat-x.threat)||((y.bytes_in+y.bytes_out)-(x.bytes_in+x.bytes_out)));
-  const shown=devs.slice(0,LAN.max).sort((x,y)=>ipNum(x.ip)-ipNum(y.ip)),n=shown.length,pos=new Map();
+  const shown=devs.slice(0,LAN.max).sort((x,y)=>ipNum(x.ip)-ipNum(y.ip)),n=shown.length;
   shown.forEach((h,i)=>{const ang=-Math.PI/2+(i+.5)*2*Math.PI/n;pos.set(h.ip,[cx+Math.cos(ang)*92,cy+Math.sin(ang)*76,Math.cos(ang)])});
-  LP={alias,pos,devs:shown,more:devs.length-n,v6,me,cx,cy,b}}
+  LP={alias,pos,devs:shown,more:devs.length-n,v6,me,cx,cy,b,cards,groups:[],all:devs}}
 function ipNum(ip){return isV6(ip)?1e10:ip.split('.').reduce((a,x)=>a*256+(+x),0)}
 function lanPt(ip){if(!LP.b)lanPlan();const b=LP.b;
+  if(LP.big){if(ip==='@bcast')return LP.bcp;const h=S.hosts.get(ip);if(!h)return null;if(h.me)return LP.mep;if(h.gw)return LP.gwp;
+    const p=LP.pos.get(ip);return p?[p[0],p[1]]:[b.x+b.w-30,b.y+b.h-20]}
   if(ip==='@bcast')return[b.x+b.w-22,b.y+b.h-44];
   const h=S.hosts.get(ip);if(!h)return null;
   if(h.me)return[LP.cx,LP.cy];if(h.gw)return[LP.cx,b.y+40];
@@ -293,6 +447,9 @@ function pos(ip){
   return lanPt(LP.alias.get(ip)||ip);
 }
 function ends(sip,dip){const hs=S.hosts.get(sip),hd=S.hosts.get(dip);if(!hs||!hd)return[null,null];
+  if(S.showLan&&LAN.big){  // μεγάλη όψη του LAN: το Internet είναι ένας κόμβος· μόνο ό,τι αγγίζει το σπίτι
+    if(hs.kind==='public'&&hd.kind==='public')return[null,null];
+    return[hs.kind==='public'?homePt():pos(sip),hd.kind==='public'?homePt():pos(dip)]}
   if(hs.kind==='public'&&hd.kind!=='public')return[pos(sip),homePt()];
   if(hd.kind==='public'&&hs.kind!=='public')return[homePt(),pos(dip)];
   return[pos(sip),pos(dip)]}
@@ -307,7 +464,7 @@ function spawn(it,delay){
   if(parts.length>900)return;
   parts.push({s:it.s,d:it.d,t0:performance.now()+(delay||0),c:colorFor(it),r:it.x?2.6:1.2+Math.min(1.8,it.l/900),x:it.x});
 }
-function ctrl(a,b,d){return[(a[0]+b[0])/2,(a[1]+b[1])/2-Math.min(160,d*.28)]}
+function ctrl(a,b,d){const k=S.showLan&&LAN.big?.1:.28;return[(a[0]+b[0])/2,(a[1]+b[1])/2-Math.min(160,d*k)]}
 function bez(a,c,b,t){const u=1-t;return[u*u*a[0]+2*u*t*c[0]+t*t*b[0],u*u*a[1]+2*u*t*c[1]+t*t*b[1]]}
 
 let nodesDrawn=[];
@@ -317,14 +474,18 @@ function frame(){requestAnimationFrame(frame);
 function draw(){
   const now=performance.now();ctx.setTransform(DPR,0,0,DPR,0,0);ctx.fillStyle='#05080f';ctx.fillRect(0,0,W,H);ctx.drawImage(mapImg,0,0,W,H);
   const hp=homePt(),b=lanBox(),sel=S.sel;
-  if(S.showLan){lanPlan();ctx.fillStyle='#08101de8';ctx.strokeStyle='#1f3352';ctx.lineWidth=1;roundRect(b.x,b.y,b.w,b.h,10);ctx.fill();ctx.stroke();
+  if(S.showLan){lanPlan();ctx.fillStyle=LAN.big?'#070d18fa':'#08101de8';ctx.strokeStyle='#1f3352';ctx.lineWidth=1;roundRect(b.x,b.y,b.w,b.h,10);ctx.fill();ctx.stroke();
     ctx.fillStyle='#8aa0bd';ctx.font='bold 10px ui-monospace,monospace';ctx.fillText('🏠 ΤΟ ΔΙΚΤΥΟ ΣΟΥ',b.x+10,b.y+16);
     ctx.font='10px ui-monospace,monospace';ctx.fillStyle='#6d7f99';const nd=LP.devs.length+LP.more;
-    ctx.fillText(`${nd} συσκευ${nd===1?'ή':'ές'} + εσύ + router`,b.x+10,b.y+29);
+    const byT={};for(const h of (LP.big?LP.groups.flatMap(g=>g.devs):LP.all||[]))byT[h.dicon||'❔']=(byT[h.dicon||'❔']||0)+1;
+    ctx.fillText(`${nd} συσκευ${nd===1?'ή':'ές'} + εσύ + router`+(LP.big?'   '+Object.entries(byT).map(([i,n])=>i+n).join(' '):''),b.x+10,b.y+29);
+    // κουμπί ⤢ / ✕ πάνω δεξιά στο πλαίσιο
+    LP.btn=[b.x+b.w-(LAN.big?96:58),b.y+5,LAN.big?88:50,16];ctx.fillStyle='#13203a';ctx.strokeStyle='#2d3b55';roundRect(...LP.btn,4);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#cfe0f5';ctx.font='10px ui-monospace,monospace';ctx.textAlign='center';ctx.fillText(LAN.big?'✕ πίσω':'⤢ όλο',LP.btn[0]+LP.btn[2]/2,LP.btn[1]+12);ctx.textAlign='start';
     let lx=b.x+10;const ly=b.y+b.h-10;ctx.font='9px ui-monospace,monospace';
     for(const[c,t]of[['#fff','εσύ'],['#3ec5ff','router'],['#3ddc97','συσκευή'],['#ffd23f','νέα'],['#ff3b5c','επίθεση']]){
       ctx.fillStyle=c;ctx.beginPath();ctx.arc(lx+3,ly-3,3,0,7);ctx.fill();ctx.fillStyle='#8aa0bd';ctx.fillText(t,lx+9,ly);lx+=ctx.measureText(t).width+20}
-    ctx.fillStyle='#6d7f99';ctx.textAlign='right';ctx.fillText('γραμμές = κίνηση',b.x+b.w-10,b.y+16);ctx.textAlign='start';
+    ctx.fillStyle='#6d7f99';ctx.textAlign='right';ctx.fillText('γραμμές = κίνηση',b.x+b.w-(LAN.big?104:66),b.y+16);ctx.textAlign='start';
     const gwp=S.gw&&S.hosts.has(S.gw)?pos(S.gw):[b.x+b.w/2,b.y+34];
     ctx.setLineDash([3,4]);ctx.strokeStyle='#3ec5ff44';ctx.beginPath();ctx.moveTo(gwp[0],gwp[1]);ctx.lineTo(hp[0],hp[1]);ctx.stroke();ctx.setLineDash([])}
   for(const[k,L]of S.links){const age=(now-L.last)/1000;if(age>25){S.links.delete(k);continue}
@@ -334,7 +495,7 @@ function draw(){
     ctx.beginPath();ctx.moveTo(a[0],a[1]);ctx.quadraticCurveTo(q[0],q[1],c[0],c[1]);ctx.stroke()}
   ctx.globalAlpha=1;nodesDrawn=[];const top=[];
   for(const h of S.hosts.values()){
-    if(h.kind!=='public')continue;
+    if(h.kind!=='public'||(S.showLan&&LAN.big))continue;
     const p=pos(h.ip);if(!p||p[0]<-20||p[1]<-20||p[0]>W+20||p[1]>H+20)continue;const tot=h.bytes_in+h.bytes_out;
     const r=h.me?7:h.gw?6:Math.min(7,1.5+Math.log10(tot+10)*.6);
     const col=h.threat>=2?'#ff3b5c':h.threat===1?'#ffd23f':h.me?'#ffffff':h.gw?'#ffd23f':h.kind==='public'?'#3ec5ff':h.kind==='bcast'?'#6d7f99':'#3ddc97';
@@ -352,7 +513,8 @@ function draw(){
   for(const[,h,p]of top.slice(0,nl)){const t=`${flag(h.geo?.countryCode)} ${hname(h)||h.ip}${ZT.k>3&&h.geo?.city?' · '+h.geo.city:''}`.slice(0,44);
     ctx.fillStyle='#000a';const w=ctx.measureText(t).width;ctx.fillRect(p[0]+9,p[1]-8,w+6,15);ctx.fillStyle=h.threat>=2?'#ff8da0':'#cfe0f5';ctx.fillText(t,p[0]+12,p[1]+3)}
   const ph=(now/1400)%1;ctx.strokeStyle=`rgba(255,255,255,${.8-ph*.8})`;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(hp[0],hp[1],5+ph*18,0,7);ctx.stroke();
-  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(hp[0],hp[1],4,0,7);ctx.fill();ctx.font='bold 11px ui-monospace,monospace';ctx.fillText('⌂ '+(S.home?.city||'ΕΔΩ'),hp[0]+8,hp[1]-8);
+  ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(hp[0],hp[1],4,0,7);ctx.fill();ctx.font='bold 11px ui-monospace,monospace';
+  if(S.showLan&&LAN.big){ctx.textAlign='center';ctx.fillText('☁ Internet',hp[0],hp[1]-12);ctx.textAlign='start'}else ctx.fillText('⌂ '+(S.home?.city||'ΕΔΩ'),hp[0]+8,hp[1]-8);
   ctx.globalCompositeOperation='lighter';const keep=[];
   for(const p of parts){const[a,b2]=ends(p.s,p.d);if(!a||!b2)continue;
     const d=Math.hypot(b2[0]-a[0],b2[1]-a[1]),dur=Math.min(2200,500+d*2.2/Math.max(1,Math.sqrt(ZT.k)));
@@ -367,16 +529,18 @@ function draw(){
     ctx.globalAlpha=1-t;ctx.strokeStyle='#ff3b5c';ctx.lineWidth=2;ctx.beginPath();ctx.arc(p[0],p[1],4+t*26,0,7);ctx.stroke()}
   ctx.globalAlpha=1;ctx.globalCompositeOperation='source-over';
 }
-function lanName(h){const n=hname(h).split('.')[0];if(n)return n.length>12?n.slice(0,11)+'…':n;return randMac(h.mac)?'📱 κινητό;':'συσκευή'}
+function lanName(h,max=12){const a=aliasOf(h);let n=a||hname(h).split('.')[0]||vshort(h.vendor)||(randMac(h.mac)?'κινητό;':h.dlabel)||'συσκευή';
+  return n.length>max?n.slice(0,max-1)+'…':n}
+function nodeCol(h,base){return h&&h.threat>=2?'#ff3b5c':h&&h.threat===1?'#ffd23f':base}
 function drawLan(now,sel){
   const list=[];const meH=S.hosts.get(LP.me),gwH=S.hosts.get(S.gw);
   const bc=[...S.hosts.values()].filter(h=>h.kind==='bcast');
+  if(LP.big){drawLanBig(now,sel,meH,gwH,bc);return}
   if(bc.length)list.push({ip:'@bcast',p:lanPt('@bcast'),col:'#6d7f99',r:4,l1:'📢 όλοι',l2:'broadcast',side:-1});
-  if(gwH)list.push({ip:gwH.ip,h:gwH,p:lanPt(gwH.ip),col:'#3ec5ff',r:6.5,l1:'ROUTER',l2:octet(gwH.ip),side:1});
-  for(const h of LP.devs){const q=LP.pos.get(h.ip);list.push({ip:h.ip,h,p:[q[0],q[1]],col:'#3ddc97',r:4.5,l1:lanName(h),l2:octet(h.ip),side:q[2]>=-.05?1:-1})}
+  if(gwH)list.push({ip:gwH.ip,h:gwH,p:lanPt(gwH.ip),col:'#3ec5ff',r:6.5,l1:'🌐 '+(aliasOf(gwH)||'ROUTER'),l2:octet(gwH.ip)+(gwH.vendor?' '+vshort(gwH.vendor):''),side:1});
+  for(const h of LP.devs){const q=LP.pos.get(h.ip);list.push({ip:h.ip,h,p:[q[0],q[1]],col:'#3ddc97',r:4.5,l1:(h.dicon||'')+' '+lanName(h),l2:octet(h.ip),side:q[2]>=-.05?1:-1})}
   if(meH)list.push({ip:meH.ip,h:meH,p:[LP.cx,LP.cy],col:'#fff',r:7,l1:'ΕΣΥ',l2:octet(meH.ip),side:1,me:1});
-  for(const n of list){const h=n.h,[x,y]=n.p;let col=n.col;
-    if(h&&h.threat>=2)col='#ff3b5c';else if(h&&h.threat===1)col='#ffd23f';
+  for(const n of list){const h=n.h,[x,y]=n.p;const col=nodeCol(h,n.col);
     if(h&&h.threat>=2){const ph=(now/900)%1;ctx.strokeStyle=`rgba(255,59,92,${1-ph})`;ctx.lineWidth=2;ctx.beginPath();ctx.arc(x,y,n.r+ph*18,0,7);ctx.stroke()}
     const fl=h&&h._flash?Math.max(0,1-(now-h._flash)/400):0;
     ctx.fillStyle=col;ctx.globalAlpha=(sel&&sel!==n.ip?.1:.2)+fl*.4;ctx.beginPath();ctx.arc(x,y,n.r*1.8+fl*4,0,7);ctx.fill();ctx.globalAlpha=1;
@@ -388,13 +552,45 @@ function drawLan(now,sel){
     ctx.font='9px ui-monospace,monospace';ctx.fillStyle='#6d7f99';ctx.fillText(n.l2,tx,y+10);ctx.textAlign='start';
     nodesDrawn.push({ip:n.ip,x,y,r:Math.max(n.r,7)})}
   if(LP.more>0){const b=LP.b;ctx.font='9px ui-monospace,monospace';ctx.fillStyle='#8aa0bd';ctx.textAlign='right';
-    ctx.fillText(`+${LP.more} ακόμα (📟 Συσκευές)`,b.x+b.w-10,b.y+31);ctx.textAlign='start'}
+    ctx.fillText(`+${LP.more} ακόμα (⤢ όλο)`,b.x+b.w-10,b.y+34);ctx.textAlign='start'}
+}
+// Μεγάλη όψη: Internet → router → ομάδες συσκευών σε κάρτες (εικονίδιο, όνομα, IP, κατασκευαστής, κίνηση)
+function drawLanBig(now,sel,meH,gwH,bc){
+  const b=LP.b,fit=(t,w)=>{if(ctx.measureText(t).width<=w)return t;while(t.length>1&&ctx.measureText(t+'…').width>w)t=t.slice(0,-1);return t+'…'};
+  const hub=(p,col,r,ico,l1,l2,ip,h)=>{ctx.fillStyle=nodeCol(h,col);ctx.globalAlpha=.18;ctx.beginPath();ctx.arc(p[0],p[1],r*2,0,7);ctx.fill();ctx.globalAlpha=1;
+    ctx.beginPath();ctx.arc(p[0],p[1],r,0,7);ctx.fill();ctx.font='14px sans-serif';ctx.textAlign='center';ctx.fillText(ico,p[0],p[1]-r-6);
+    ctx.font='bold 11px ui-monospace,monospace';ctx.fillStyle='#fff';ctx.fillText(l1,p[0],p[1]+r+14);ctx.font='9px ui-monospace,monospace';ctx.fillStyle='#6d7f99';ctx.fillText(l2,p[0],p[1]+r+25);ctx.textAlign='start';
+    if(sel===ip){ctx.strokeStyle='#fff';ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(p[0],p[1],r+6+Math.sin(now/200)*2,0,7);ctx.stroke()}
+    if(ip)nodesDrawn.push({ip,x:p[0],y:p[1],r:Math.max(r,10)})};
+  // κορμός: router ↔ ομάδες
+  ctx.strokeStyle='#1f3352';ctx.lineWidth=1;ctx.setLineDash([2,4]);
+  for(const g of LP.groups){ctx.beginPath();ctx.moveTo(LP.gwp[0],LP.gwp[1]+30);ctx.lineTo(g.x+g.w/2,g.y-4);ctx.stroke()}
+  ctx.beginPath();ctx.moveTo(LP.gwp[0],LP.gwp[1]);ctx.lineTo(LP.mep[0],LP.mep[1]);ctx.stroke();ctx.setLineDash([]);
+  if(gwH)hub(LP.gwp,'#3ec5ff',8,'🌐',aliasOf(gwH)||'ROUTER',gwH.ip+(gwH.vendor?' · '+vshort(gwH.vendor):''),gwH.ip,gwH);
+  if(meH)hub(LP.mep,'#ffffff',7,'💻','ΕΣΥ',meH.ip,meH.ip,meH);
+  if(bc.length)hub(LP.bcp,'#6d7f99',5,'📢','όλοι','broadcast / multicast','@bcast');
+  for(const g of LP.groups){
+    ctx.font='bold 10px ui-monospace,monospace';ctx.fillStyle='#8aa0bd';ctx.fillText(fit(`${g.t} (${g.devs.length})`,g.w),g.x,g.y+10);
+    for(const h of g.devs){const c=LP.cards.get(h.ip);if(!c)continue;const[x,y,w,hh]=c,act=now-(h._flash||0)<1500;
+      const col=nodeCol(h,act?'#3ddc97':'#2d3b55');
+      ctx.fillStyle=sel===h.ip?'#16243c':'#0d1626';ctx.strokeStyle=sel===h.ip?'#fff':col;ctx.lineWidth=h.threat>=2||sel===h.ip?1.6:1;roundRect(x,y,w,hh,6);ctx.fill();ctx.stroke();
+      if(h.threat>=2){const ph=(now/900)%1;ctx.strokeStyle=`rgba(255,59,92,${1-ph})`;ctx.lineWidth=2;roundRect(x-ph*6,y-ph*6,w+ph*12,hh+ph*12,8);ctx.stroke()}
+      ctx.font='15px sans-serif';ctx.fillStyle='#fff';ctx.fillText(h.dicon||'❔',x+5,y+21);
+      ctx.font='bold 10.5px ui-monospace,monospace';ctx.fillStyle=h.threat>=2?'#ff8da0':aliasOf(h)?'#fff':'#cfe0f5';ctx.fillText(fit(lanName(h,40),w-32),x+26,y+13);
+      ctx.font='9px ui-monospace,monospace';ctx.fillStyle='#6d7f99';ctx.fillText(fit(h.ip+(h.vendor&&h.vendor!=='τυχαία MAC'?' · '+vshort(h.vendor):''),w-32),x+26,y+25);
+      nodesDrawn.push({ip:h.ip,x:x+w/2,y:y+hh/2,r:Math.min(w,hh)/2+6,rect:c})}
+    if(g.more>0){ctx.font='9px ui-monospace,monospace';ctx.fillStyle='#8aa0bd';ctx.fillText(`+${g.more} ακόμα — 📟 Συσκευές`,g.moreXY[0],g.moreXY[1])}
+  }
+  if(!LP.groups.length){ctx.font='11px ui-monospace,monospace';ctx.fillStyle='#6d7f99';ctx.textAlign='center';ctx.fillText('Δεν έχω δει ακόμα άλλες συσκευές — κάνε 🔴 Pentest → σάρωση LAN.',LP.cx,LP.gwp[1]+90);ctx.textAlign='start'}
 }
 function roundRect(x,y,w,h,r){ctx.beginPath();ctx.moveTo(x+r,y);ctx.arcTo(x+w,y,x+w,y+h,r);ctx.arcTo(x+w,y+h,x,y+h,r);ctx.arcTo(x,y+h,x,y,r);ctx.arcTo(x,y,x+w,y,r);ctx.closePath()}
 requestAnimationFrame(frame);
 
 function pick(e){const r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clientY-r.top;let best=null,bd=1e9;
-  for(const n of nodesDrawn){const d=Math.hypot(n.x-x,n.y-y);if(d<n.r+5&&d<bd){bd=d;best=n}}return[best,x,y]}
+  for(const n of nodesDrawn){if(n.rect){const[rx,ry,rw,rh]=n.rect;if(x>=rx&&x<=rx+rw&&y>=ry&&y<=ry+rh)return[n,x,y];continue}
+    const d=Math.hypot(n.x-x,n.y-y);if(d<n.r+5&&d<bd){bd=d;best=n}}return[best,x,y]}
+const inBtn=(x,y)=>S.showLan&&LP.btn&&x>=LP.btn[0]&&x<=LP.btn[0]+LP.btn[2]&&y>=LP.btn[1]&&y<=LP.btn[1]+LP.btn[3];
+function lanBig(on){LAN.big=on==null?!LAN.big:on;if(LAN.big)S.showLan=true;const lg=$('legend');if(lg)lg.style.display=LAN.big?'none':''}
 // το παράθυρο πληροφοριών ανοίγει όπου χωράει: κάτω-δεξιά, αλλιώς πάνω ή αριστερά από τον κέρσορα
 function placeTip(tip,x,y){tip.style.display='block';tip.style.left='0px';tip.style.top='0px';
   const w=tip.offsetWidth,h=tip.offsetHeight;
@@ -410,35 +606,71 @@ cv.addEventListener('mousemove',e=>{const[n,x,y]=pick(e);const tip=$('tip');
   const st=h.threat>=2?'<span style="color:#ff8da0">🔴 εμπλέκεται σε επίθεση — δες ⚠ Επιθέσεις</span>':h.threat===1&&h.kind==='local'?'<span style="color:#ffd23f">🟡 νέα/άγνωστη συσκευή ή χαμηλή ειδοποίηση</span>':'';
   const v6=(LP.v6.get(n.ip)||[]);
   const hits=(h.hits||[]).slice(0,3).map(([p,c,s])=>`${p}${s?' '+s:''}`).join(', ');
-  tip.innerHTML=`<b style="color:#fff">${esc(h.ip)}</b> ${h.threat>=2?'<span class="tag r">ΕΠΙΤΙΘΕΤΑΙ</span>':''}<br>${role?role+'<br>':''}${st?st+'<br>':''}${hname(h)?esc(hname(h))+'<br>':''}`+(v6.length?`<span style="color:#6d7f99">και IPv6: ${esc(v6.slice(0,2).join(', '))}</span><br>`:'')+
+  const al=aliasOf(h),dt=h.kind==='local'&&h.dlabel?`${h.dicon} ${esc(h.dlabel)}${h.vendor?' · <span style="color:#6d7f99">'+esc(h.vendor)+'</span>':''}<br>`:'';
+  tip.innerHTML=`<b style="color:#fff">${al?esc(al)+' · ':''}${esc(h.ip)}</b> ${h.threat>=2?'<span class="tag r">ΕΠΙΤΙΘΕΤΑΙ</span>':''}<br>${dt}${role?role+'<br>':''}${st?st+'<br>':''}${hname(h)?esc(hname(h))+'<br>':''}`+(v6.length?`<span style="color:#6d7f99">και IPv6: ${esc(v6.slice(0,2).join(', '))}</span><br>`:'')+
    (g?`${flag(g.countryCode)} ${esc(g.city)}, ${esc(g.country)}<br><span style="color:#6d7f99">${esc(g.isp)} · ${esc(g.as||'')}</span><br>`:'')+
    (h.mac?`<span style="color:#6d7f99">MAC ${esc(h.mac)}</span><br>`:'')+
    `↑ ${fmtB(h.bytes_out)} &nbsp; ↓ ${fmtB(h.bytes_in)}`+(hits?`<br>🎯 ${esc(hits)}`:'')+'<br><span style="color:#6d7f99">κλικ για λεπτομέρειες</span>';
   placeTip(tip,x,y)});
 cv.addEventListener('mouseleave',()=>$('tip').style.display='none');
-cv.addEventListener('click',e=>{const[n]=pick(e);if(n)select(n.ip);else if(S.sel){S.sel=null}});
+cv.addEventListener('click',e=>{const[n,x,y]=pick(e);if(inBtn(x,y)){showTab(view==='lan'?'map':'lan');return}if(n)select(n.ip);else if(S.sel){S.sel=null}});
 
 // ================= TABS =================
 let tab='home';
 // Ενότητες σε κάρτες: μία σειρά καρτελών + μενού «☰ Ενότητες» (και πλέγμα στην Αρχική)
 const SECTIONS=[
-  ['🛡 Προστασία',[['alerts','⚠ Επιθέσεις','τι ύποπτο έγινε, με απλά λόγια'],['wifi','☕ Wi‑Fi','είμαι ασφαλής σε αυτό το δίκτυο;'],['priv','🕵 Ανωνυμία','Tor, VPN, διαρροές'],['audit','🛡 Έλεγχος','βαθμός ασφάλειας του σπιτιού'],['honey','🪤 Παγίδα','ψεύτικες θύρες που πιάνουν όποιον ψάχνει'],['block','🚫 Μπλοκ','IP που έκοψες με το τείχος'],['iot','🔌 IoT μου','ESP32 & Raspberry Pi: πόσο ασφαλή είναι'],['sensor','📡 Αισθητήρες','ESP32 που φυλάνε τον αέρα (deauth, evil twin)'],['mqtt','📨 MQTT','ο broker σου: ποιος μπαίνει, τι στέλνει']]],
-  ['🌐 Το δίκτυό μου',[['devs','📟 Συσκευές','ποιος είναι συνδεδεμένος'],['hosts','🌍 Προορισμοί','πού μιλάει ο υπολογιστής'],['apps','📱 Εφαρμογές','ποια app μιλάει με ποιον · trackers'],['stats','📊 Στατιστικά','πρωτόκολλα, κίνηση, MITRE'],['feed','📦 Πακέτα','ζωντανά πακέτα & στρώματα OSI'],['det','🔎 Λεπτομέρειες','όλα για μία IP'],['hist','🕓 Ιστορικό','παλιές ειδοποιήσεις & συσκευές']]],
-  ['🔴 Εργαλεία',[['pentest','🔴 Pentest','σάρωση LAN, CVE, purple-team lab'],['rules','🧩 Κανόνες','γράψε δικούς σου ανιχνευτές'],['ctf','🚩 CTF','ασκήσεις ανάλυσης κίνησης']]],
+  ['🛡 Προστασία',[['alerts','⚠ Επιθέσεις','τι ύποπτο έγινε, με απλά λόγια'],['wifi','☕ Wi‑Fi','είμαι ασφαλής σε αυτό το δίκτυο;'],['priv','🕵 Ανωνυμία','Tor, VPN, διαρροές'],['audit','🛡 Έλεγχος','βαθμός ασφάλειας του σπιτιού'],['honey','🪤 Παγίδα','ψεύτικες θύρες που πιάνουν όποιον ψάχνει'],['block','🚫 Μπλοκ','IP που έκοψες με το τείχος'],['iot','🔌 IoT μου','ESP32 & Raspberry Pi: πόσο ασφαλή είναι'],['sensor','📡 Αισθητήρες','ESP32 που φυλάνε τον αέρα (deauth, evil twin)'],['mqtt','📨 MQTT','ο broker σου: ποιος μπαίνει, τι στέλνει'],['pb','⚡ Αντιδράσεις','αυτόματα: όταν γίνει Χ, κάνε Υ']]],
+  ['🌐 Το δίκτυό μου',[['devs','📟 Συσκευές','ποιος είναι συνδεδεμένος'],['hosts','🌍 Προορισμοί','πού μιλάει ο υπολογιστής'],['apps','📱 Εφαρμογές','ποια app μιλάει με ποιον · trackers'],['stats','📊 Στατιστικά','πρωτόκολλα, κίνηση, MITRE'],['feed','📦 Πακέτα','ζωντανά πακέτα & στρώματα OSI'],['det','🔎 Λεπτομέρειες','όλα για μία IP'],['hist','🕓 Ιστορικό','παλιές ειδοποιήσεις & συσκευές'],['health','🩺 Homelab','είναι όλα πάνω; πόσο αργούν;']]],
+  ['🔴 Εργαλεία',[['pentest','🔴 Pentest','σάρωση, εργαλεία τεχνικού, CVE, lab'],['ws','🦈 Wireshark','φίλτρα, tshark, συντομεύσεις — δοκίμασέ τα ζωντανά'],['rules','🧩 Κανόνες','γράψε δικούς σου ανιχνευτές'],['ctf','🚩 CTF','ασκήσεις ανάλυσης κίνησης']]],
   ['📚 Μάθηση',[['academy','🎓 Ακαδημία','CCNA & IoT security, από το μηδέν'],['learn','📚 Μάθε','πώς δουλεύουν οι επιθέσεις'],['tips','💡 Συμβουλές','τι να κάνεις τώρα'],['quiz','❓ Κουίζ','τεστάρισε τι έμαθες']]]];
 const SECT_NAME={home:'🧭 Αρχική'};SECTIONS.forEach(([,l])=>l.forEach(([t,n])=>SECT_NAME[t]=n));
 const cardsHTML=()=>SECTIONS.map(([g,l])=>`<div class="mgroup">${g}</div><div class="mgrid">${l.map(([t,n,d])=>`<div class="mcard${t===tab?' on':''}" data-t="${t}"><b>${n}</b><span>${d}</span></div>`).join('')}</div>`).join('');
-function closeMenu(){$('menu').classList.remove('open');$('menu-btn').classList.remove('open')}
-$('menu-btn').onclick=e=>{e.stopPropagation();const m=$('menu');if(m.classList.contains('open'))return closeMenu();
-  m.innerHTML=cardsHTML();m.querySelectorAll('[data-t]').forEach(c=>c.onclick=()=>{closeMenu();showTab(c.dataset.t)});m.classList.add('open');$('menu-btn').classList.add('open')};
-document.addEventListener('click',e=>{if(!e.target.closest('#menu'))closeMenu()});
-document.addEventListener('keydown',e=>{if(e.key==='Escape')closeMenu()});
+// Πλευρικό μενού (ιδέες από UniFi / Wazuh / Cisco XDR: ομάδες ανά εργασία, μία οθόνη τη φορά, λεπτομέρειες «με κλικ»)
+const SIDE=['alerts','det','feed'];
+const SECT_DESC={home:'τα βήματα με τη σειρά και η εικόνα με μια ματιά',map:'',lan:''};SECTIONS.forEach(([,l])=>l.forEach(([t,,d])=>SECT_DESC[t]=d));
+const RAIL_TOP=[['map','🗺','Ζωντανός χάρτης'],['lan','🏠','Δίκτυο σπιτιού'],['alerts','⚠','Επιθέσεις']];
+let MODE='';try{MODE=localStorage.getItem('nw-mode')||''}catch(e){}
+// σειρά ομάδων στο μενού: ο τεχνικός θέλει πρώτα «ζωντανά» και εργαλεία· όποιος μαθαίνει, πρώτα τη μάθηση
+const RAIL_ORDER={tech:['live',2,1,0,3],learn:[3,'live',0,1,2]};
+function railHTML(){const it=(t,ic,lb)=>`<button data-r="${t}" title="${esc(lb)}"><span class="ic">${ic}</span><span class="lb">${esc(lb)}</span>${t==='alerts'?'<span class="cnt" id="rac" style="display:none"></span>':''}</button>`;
+  const split=n=>{const m=n.match(/^(\S+)\s+(.+)$/);return m?[m[1],m[2]]:['•',n]};
+  const grp=([g,l])=>`<div class="rg">${esc(g.replace(/^\S+\s+/,''))}</div>`+l.filter(([t])=>t!=='alerts'&&t!=='det'&&t!=='feed').map(([t,n])=>it(t,...split(n))).join('');
+  return it('home','🧭','Αρχική')+RAIL_ORDER[MODE==='tech'?'tech':'learn'].map(o=>o==='live'?'<div class="rg">Ζωντανά</div>'+RAIL_TOP.map(([t,i,l])=>it(t,i,l)).join(''):grp(SECTIONS[o])).join('')+
+    '<button class="mini" id="rail-mini" title="Σμίκρυνση/άνοιγμα μενού">⇤</button>'}
+function buildRail(){$('rail').innerHTML=railHTML();
+  $('rail').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const t=b.dataset.r;if(t!=='map'&&t!=='lan')setView('page');showTab(t);document.body.classList.remove('rail-open')});
+  $('rail-mini').onclick=()=>{const m=document.body.classList.toggle('rail-mini');$('rail-mini').textContent=m?'⇥':'⇤';try{localStorage.setItem('nw-railmini',m?'1':'0')}catch(e){}};
+  if(document.body.classList.contains('rail-mini'))$('rail-mini').textContent='⇥';
+  const rk=view==='page'?tab:view;$('rail').querySelectorAll('[data-r]').forEach(b=>b.classList.toggle('on',b.dataset.r===rk));setAC(S.unread||0)}
+function setMode(m){MODE=m;try{localStorage.setItem('nw-mode',m)}catch(e){}
+  document.body.classList.toggle('mode-tech',m==='tech');document.body.classList.toggle('mode-learn',m!=='tech');
+  $('mode-btn').innerHTML=m==='tech'?'👷<span class="ml"> Τεχνικός</span>':'🎓<span class="ml"> Μαθαίνω</span>';$('mode-btn').title=m==='tech'?'Λειτουργία τεχνικού: πυκνή εικόνα, γρήγορα εργαλεία. Πάτα για «Μαθαίνω».':'Λειτουργία μάθησης: εξηγήσεις και οδηγός. Πάτα για «Τεχνικός».';
+  buildRail()}
+$('mode-btn').onclick=()=>{setMode(MODE==='tech'?'learn':'tech');showTab(view==='page'?tab:view)};
+try{if(localStorage.getItem('nw-railmini')==='1')document.body.classList.add('rail-mini')}catch(e){}
+{const first=!MODE;setMode(MODE||'learn');if(first){MODE='';try{localStorage.removeItem('nw-mode')}catch(e){}}}
+$('rail-btn').onclick=e=>{e.stopPropagation();document.body.classList.toggle('rail-open')};
+document.addEventListener('click',e=>{if(!e.target.closest('#rail')&&!e.target.closest('#rail-btn'))document.body.classList.remove('rail-open')});
+function setView(v){view=v;document.body.classList.remove('v-page','v-map','v-lan');document.body.classList.add('v-'+v);
+  if(v==='lan')lanBig(true);else if(v==='map'){lanBig(false);if(!S.lanUser)S.showLan=false}}
+function setAC(n){S.unread=n;for(const id of['ac','rac']){const e=$(id);if(e){e.textContent=n;e.style.display=n?'':'none'}}}
 document.querySelectorAll('nav > button[data-t]').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
-function showTab(t){tab=t;document.querySelectorAll('nav [data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
-  $('curtab').textContent=t==='home'||t==='alerts'?'':SECT_NAME[t]||'';
+function showTab(t){
+  if(t==='map'||t==='lan'){setView(t);t=SIDE.includes(tab)?tab:'alerts'}
+  else if(view!=='page'&&!SIDE.includes(t))setView('page');
+  tab=t;document.querySelectorAll('nav [data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
+  const rk=view==='page'?t:view;$('rail').querySelectorAll('[data-r]').forEach(b=>b.classList.toggle('on',b.dataset.r===rk));
+  $('ph-t').textContent=t==='home'?'🧭 Αρχική':SECT_NAME[t]||'';$('ph-d').textContent=t==='home'&&MODE==='tech'?'η εικόνα του δικτύου με μια ματιά · γρήγορα εργαλεία · ⌘K για εντολές':SECT_DESC[t]||'';
+  try{localStorage.setItem('nw-view',view+'|'+t)}catch(e){}
+  const changed=!$('t-'+t).classList.contains('on');
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
-  if(t==='alerts'){S.unread=0;$('ac').style.display='none'}renderTab()}
-function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,rules:renderRules,ctf:renderCtf,wifi:renderWifi,priv:renderPriv,home:renderHome,academy:renderAcademy,apps:renderApps,honey:renderHoney,block:renderBlock,iot:renderIot,sensor:renderSensor,mqtt:renderMqtt})[tab]()}
+  if(changed){enterAnim($('t-'+t));if(view==='page')enterAnim($('pagehead'))}
+  if(t==='alerts')setAC(0);renderTab()}
+function enterAnim(el){if(!el)return;el.classList.remove('enter');void el.offsetWidth;el.classList.add('enter');clearTimeout(el._et);el._et=setTimeout(()=>el.classList.remove('enter'),500)}
+// αριθμοί που «μετράνε» μέχρι την τιμή τους (μόνο όταν ανοίγει η οθόνη)
+function countUp(root){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;root.querySelectorAll('[data-count]').forEach(el=>{const m=el.textContent.match(/^(\d+)(.*)$/);if(!m||+m[1]<2)return;
+  const end=+m[1],rest=m[2],t0=performance.now();const st=n=>{const k=Math.min(1,(n-t0)/600);el.textContent=Math.round(end*(1-Math.pow(1-k,3)))+rest;if(k<1)requestAnimationFrame(st)};requestAnimationFrame(st)})}
+function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,ws:renderWs,rules:renderRules,ctf:renderCtf,wifi:renderWifi,priv:renderPriv,home:renderHome,academy:renderAcademy,apps:renderApps,honey:renderHoney,block:renderBlock,iot:renderIot,sensor:renderSensor,mqtt:renderMqtt,pb:renderPb,health:renderHealth})[tab]()}
 function renderAcademy(){const el=$('t-academy');if(el.dataset.r)return;el.dataset.r=1;window.ACADEMY?ACADEMY.render(el):el.innerHTML='<div class="empty">Δεν φορτώθηκε η Ακαδημία</div>'}
 function tabHover(){return document.querySelector('.tab.on:hover')}
 
@@ -446,16 +678,23 @@ function eduHTML(type){const e=eduFor(type);if(!e)return'';
   return `<div class="edu"><b>${esc(e.t)}</b><span class="lvl">${esc(e.lvl)}</span><br><b>Τι είναι:</b> ${esc(e.what)}<br><b>Πώς γίνεται:</b> ${esc(e.how)}<br><b>Κίνδυνος:</b> ${esc(e.risk)}<br><b>Τι να κάνεις:</b><ul>${e.todo.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`}
 const VLOOK={ok:['#3ddc97','🟢 Συνήθως αθώο'],check:['#ffd23f','🟡 Αξίζει να το ελέγξεις'],bad:['#ff3b5c','🔴 Πιθανό πρόβλημα']};
 function roleTag(ip){const h=S.hosts.get(ip);if(!h)return'';return h.me?' <span class="tag">εσύ</span>':h.gw?' <span class="tag">router</span>':h.kind==='local'?' <span class="tag">συσκευή σου</span>':h.kind==='public'?' <span class="tag">Internet</span>':''}
+// «Ποιος το έκανε;» — οι δικές σου δοκιμές να μη μπερδεύονται με πραγματικές επιθέσεις
+function whoTag(a){if(a.lab)return' <span class="tag y" title="Purple-team lab: προσομοίωση που ξεκίνησες εσύ">🧪 LAB · εσύ</span>';
+  if(a.selftest)return` <span class="tag" style="background:#10243a;border-color:#4ea8ff;color:#8cc8ff" title="${esc(a.selftest)}">🧪 Δοκιμή σου</span>`;
+  if(a.benign)return'';const h=S.hosts.get(a.actor);
+  return h?.me?' <span class="tag r" title="Βγήκε από τον υπολογιστή σου, αλλά όχι από εργαλείο του NetWatch ούτε από δηλωμένη δοκιμή">💻 Από εσένα — όχι δοκιμή</span>'
+    :(h?h.kind==='local':/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|f[cd])/.test(a.actor))?' <span class="tag r" title="Άλλη συσκευή στο δίκτυό σου — όχι δική σου δοκιμή">👤 Άλλη συσκευή</span>'
+    :' <span class="tag r" title="Από το Internet">🌐 Από το Internet</span>'}
 function alertHTML(a){const h=S.hosts.get(a.actor),g=h?.geo,open=S.openEdu.has(a.id),e=eduFor(a.type),v=verdictFor(a.type);
-  const vv=a.benign?['#3ddc97','🟢 Αναμενόμενο',a.benign]:v?[VLOOK[v[0]][0],VLOOK[v[0]][1],v[1]]:null;
+  const vv=a.selftest?['#4ea8ff','🧪 Δική σου δοκιμή',a.selftest,'όχι επίθεση· δες τι θα έπιανε η άμυνα αν το έκανε κάποιος άλλος.']:a.benign?['#3ddc97','🟢 Αναμενόμενο',a.benign]:v?[VLOOK[v[0]][0],VLOOK[v[0]][1],v[1]]:null;
   const out=a.type.startsWith('Ύποπτη εξερχόμενη')||a.type.startsWith('Σύνδεση σε κακόβουλη');  // εσύ ξεκίνησες τη σύνδεση
   const from=out?a.target:a.actor,to=out?a.actor:a.target;
-  return `<div class="al ${a.sev}"${a.benign?' style="opacity:.75;border-left-color:#3ddc97"':''}><div class="h"><span><span class="sev ${a.sev}">${a.sev.toUpperCase()}</span><span class="ty">${esc(a.type)}</span>${a.lab?' <span class="tag y">🧪 LAB</span>':''}</span><span class="tm">${fmtT(a.t)}</span></div>
+  return `<div class="al ${a.sev}${alSeen>=0&&a.id>alSeen&&tab==='alerts'?' new':''}"${a.benign?' style="opacity:.75;border-left-color:#3ddc97"':a.selftest?' style="opacity:.8;border-left-color:#4ea8ff"':''}><div class="h"><span><span class="sev ${a.sev}">${a.sev.toUpperCase()}</span><span class="ty">${esc(a.type)}</span>${whoTag(a)}</span><span class="tm">${fmtT(a.t)}</span></div>
   <div style="margin:4px 0">${out?'':flag(g?.countryCode)+' '}<b>${esc(from)}</b>${roleTag(from)} → ${out?flag(g?.countryCode)+' ':''}${esc(to)}${roleTag(to)} ${g?`<span style="color:#6d7f99">· ${esc(g.country)} · ${esc(g.isp)}</span>`:''}</div>
   <div style="color:#9fb4d0">${esc(a.detail)}</div>
-  ${vv?`<div style="margin-top:6px;padding:6px 8px;border-radius:6px;background:${vv[0]}14;border-left:3px solid ${vv[0]};white-space:normal"><b style="color:${vv[0]}">${vv[1]}</b> — <span style="color:#cfe0f5">${esc(vv[2])}</span>${!a.benign&&e?`<div class="sm" style="margin-top:3px">👉 ${esc(e.todo[0])}</div>`:''}</div>`:''}
+  ${vv?`<div style="margin-top:6px;padding:6px 8px;border-radius:6px;background:${vv[0]}14;border-left:3px solid ${vv[0]};white-space:normal"><b style="color:${vv[0]}">${vv[1]}</b> — <span style="color:#cfe0f5">${esc(vv[2])}</span>${vv[3]?` — <span style="color:#cfe0f5">${vv[3]}</span>`:''}${!a.benign&&!a.selftest&&e?`<div class="sm" style="margin-top:3px">👉 ${esc(e.todo[0])}</div>`:''}</div>`:''}
   ${a.mitre?`<div style="margin-top:4px"><a class="mitre" target="_blank" href="${esc(a.mitre.url)}" title="${esc(a.mitre.name)}">MITRE ATT&amp;CK ${esc(a.mitre.id)}</a> <span class="sm">${esc(a.mitre.tactic)} · ${esc(a.mitre.name)}</span></div>`:''}
-  <div class="act"><button class="b" data-sel="${esc(a.actor)}">🔎 ${a.sev==='high'&&!a.benign?'Ανάλυση επιτιθέμενου':'Ποιος είναι;'}</button><button class="b" data-edu="${a.id}">${open?'▾':'ℹ'} Πες μου περισσότερα</button>${g?`<button class="b" data-map="${esc(a.actor)}">📍 Χάρτης</button>`:''}${!a.benign&&a.sev!=='low'&&canBlock(a.actor)?`<button class="b" data-block="${esc(a.actor)}" data-why="${esc(a.type)}" style="border-color:#ff3b5c55">${blockedSet.has(a.actor)?'✅ Μπλοκαρισμένο':'🚫 Μπλόκαρε'}</button>`:''}</div>
+  <div class="act"><button class="b" data-sel="${esc(a.actor)}">🔎 ${a.sev==='high'&&!a.benign?'Ανάλυση επιτιθέμενου':'Ποιος είναι;'}</button><button class="b" data-edu="${a.id}">${open?'▾':'ℹ'} Πες μου περισσότερα</button>${g?`<button class="b" data-map="${esc(a.actor)}">📍 Χάρτης</button>`:''}${!a.benign&&!a.selftest&&a.sev!=='low'&&canBlock(a.actor)?`<button class="b" data-block="${esc(a.actor)}" data-why="${esc(a.type)}" style="border-color:#ff3b5c55">${blockedSet.has(a.actor)?'✅ Μπλοκαρισμένο':'🚫 Μπλόκαρε'}</button>`:''}</div>
   ${open?eduHTML(a.type):''}</div>`}
 function bindCommon(el){
   el.querySelectorAll('[data-sel]').forEach(d=>d.onclick=e=>{e.stopPropagation();select(d.dataset.sel)});
@@ -487,7 +726,8 @@ function drawBlock(){const d=blockData,el=$('t-block');if(d.error&&!d.blocked){e
   el.querySelectorAll('[data-un]').forEach(b=>b.onclick=()=>post('/api/block',{unblock:b.dataset.un}).then(j=>{blockData=j;blockedSet=new Set(j.blocked.map(x=>x.ip));drawBlock()}));
   el.querySelectorAll('[data-ip]').forEach(x=>x.onclick=e=>{e.preventDefault();select(x.dataset.ip)});
   $('bl-go').onclick=()=>{const v=$('bl-ip').value.trim();if(v)blockIp(v,'χειροκίνητα')}}
-function renderAlerts(){const el=$('t-alerts');if(!S.alerts.length)return;
+let alSeen=-1;
+function renderAlerts(){const el=$('t-alerts');if(!S.alerts.length)return;setTimeout(()=>{alSeen=Math.max(alSeen,...S.alerts.map(a=>a.id))},0);
   const counts={};S.alerts.forEach(a=>counts[a.sev]=(counts[a.sev]||0)+1);
   el.innerHTML=`<div style="margin-bottom:8px"><button class="b" onclick="exportReport()">⬇ Αναφορά συμβάντος (JSON)</button></div><div class="sm" style="margin-bottom:8px">${counts.high||0} σοβαρές · ${counts.med||0} μέτριες · ${counts.low||0} χαμηλές — πάτα «Πες μου περισσότερα» για αναλυτική εξήγηση</div>`+S.alerts.slice(0,200).map(alertHTML).join('');bindCommon(el)}
 
@@ -599,10 +839,18 @@ function layersHTML(p){const L=[],pi=portInfo(p.dp)||portInfo(p.sp);
   return `<div style="margin-top:8px"><div class="sm" style="margin-bottom:3px">📚 Τα στρώματα του πακέτου (μοντέλο OSI) — κάθε στρώμα «τυλίγει» το από πάνω:</div>${L.map(([n,name,val,info,c])=>`<div style="border-left:3px solid ${c};background:${c}14;padding:3px 8px;margin:2px 0;border-radius:3px"><b style="color:${c}">L${n} ${name}</b> <code>${esc(val)}</code><div class="sm">${esc(info)}</div></div>`).join('')}</div>`}
 function renderFeed(){if($('fpause').checked&&S.feedEx==null)return;
   let list=S.feed;if($('fbad').checked)list=list.filter(p=>p.x);
+  const F=window.WS?WS.compile($('fflt').value):{ok:true},fi=$('fflt');fi.classList.toggle('ok',!!(F.ok&&F.fn));fi.classList.toggle('bad',!F.ok);
+  if(F.ok&&F.fn){const n=list.length;list=list.filter(F.fn);$('fflt-st').textContent=`🦈 ${list.length} από ${n} πακέτα ταιριάζουν`}
+  else $('fflt-st').innerHTML=F.ok?'':`<span style="color:${F.ws?'#ffd23f':'#ff8da0'}">${esc(F.err)}</span>`;
   $('fb').innerHTML=list.slice(0,200).map((p,i)=>`<tr class="r" data-i="${i}" style="color:${p.x?'#ff3b5c':COLORS[p.a]||COLORS[p.p]||'#cfe0f5'}"><td>${fmtT(p.t)}</td><td>${esc(p.a)}${p.f?' ['+esc(p.f)+']':''}</td><td>${esc(p.s)}${p.sp!=null?':'+p.sp:''} → ${esc(p.d)}${p.dp!=null?':'+p.dp:''}</td><td>${p.l}</td></tr>`+
     (S.feedEx===p?`<tr class="ex"><td colspan="4">${explainPacket(p)}</td></tr>`:'')).join('');
   $('fb').querySelectorAll('tr.r').forEach(tr=>tr.onclick=()=>{const p=list[+tr.dataset.i];S.feedEx=S.feedEx===p?null:p;$('fpause').checked=!!S.feedEx;renderFeed()})}
-$('fpause').onchange=()=>{if(!$('fpause').checked)S.feedEx=null;renderFeed()};$('fbad').onchange=renderFeed;
+$('fpause').onchange=()=>{if(!$('fpause').checked)S.feedEx=null;renderFeed()};
+try{$('fflt').value=localStorage.getItem('nw-wsf')||''}catch(e){}
+$('fflt').oninput=()=>{try{localStorage.setItem('nw-wsf',$('fflt').value)}catch(e){}S.feedEx=null;renderFeed()};
+$('fflt-x').onclick=()=>{$('fflt').value='';$('fflt').oninput()};$('fflt-ws').onclick=()=>{setView('page');showTab('ws')};
+function setFeedFilter(f){$('fflt').value=f;$('fflt').oninput();showTab('feed')}
+$('fbad').onchange=renderFeed;
 
 function verdict(h,al){
   const g=h.geo,types=[...new Set(al.filter(a=>a.actor===h.ip).map(a=>a.type))];if(!types.length)return'';
@@ -629,13 +877,16 @@ function renderDet(){
   for(const f of h.intel||[])tags.push(`<span class="tag r" title="Threat intelligence">⛔ ${esc(f.name)}</span>`);
   if(g?.proxy)tags.push('<span class="tag r">PROXY / VPN / TOR</span>');if(g?.hosting)tags.push('<span class="tag">Datacenter / Hosting</span>');if(g?.mobile)tags.push('<span class="tag">Κινητό δίκτυο</span>');
   if(randMac(h.mac))tags.push('<span class="tag">τυχαία MAC</span>');
+  if(h.kind==='local'&&h.dlabel)tags.push(`<span class="tag" title="εκτίμηση από κατασκευαστή, όνομα και θύρες">${h.dicon} ${esc(h.dlabel)}</span>`);
+  if(h.vendor)tags.push(`<span class="tag" title="κατασκευαστής κάρτας δικτύου (από τη MAC)">🏭 ${esc(h.vendor)}</span>`);
   tags.push(`<span class="tag">${pub?'Internet':h.kind==='local'?'Τοπικό δίκτυο':'Broadcast/Multicast'}</span>`);
   const peers=[];for(const L of S.links.values())if(L.a===h.ip||L.b===h.ip)peers.push([L.a===h.ip?L.b:L.a,L.bytes]);peers.sort((a,b)=>b[1]-a[1]);
   const al=S.alerts.filter(a=>a.actor===h.ip||a.target===h.ip);const ip=encodeURIComponent(h.ip);
   const hits=h.hits||[],mx=Math.max(1,...hits.map(x=>x[1]));const atk=h.threat>=2;
-  el.innerHTML=`<h2>${flag(g?.countryCode)} ${esc(h.ip)}</h2><div>${tags.join('')}</div>
-  <div style="margin-top:6px">${g?`<button class="b" data-map="${esc(h.ip)}">📍 Δείξε στον χάρτη</button> `:''}<button class="b" onclick="pktOpen('${esc(h.ip)}')" title="Σπάσε ένα πραγματικό πακέτο σε επίπεδα OSI, με εξήγηση για κάθε πεδίο (CCNA)">🔬 Εξήγησέ μου ένα πακέτο</button></div>
+  el.innerHTML=`<h2>${flag(g?.countryCode)} ${aliasOf(h)?esc(aliasOf(h))+' · ':''}${esc(h.ip)}</h2><div>${tags.join('')}</div>
+  <div style="margin-top:6px">${h.kind==='local'?`<button class="b" onclick="setAlias('${esc(h.ip)}')" title="Δώσε όνομα στη συσκευή (π.χ. «TV σαλονιού»). Μένει σε αυτόν τον browser.">✏️ Όνομα</button> `:''}${g?`<button class="b" data-map="${esc(h.ip)}">📍 Δείξε στον χάρτη</button> `:''}<button class="b" onclick="pktOpen('${esc(h.ip)}')" title="Σπάσε ένα πραγματικό πακέτο σε επίπεδα OSI, με εξήγηση για κάθε πεδίο (CCNA)">🔬 Εξήγησέ μου ένα πακέτο</button></div>
   ${verdict(h,al)}
+  ${h.kind==='local'?outHTML(h):''}
   ${hits.length?`<h3>🎯 ${atk?'Τι χτυπάει':'Πού συνδέεται / τι ζητάει'}</h3><div class="sm" style="margin-bottom:6px">${atk?'Οι θύρες/υπηρεσίες που δοκίμασε και γιατί τις θέλει ένας επιτιθέμενος:':'Οι υπηρεσίες στις οποίες ξεκίνησε συνδέσεις:'}</div>`+
     hits.slice(0,15).map(([p,c,s])=>{const pi=portInfo(p);return `<div class="hit"><div class="brow"><span><b>${esc(p)}</b> ${esc(pi?pi[0]:s||'')} <span class="sm">${esc(pi?pi[1]:'')}</span></span><span>×${c}</span></div><div class="bar"><i style="width:${c/mx*100}%;background:${atk?'#ff3b5c':'#3ec5ff'}"></i></div>${atk&&pi?`<div class="why">→ ${esc(pi[2])}</div>`:''}</div>`}).join(''):''}
   ${(h.victims||[]).length?`<h3>${atk?'Θύματα':'Προορισμοί'}</h3>`+h.victims.slice(0,10).map(([v,c])=>`<div class="r" style="cursor:pointer" data-sel="${esc(v)}">→ ${esc(who(v))} <span class="sm">×${c}</span></div>`).join(''):''}
@@ -663,7 +914,7 @@ function renderDet(){
     <div style="margin-top:8px"><button class="b" id="wb">📄 WHOIS — σε ποιον ανήκει</button> ${S.features?.abuseipdb?'<button class="b" id="ab">🛡 AbuseIPDB score</button>':''}</div>
     ${S.abuse&&S.abuse.ip===h.ip?abuseHTML(S.abuse):''}${S.whois?`<pre>${esc(S.whois)}</pre>`:''}`
    :h.mac?`<h3>OSINT</h3><div class="links"><a target="_blank" href="https://maclookup.app/search/result?mac=${encodeURIComponent(h.mac)}">Κατασκευαστής συσκευής (MAC lookup)</a></div>`:''}`;
-  bindCommon(el);
+  bindCommon(el);outBind(el,h);
   const ab=$('ab');if(ab)ab.onclick=()=>{ab.textContent='φόρτωση…';fetch('/api/abuseipdb?ip='+ip).then(r=>r.json()).then(j=>{S.abuse=j;renderDet()})};
   const wb=$('wb');if(wb)wb.onclick=()=>{wb.textContent='φόρτωση…';fetch('/api/whois?ip='+ip).then(r=>r.json()).then(j=>{if(S.sel===j.ip){S.whois=j.text;renderDet()}})};
 }
@@ -762,14 +1013,14 @@ function renderTips(){
 function upsert(list){for(const h of list){const o=S.hosts.get(h.ip);if(o)h._flash=o._flash;S.hosts.set(h.ip,h)}}
 function toastInfo(msg){const t=document.createElement('div');t.className='toast';t.style.borderColor='#3ec5ff';t.style.background='#0b1424f2';t.textContent=msg;$('toasts').prepend(t);setTimeout(()=>t.remove(),3500)}
 function addAlert(a,quiet){S.alerts.unshift(a);if(quiet)return;
-  if(tab!=='alerts'){S.unread++;$('ac').textContent=S.unread;$('ac').style.display=''}
+  if(tab!=='alerts')setAC(S.unread+1);
   if(a.sev!=='low'){const g=S.hosts.get(a.actor)?.geo,e=eduFor(a.type);const t=document.createElement('div');t.className='toast';
-    t.innerHTML=`<b style="color:#ff8da0">${a.lab?'🧪 LAB · ':'⚠ '}${esc(a.type)}</b> — ${flag(g?.countryCode)} ${esc(a.actor)} → ${esc(a.target)}<div style="color:#cfe0f5;margin-top:3px">${esc(a.detail)}</div>${e?`<div class="sm" style="margin-top:3px">${esc(e.what)}</div>`:''}`;
+    t.innerHTML=`<b style="color:#ff8da0"><span>${a.lab?'🧪 LAB · ':a.selftest?'🧪 Δοκιμή σου · ':'⚠ '}</span>${esc(a.type)}</b> — ${flag(g?.countryCode)} ${esc(a.actor)} → ${esc(a.target)}<div style="color:#cfe0f5;margin-top:3px">${esc(a.detail)}</div>${e?`<div class="sm" style="margin-top:3px">${esc(e.what)}</div>`:''}`;
     t.onclick=()=>{select(a.actor);t.remove()};$('toasts').prepend(t);setTimeout(()=>t.remove(),8000);
     while($('toasts').children.length>3)$('toasts').lastChild.remove();
     $('flash').style.boxShadow='inset 0 0 80px 10px #ff3b5c88';setTimeout(()=>$('flash').style.boxShadow='inset 0 0 0 0 #ff3b5c',600)}
   $('na').textContent=S.alerts.length;updStatus()}
-function updStatus(){const now=Date.now()/1000,rec=S.alerts.filter(a=>now-a.t<300&&!a.lab),el=$('status');
+function updStatus(){const now=Date.now()/1000,rec=S.alerts.filter(a=>now-a.t<300&&!a.lab&&!a.selftest),el=$('status');
   if(rec.some(a=>a.sev==='high')){el.className='st-bad';el.textContent='⚠ ΕΝΕΡΓΗ ΑΠΕΙΛΗ'}
   else if(rec.length){el.className='st-warn';el.textContent='! Ύποπτη δραστηριότητα'}
   else{el.className='st-ok';el.textContent='✓ Όλα καλά'}}
@@ -779,7 +1030,7 @@ function setStats(s){S.stats=s;$('pps').textContent=s.pps;$('bps').textContent=f
   c.clearRect(0,0,160,34);c.beginPath();S.spark.forEach((v,i)=>c[i?'lineTo':'moveTo'](i*3,32-v/mx*30));c.strokeStyle='#3ec5ff';c.lineWidth=1.5;c.stroke();
   c.lineTo((S.spark.length-1)*3,34);c.lineTo(0,34);c.fillStyle='#3ec5ff22';c.fill();updStatus()}
 function handle(m){
-  if(m.type==='snapshot'){if(S.feedKind!==undefined&&(S.feedKind!==m.feed||S.ctf!==m.ctf)){S.feed=[];S.links.clear();S.sel=null;S.unread=0;$('ac').style.display='none';auditData=null;histData=null;S.feedEx=null}
+  if(m.type==='snapshot'){if(S.feedKind!==undefined&&(S.feedKind!==m.feed||S.ctf!==m.ctf)){S.feed=[];S.links.clear();S.out.clear();S.sel=null;setAC(0);auditData=null;histData=null;S.feedEx=null}
     S.feedKind=m.feed;S.ctf=m.ctf;S.hosts.clear();upsert(m.hosts);S.me=new Set(m.me);S.gw=m.gw;S.home=m.home;S.mode=m.mode;S.alerts=[];
     S.features=m.features;m.alerts.slice().reverse().forEach(a=>addAlert(a,true));$('na').textContent=S.alerts.length;
     $('mode').textContent=m.feed==='ctf'?'🚩 CTF':{demo:'DEMO',pcap:'▶ PCAP'}[m.mode]||'● LIVE';$('mode').className='badge '+(m.mode==='live'?'live':'demo');
@@ -791,6 +1042,7 @@ function handle(m){
   if(m.type==='alert'){addAlert(m.alert);if(tab==='alerts')renderAlerts();return}
   if(m.type==='pkts'){if(m.hosts)upsert(m.hosts);
     const n=m.items.length;m.items.forEach((it,i)=>spawn(it,i*200/Math.max(1,n)));
+    for(const it of m.items)trackOut(it);
     if(!$('fpause').checked){for(const it of m.items)S.feed.unshift(it);if(S.feed.length>400)S.feed.length=400}
     if(m.stats)setStats(m.stats)}
 }
@@ -849,7 +1101,10 @@ function renderQuiz(){const el=$('t-quiz');if(!QZ.q)QZ.q=makeQuestion();const q=
 // ================= 🔴 PENTEST =================
 let scanData=null,expo=null,labData=null,ptTarget=null;const cveCache={};
 const post=(u,b)=>fetch(u,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(b||{})}).then(r=>r.json());
-const ptBusy=()=>document.activeElement&&document.activeElement.id==='pt-target';
+const PT_SUBS=[['scan','🔍 Σάρωση'],['tools','🧰 Εργαλεία'],['expo','🌐 Τι βλέπει το Internet'],['lab','🧪 Lab'],['mine','🙋 Δοκιμή μου']];
+let ptSub='scan';try{ptSub=localStorage.getItem('nw-ptsub')||'scan'}catch(e){}
+const PTIN={};  // ό,τι έχεις γράψει στα πεδία (μένει όταν ξαναζωγραφίζεται η σελίδα)
+const ptBusy=()=>{const a=document.activeElement;return !!(a&&a.closest&&a.closest('#t-pentest')&&/INPUT|SELECT/.test(a.tagName))};
 function loadScan(){return fetch('/api/scan').then(r=>r.json()).then(j=>{scanData=j;if(ptTarget==null)ptTarget=j.default_target;if(tab==='pentest'&&!ptBusy())drawPentest()})}
 function loadLab(){return fetch('/api/lab').then(r=>r.json()).then(j=>{labData=j;if(tab==='pentest'&&!ptBusy())drawPentest()})}
 function renderPentest(){if(!scanData||!labData){$('t-pentest').innerHTML='<div class="empty">φόρτωση…</div>';loadScan();loadLab();return}drawPentest()}
@@ -858,32 +1113,149 @@ const sevCol=s=>s>=9?'#ff3b5c':s>=7?'#ff9f43':s>=4?'#ffd23f':'#6d7f99';
 function cveHTML(k){const c=cveCache[k];if(!c)return'';if(c.loading)return'<div class="sm">ψάχνω στο NVD…</div>';if(c.error)return`<div class="sm" style="color:#ff8da0">${esc(c.error)}</div>`;
   if(!c.cves.length)return`<div class="sm">Δεν βρέθηκαν γνωστές ευπάθειες για «${esc(c.query)}».</div>`;
   return `<div class="sm" style="margin:4px 0">${c.total} αποτελέσματα στο NVD για «${esc(c.query)}» — οι πιο σοβαρές (ενδεικτικά, έλεγξε ότι ταιριάζει η έκδοση):</div>`+c.cves.map(v=>`<div style="margin:3px 0;white-space:normal"><a class="mitre" style="background:#2a0910;border-color:${sevCol(v.score)};color:${sevCol(v.score)}" target="_blank" href="https://nvd.nist.gov/vuln/detail/${esc(v.id)}">${esc(v.id)} · ${v.score??'?'}</a> <span class="sm">${esc(v.summary)}</span></div>`).join('')}
-function drawPentest(){const el=$('t-pentest'),sd=scanData,run=sd.status==='running';
-  let h=`<div class="card" style="border-color:#5a2a2a;background:#1a0d10"><b style="color:#ff8da0">⚖️ Μόνο στο δικό σου δίκτυο.</b><div class="sm" style="margin-top:3px">Η σάρωση συσκευών που δεν σου ανήκουν χωρίς γραπτή άδεια είναι παράνομη. Ο σαρωτής δέχεται μόνο ιδιωτικές διευθύνσεις (192.168.x.x, 10.x.x.x).</div></div>`;
-  // --- σαρωτής
-  h+=`<h3>1 · Σάρωση του LAN σου ${sd.sim?'<span class="tag y">demo</span>':''}</h3><div class="sm" style="margin-bottom:6px">Βρίσκει συσκευές, ανοιχτές θύρες, τι λογισμικό και ποια έκδοση τρέχουν (banner grabbing) και ελέγχει το TLS — όπως το <code>nmap -sV</code>.</div>
-  <div style="display:flex;gap:6px"><input class="f" id="pt-target" style="margin:0" value="${esc(ptTarget||'')}" placeholder="192.168.1.0/24"><button class="b" id="pt-scan" ${run?'disabled':''}>${run?'σαρώνω…':'▶ Σάρωσε'}</button></div>`;
-  if(run)h+=`<div class="sm" style="margin-top:6px">${esc(sd.phase||'')} — ${sd.progress||0}%</div><div class="bar"><i style="width:${sd.progress||0}%;background:#ff3b5c"></i></div>`;
+function drawPentest(){if(!scanData||!labData)return;  // τα δύο fetch γυρίζουν με τυχαία σειρά
+  const el=$('t-pentest');
+  let h=`<div class="card" style="border-color:#5a2a2a;background:#1a0d10;white-space:normal"><b style="color:#ff8da0">⚖️ Μόνο στο δικό σου δίκτυο.</b> <span class="sm">Η σάρωση συσκευών που δεν σου ανήκουν χωρίς γραπτή άδεια είναι παράνομη. Σάρωση και έλεγχος θυρών δέχονται μόνο ιδιωτικές διευθύνσεις (192.168.x.x, 10.x.x.x). Ό,τι τρέχεις από εδώ σημειώνεται στις ειδοποιήσεις ως «🧪 Δοκιμή σου».</span></div>`;
+  h+=`<div class="seg">${PT_SUBS.map(([k,n])=>`<button data-sub="${k}" class="${k===ptSub?'on':''}">${n}</button>`).join('')}</div>`;
+  h+=({scan:ptScanHTML,tools:ptToolsHTML,expo:ptExpoHTML,lab:ptLabHTML,mine:ptMineHTML}[ptSub]||ptScanHTML)();
+  el.innerHTML=h;
+  el.querySelectorAll('[data-sub]').forEach(b=>b.onclick=()=>{ptSub=b.dataset.sub;enterAnim(el);try{localStorage.setItem('nw-ptsub',ptSub)}catch(e){}if(ptSub==='mine')loadSelftest();if(ptSub==='tools'&&!NK.iface)nkIface();drawPentest()});
+  // κοινά: κράτα ό,τι γράφεις στα πεδία όταν ξαναζωγραφίζεται η σελίδα
+  el.querySelectorAll('[data-in]').forEach(i=>{const ev=i.tagName==='SELECT'||i.type==='checkbox'?'onchange':'oninput';
+    i[ev]=()=>{PTIN[i.dataset.in]=i.type==='checkbox'?i.checked:i.value;if(i.tagName==='SELECT'||i.type==='checkbox')drawPentest()};
+    i.onkeydown=e=>{if(e.key==='Enter'){const b=i.closest('[data-tool]')?.querySelector('[data-run]');if(b)b.click()}}});
+  ({scan:ptScanBind,tools:ptToolsBind,expo:ptExpoBind,lab:ptLabBind,mine:ptMineBind}[ptSub]||ptScanBind)(el)}
+
+// ---------- 🔍 Σάρωση ----------
+function ptScanHTML(){const sd=scanData,run=sd.status==='running',pr=PTIN.profile||'quick';
+  let h=`<div class="card"><b style="color:#fff">🔍 Σάρωση του LAN</b> ${sd.sim?'<span class="tag y">demo</span>':''}<div class="sm" style="margin:3px 0 8px">Βρίσκει συσκευές, κατασκευαστή, ανοιχτές θύρες, λογισμικό και έκδοση (banner), TLS και ονόματα (DNS, mDNS, NetBIOS, UPnP) — όπως το <code>nmap -sV</code>.</div>
+    <div class="frow"><input class="f" data-in="target" value="${esc(PTIN.target??ptTarget??'')}" placeholder="192.168.1.0/24">
+    <select class="f" data-in="profile">${[['quick','⚡ Γρήγορη (~30 θύρες)'],['top1000','📋 Top 1000 θύρες'],['full','🔬 Όλες (1-65535, ≤4 hosts)'],['custom','✏️ Δικές μου θύρες']].map(([v,n])=>`<option value="${v}"${v===pr?' selected':''}>${n}</option>`).join('')}</select>
+    ${pr==='custom'?`<input class="f" data-in="ports" value="${esc(PTIN.ports||'')}" placeholder="22,80,443,8000-8100" style="max-width:200px">`:''}
+    <label class="sm" title="SNMP, DNS, NTP, mDNS, SSDP — βρίσκει π.χ. SNMP με community «public»"><input type="checkbox" data-in="udp" ${PTIN.udp?'checked':''}> + UDP</label>
+    <button class="b" id="pt-scan" ${run?'disabled':''}>${run?'σαρώνω…':'▶ Σάρωσε'}</button></div>`;
+  if(run)h+=`<div class="sm" style="margin-top:8px">${esc(sd.phase||'')} — ${sd.progress||0}%</div><div class="bar"><i style="width:${sd.progress||0}%;background:#ff3b5c"></i></div>`;
   if(sd.status==='error')h+=`<div class="sm" style="color:#ff8da0;margin-top:6px">${esc(sd.error)}</div>`;
-  if(sd.status==='done'){const hs=sd.hosts||[],nOpen=hs.reduce((n,x)=>n+x.services.length,0),bad=hs.filter(x=>x.risk==='high').length;
-    h+=`<div class="sm" style="margin:8px 0">✔ ${hs.length} συσκευές, ${nOpen} ανοιχτές θύρες, ${bad} συσκευές με υψηλό κίνδυνο · ${Math.round(sd.finished-sd.started)} s</div>`;
-    h+=hs.map(x=>`<div class="card"><div class="brow"><span><b style="color:#fff">${esc(x.ip)}</b> ${esc(x.name||'')} ${x.gw?'<span class="tag">router</span>':''}${x.me?'<span class="tag">εσύ</span>':''}</span>${riskTag(x.risk)}</div>
-      <div class="sm">${x.mac?'MAC '+esc(x.mac):''}</div>
-      ${x.services.length?`<table style="margin-top:4px"><tbody>${x.services.map(sv=>{const k=sv.product+' '+(sv.version||'');return `<tr><td style="width:92px">${sv.port} ${esc(sv.svc)}</td><td style="max-width:200px" title="${esc(sv.banner||'')}">${sv.product?`<b style="color:#fff">${esc(sv.product)}</b> ${esc(sv.version||'')}`:'<span class="sm">χωρίς banner</span>'}${sv.tls?` <span class="tag">${esc(sv.tls.version||'TLS ?')}</span>`:''}</td><td>${riskTag(sv.risk)}</td><td>${sv.product&&sv.version?`<button class="b" data-cve="${esc(sv.product)}" data-ver="${esc(sv.version)}">CVE</button>`:''}</td></tr>
-        ${sv.why?`<tr class="ex"><td colspan="4" class="sm">${esc(sv.why)}</td></tr>`:''}${cveCache[k]?`<tr class="ex"><td colspan="4">${cveHTML(k)}</td></tr>`:''}`}).join('')}</tbody></table>`:'<div class="sm">καμία ανοιχτή θύρα από τις συνηθισμένες</div>'}</div>`).join('');
-    h+=`<div class="sm">Τα αποτελέσματα μπήκαν και στην καρτέλα 🛡 Έλεγχος.</div>`}
-  // --- shodan
-  h+=`<h3>2 · Τι βλέπει το Internet για σένα</h3><div class="sm" style="margin-bottom:6px">Το Shodan σαρώνει συνεχώς όλο το Internet. Δες τι έχει καταγράψει για τη δημόσια IP σου${S.home?.query?' ('+esc(S.home.query)+')':''} — αυτό βλέπει πρώτα ένας επιτιθέμενος. <i>Το κουμπί στέλνει τη δημόσια IP σου στο internetdb.shodan.io.</i></div>
-  <button class="b" id="pt-expo">${expo&&expo.loading?'ρωτάω το Shodan…':'🌐 Έλεγχος έκθεσης'}</button>`;
+  h+='</div>';
+  if(sd.status!=='done')return h;
+  const hs=sd.hosts||[],nOpen=hs.reduce((n,x)=>n+x.services.length,0),bad=hs.filter(x=>x.risk==='high').length,d=sd.diff;
+  h+=`<div class="kpis"><div><b>${hs.length}</b><span>συσκευές</span></div><div><b>${nOpen}</b><span>ανοιχτές θύρες</span></div><div><b style="color:${bad?'#ff8da0':'#3ddc97'}">${bad}</b><span>υψηλός κίνδυνος</span></div><div><b>${Math.round(sd.finished-sd.started)} s</b><span>${esc(sd.profile||'')} · ${sd.n_ports||'?'} θύρες${sd.udp?' + UDP':''}</span></div>
+    <div class="exp"><span class="sm">⬇ Αναφορά:</span>${['csv','json','md'].map(f=>`<a class="b" href="/api/scan/export?fmt=${f}" download>${f.toUpperCase()}</a>`).join('')}</div></div>`;
+  if(d){const ch=d.new_hosts.length+d.gone_hosts.length+d.new_ports.length+d.closed_ports.length;
+    h+=`<div class="card" style="border-color:${ch?'#ffd23f66':'#3ddc9755'};white-space:normal"><b style="color:#fff">🔁 Τι άλλαξε από την προηγούμενη σάρωση</b> <span class="sm">(${fmtT(d.prev_finished)})</span>
+      ${ch?`<div style="margin-top:4px">${d.new_hosts.map(ip=>`<span class="tag y">🆕 ${esc(ip)}</span>`).join('')}${d.gone_hosts.map(ip=>`<span class="tag">👻 ${esc(ip)} λείπει</span>`).join('')}
+      ${d.new_ports.map(p=>`<span class="tag r">＋ ${esc(p.ip)}:${p.port}/${p.proto}</span>`).join('')}${d.closed_ports.map(p=>`<span class="tag g">− ${esc(p.ip)}:${p.port}/${p.proto}</span>`).join('')}</div>
+      <div class="sm" style="margin-top:4px">🆕 νέα συσκευή · 👻 δεν απάντησε · ＋ νέα ανοιχτή θύρα (έλεγξέ τη!) · − έκλεισε</div>`:'<div class="sm" style="margin-top:3px">✅ Τίποτα — ίδιες συσκευές, ίδιες θύρες.</div>'}</div>`}
+  h+='<div class="hgrid">'+hs.map(x=>`<div class="card"><div class="brow"><span><b style="color:#fff">${esc(x.ip)}</b> ${esc(x.name||(x.names||[])[0]||'')} ${x.gw?'<span class="tag">router</span>':''}${x.me?'<span class="tag">εσύ</span>':''}</span>${riskTag(x.risk)}</div>
+      <div class="sm" style="white-space:normal">${[x.vendor&&'🏭 '+esc(x.vendor),x.model&&'📦 '+esc(x.model),x.os_guess&&'🖥 '+esc(x.os_guess),x.mac&&'MAC '+esc(x.mac),(x.names||[]).length>1&&'🏷 '+x.names.slice(0,4).map(esc).join(', ')].filter(Boolean).map(t=>`<span>${t}</span>`).join(' · ')}</div>
+      ${x.services.length?`<table style="margin-top:4px"><tbody>${x.services.map(sv=>{const k=sv.product+' '+(sv.version||'');return `<tr><td style="width:96px">${sv.port}/${sv.proto||'tcp'} ${esc(sv.svc)}</td><td style="max-width:220px" title="${esc(sv.banner||'')}">${sv.product?`<b style="color:#fff">${esc(sv.product)}</b> ${esc(sv.version||'')}`:'<span class="sm">χωρίς banner</span>'}${sv.tls?` <span class="tag">${esc(sv.tls.version||'TLS ?')}</span>`:''}</td><td>${riskTag(sv.risk)}</td><td>${sv.product&&sv.version?`<button class="b" data-cve="${esc(sv.product)}" data-ver="${esc(sv.version)}">CVE</button>`:''}</td></tr>
+        ${sv.why?`<tr class="ex"><td colspan="4" class="sm">${esc(sv.why)}</td></tr>`:''}${(sv.findings||[]).map(f=>`<tr class="ex"><td colspan="4" class="sm">⚠ ${esc(f[1])}</td></tr>`).join('')}${cveCache[k]?`<tr class="ex"><td colspan="4">${cveHTML(k)}</td></tr>`:''}`}).join('')}</tbody></table>`:'<div class="sm">καμία ανοιχτή θύρα από όσες ελέγχθηκαν</div>'}
+      <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap"><button class="b" data-qt="ping" data-host="${esc(x.ip)}">📶 Ping</button><button class="b" data-qt="ports" data-host="${esc(x.ip)}">🚪 Θύρες</button>${x.services.some(s=>[80,443,8080,8443,8123,8006].includes(s.port))?`<button class="b" data-qt="http" data-host="${esc(x.services.some(s=>[443,8443,8006].includes(s.port))?'https://':'http://')}${esc(x.ip)}${(()=>{const p=x.services.find(s=>[80,443,8080,8443,8123,8006].includes(s.port)).port;return [80,443].includes(p)?'':':'+p})()}">🌐 HTTP</button>`:''}${x.mac?`<button class="b" data-qt="wol" data-host="${esc(x.mac)}">⏰ WoL</button>`:''}</div></div>`).join('')+'</div>';
+  return h+`<div class="sm">Τα αποτελέσματα μπήκαν και στην καρτέλα 🛡 Έλεγχος.</div>`}
+function ptScanBind(el){
+  $('pt-scan').onclick=()=>{const b={target:PTIN.target??ptTarget,profile:PTIN.profile||'quick',udp:!!PTIN.udp};if(b.profile==='custom')b.ports=PTIN.ports||'';ptTarget=b.target;
+    post('/api/scan',b).then(r=>{if(r.error){scanData={...scanData,status:'error',error:r.error};drawPentest()}else loadScan()})};
+  el.querySelectorAll('[data-cve]').forEach(b=>b.onclick=()=>{const p=b.dataset.cve,v=b.dataset.ver,k=p+' '+v;if(cveCache[k]&&!cveCache[k].error){delete cveCache[k];drawPentest();return}
+    cveCache[k]={loading:true};drawPentest();fetch('/api/cve?product='+encodeURIComponent(p)+'&version='+encodeURIComponent(v)).then(r=>r.json()).then(j=>{cveCache[k]=j;drawPentest()}).catch(e=>{cveCache[k]={error:String(e)};drawPentest()})});
+  el.querySelectorAll('[data-qt]').forEach(b=>b.onclick=()=>{const t=b.dataset.qt,v=b.dataset.host;
+    if(t==='http')PTIN.url=v;else if(t==='wol')PTIN.mac=v;else PTIN[t+'_host']=v;
+    if(t==='ports'&&!PTIN.ports_list)PTIN.ports_list='21,22,23,53,80,443,445,554,1883,3389,8080,8443';
+    ptSub='tools';drawPentest();nkRun(t)})}
+
+// ---------- 🧰 Εργαλεία τεχνικού ----------
+const NK={};
+const NK_TOOLS=[
+  ['ping','📶 Ping & καθυστέρηση','Απαντά; πόσα ms; χάνει πακέτα; jitter; τι λειτουργικό (από το TTL);',[['ping_host','192.168.1.1 ή google.com'],['ping_count','5','60px']]],
+  ['dns','🔤 DNS lookup','Σαν το dig: A, AAAA, MX, TXT, NS, CNAME, SOA, PTR, SRV — και σε ποιον DNS server.',[['dns_name','github.com ή 192.168.1.1'],['dns_type','A|AAAA|MX|TXT|NS|CNAME|SOA|PTR|SRV'],['dns_server','server (προαιρ.)','130px']]],
+  ['dnscmp','🧭 Σύγκριση DNS','Το ίδιο όνομα σε router, Cloudflare, Google, Quad9 — πιάνει DNS hijack, Pi-hole, γονικό έλεγχο.',[['dnscmp_name','example.com']]],
+  ['ports','🚪 Έλεγχος θυρών','Ανοιχτή / κλειστή / φιλτραρισμένη (firewall); με banner αν απαντήσει.',[['ports_host','192.168.1.17'],['ports_list','22,80,443,1883,8000-8010']]],
+  ['http','🌐 HTTP / TLS','Redirects, status, server, headers ασφαλείας, πιστοποιητικό (λήξη, SAN, εμπιστοσύνη).',[['url','https://192.168.1.16:8006']]],
+  ['wol','⏰ Wake-on-LAN','Ξύπνα έναν υπολογιστή/server που κοιμάται (magic packet στη θύρα 9).',[['mac','aa:bb:cc:dd:ee:ff'],['wol_bcast','broadcast (προαιρ.)','150px']]],
+  ['names','🏷 Ονόματα συσκευών','Ποια ονόματα δίνουν οι συσκευές για τον εαυτό τους (DNS, mDNS, NetBIOS, UPnP).',[['names_target','192.168.1.0/24']]],
+  ['subnet','🧮 Υπολογιστής subnet','IP/μάσκα → δίκτυο, broadcast, πρώτο/τελευταίο host, πλήθος, wildcard (για ACL). Τρέχει τοπικά.',[['subnet_in','192.168.1.37/26']]],
+];
+function nkBody(t){const g=k=>(PTIN[k]||'').trim();
+  return {ping:{tool:'ping',host:g('ping_host'),count:+(g('ping_count')||5)},dns:{tool:'dns',name:g('dns_name'),type:g('dns_type')||'A',server:g('dns_server')||undefined},
+    dnscmp:{tool:'dnscmp',name:g('dnscmp_name')},ports:{tool:'ports',host:g('ports_host'),ports:g('ports_list')||'22,80,443'},http:{tool:'http',url:g('url')},
+    wol:{tool:'wol',mac:g('mac'),broadcast:g('wol_bcast')||undefined},names:/\//.test(g('names_target'))?{tool:'names',target:g('names_target')}:{tool:'names',ips:g('names_target').split(/[\s,]+/).filter(Boolean)}}[t]}
+function nkRun(t){if(t==='subnet'){NK.subnet={res:subnetCalc((PTIN.subnet_in||'').trim()),at:Date.now()};drawPentest();return}
+  NK[t]={loading:true};drawPentest();
+  post('/api/netkit',nkBody(t)).then(r=>{NK[t]=r.error?{err:r.error}:{res:r,at:Date.now()};if(tab==='pentest')drawPentest()}).catch(e=>{NK[t]={err:String(e)};drawPentest()})}
+function nkIface(){NK.iface={loading:true};fetch('/api/netkit/iface').then(r=>r.json()).then(j=>{NK.iface=j.error?{err:j.error}:{res:j};if(tab==='pentest'&&ptSub==='tools')drawPentest()}).catch(e=>NK.iface={err:String(e)})}
+const ms=v=>v==null?'—':(+v).toFixed(v<10?2:1)+' ms';
+const kv=(k,v)=>v==null||v===''?'':`<div class="kv"><span>${k}</span><b>${v}</b></div>`;
+function nkResult(t){const x=NK[t];if(!x)return MODE!=='tech'?learnTxt(t):'';if(x.loading)return'<div class="sm" style="margin-top:8px">⏳ τρέχει…</div><div class="skel"></div><div class="skel" style="width:70%"></div>';if(x.err)return`<div class="sm" style="color:#ff8da0;margin-top:8px">${esc(x.err)}</div>`;const r=x.res;
+  let o=`<div class="nkres${Date.now()-(x.at||0)<400?' fresh':''}"><button class="b" data-copy title="Αντιγραφή αποτελέσματος (για ticket/σημειώσεις)" style="float:right;padding:1px 7px">📋</button>`;
+  if(t==='ping'){const ok=r.received>0;o+=`<div style="font-size:13px">${ok?'✅':'❌'} <b style="color:#fff">${esc(r.host)}</b> ${r.ip&&r.ip!==r.host?'('+esc(r.ip)+')':''} — ${r.received}/${r.sent} απαντήσεις${r.loss_pct?` · <b style="color:#ff8da0">${r.loss_pct}% απώλεια</b>`:''}</div>`;
+    if(ok)o+=`<div class="kvs">${kv('min / avg / max',`${ms(r.min)} / ${ms(r.avg)} / ${ms(r.max)}`)}${kv('jitter',ms(r.jitter))}${kv('TTL',r.ttl!=null?r.ttl+(r.hops!=null?` (${r.hops} βήματα)`:''):null)}${kv('λειτουργικό',r.os_guess&&esc(r.os_guess))}</div>${spark(r.rtts||[])}`;
+    o+=`<div class="sm">${!ok?'Δεν απαντά: είναι κλειστό, εκτός δικτύου ή μπλοκάρει το ICMP (π.χ. Windows firewall). Δοκίμασε 🚪 θύρες.':r.loss_pct>5?'Χάνει πακέτα: κακό Wi‑Fi/καλώδιο ή φορτωμένη συσκευή.':r.avg>50&&!/^(10|192\.168|172)\./.test(r.ip||'')?'Λογικό για μακρινό server.':r.avg>20&&/^(10|192\.168|172)\./.test(r.ip||'')?'Αργό για τοπικό δίκτυο — έλεγξε Wi‑Fi σήμα / κανάλι.':'Υγιής σύνδεση.'}</div>`}
+  if(t==='dns'){o+=`<div class="sm">${esc(r.name)} ${esc(r.type)} @ ${esc(r.server||'system')} · ${ms(r.ms)} · <b style="color:${r.rcode==='NOERROR'?'#3ddc97':'#ff8da0'}">${esc(r.rcode)}</b>${r.truncated?' · ✂ truncated':''}</div>`;
+    o+=r.answers?.length?`<table style="margin-top:4px"><tbody>${r.answers.map(a=>`<tr><td style="width:60px">${esc(a.type)}</td><td style="width:60px" class="sm">ttl ${a.ttl}</td><td data-noi18n style="white-space:normal;word-break:break-all">${esc(a.data)}</td></tr>`).join('')}</tbody></table>`:'<div class="sm">καμία απάντηση</div>'}
+  if(t==='dnscmp'){const col={ok:'#3ddc97',low:'#ffd23f',high:'#ff3b5c'}[r.severity]||'#6d7f99';
+    o+=`<div style="border-left:3px solid ${col};padding:4px 8px;white-space:normal"><b style="color:${col}">${r.severity==='ok'?'✅ Όλοι συμφωνούν':r.severity==='low'?'🟡 Διαφορετικές απαντήσεις':'🔴 Ύποπτη διαφορά'}</b> <span class="sm">${esc(r.explanation||'')}</span></div>
+      <table style="margin-top:4px"><tbody>${r.results.map(x=>`<tr><td style="width:120px">${esc(x.label)}</td><td class="sm" style="width:70px">${ms(x.ms)}</td><td data-noi18n style="white-space:normal">${x.error?`<span style="color:#ff8da0">${esc(x.error)}</span>`:x.rcode!=='NOERROR'?esc(x.rcode):x.answers.map(esc).join(', ')}</td></tr>`).join('')}</tbody></table>`}
+  if(t==='ports'){o+=`<div class="sm">${esc(r.host)}${r.ip&&r.ip!==r.host?' ('+esc(r.ip)+')':''} · ${r.open} ανοιχτές από ${r.ports.length}</div><div class="pgrid">${r.ports.map(p=>`<div class="pp ${p.state}" title="${esc(p.banner||'')}"><b>${p.port}</b> ${esc((portInfo(p.port)||[''])[0])}<span>${{open:'ανοιχτή',closed:'κλειστή',filtered:'φιλτραρισμένη'}[p.state]||p.state}${p.product?' · '+esc(p.product+' '+(p.version||'')):''}</span></div>`).join('')}</div>
+      <div class="sm" style="margin-top:4px">ανοιχτή = κάτι ακούει · κλειστή = η συσκευή απάντησε «όχι» · φιλτραρισμένη = καμία απάντηση (firewall)</div>`}
+  if(t==='http'){const c=r.status>=500?'#ff3b5c':r.status>=400?'#ffd23f':'#3ddc97';
+    o+=`<div style="font-size:13px"><b style="color:${c}">${r.status}</b> <span data-noi18n>${esc(r.final_url||r.url)}</span> · ${ms(r.ms)}${r.title?` · «${esc(r.title)}»`:''}</div>`;
+    if((r.chain||[]).length>1)o+=`<div class="sm" style="white-space:normal">↪ ${r.chain.map(c=>`${c.status} <span data-noi18n>${esc(c.url)}</span>`).join(' → ')}</div>`;
+    o+=`<div class="kvs">${kv('server',r.server&&esc(r.server))}${kv('x-powered-by',r.headers?.['x-powered-by']&&esc(r.headers['x-powered-by']))}${kv('cookies',r.cookies)}${kv('HTTP→HTTPS',r.https_redirect==null?null:r.https_redirect?'✅ ναι':'❌ όχι')}</div>`;
+    o+=`<div style="margin-top:4px"><b class="sm">Headers ασφαλείας ${esc(r.security_score||'')}</b>${(r.security||[]).map(s=>`<div class="sm" style="white-space:normal">${s.ok?'✅':'⚠'} <b>${esc(s.header)}</b> — ${esc(s.note||'')}</div>`).join('')}</div>`;
+    if(r.tls){const T=r.tls;o+=`<div style="margin-top:6px"><b class="sm">🔒 TLS</b><div class="kvs">${kv('έκδοση',esc(T.version||''))}${kv('για',esc(T.subject||''))}${kv('από',esc(T.issuer||''))}${kv('λήγει',T.days_left!=null?`${esc(T.not_after||'')} (${T.days_left} μέρες)`:null)}${kv('εμπιστοσύνη',T.trusted?'✅ έγκυρο':'⚠ '+esc(T.trust_error||'όχι (self-signed;)'))}</div>${(T.sans||[]).length?`<div class="sm" data-noi18n>SAN: ${T.sans.slice(0,8).map(esc).join(', ')}</div>`:''}${(T.findings||[]).map(f=>`<div class="sm">⚠ ${esc(f[1])}</div>`).join('')}</div>`}}
+  if(t==='wol')o+=r.ok?`✅ Στάλθηκε magic packet στο <b>${esc(r.mac)}</b> μέσω ${esc(r.broadcast)}:${r.port} (${r.bytes} bytes)${r.sim?' <span class="tag y">demo</span>':''}<div class="sm">Αν δεν ξυπνήσει: ενεργοποίησε το Wake-on-LAN στο BIOS και στην κάρτα δικτύου, και να είναι στο ίδιο LAN.</div>`:`❌ ${esc(r.error||'απέτυχε')}`;
+  if(t==='names'){const e=Object.entries(r.hosts||{});o+=e.length?`<table><tbody>${e.map(([ip,v])=>`<tr><td style="width:120px">${esc(ip)}</td><td data-noi18n style="white-space:normal"><b style="color:#fff">${(v.names||[]).map(esc).join(', ')||'—'}</b>${v.model?' · 📦 '+esc(v.model):''}</td><td class="sm">${Object.keys(v.sources||{}).join(', ')}</td></tr>`).join('')}</tbody></table><div class="sm">Μπήκαν και στον χάρτη / στις 📟 Συσκευές.</div>`:'<div class="sm">Καμία συσκευή δεν είπε όνομα.</div>'}
+  if(t==='subnet')o+=r.error?`<span style="color:#ff8da0">${esc(r.error)}</span>`:`<div class="kvs">${kv('δίκτυο',r.net+'/'+r.prefix)}${kv('μάσκα',r.mask)}${kv('wildcard',r.wild)}${kv('broadcast',r.bc)}${kv('hosts',r.first+' – '+r.last)}${kv('πλήθος hosts',r.n.toLocaleString())}${kv('είδος',r.kind)}</div><div class="sm" data-noi18n style="margin-top:4px">${r.bits}</div>`;
+  return o+'</div>'+(MODE!=='tech'?learnTxt(t):'')}
+const LEARN_NK={
+  ping:['Το ping στέλνει ICMP echo request και μετρά πόσο αργεί η απάντηση (RTT). <b>Jitter</b> = πόσο «τρεμοπαίζει» η καθυστέρηση (κακό για βιντεοκλήσεις). Το <b>TTL</b> ξεκινά 64 (Linux/Mac), 128 (Windows) ή 255 (router) και μειώνεται κατά 1 σε κάθε router — έτσι μαντεύουμε λειτουργικό και βήματα.','Ping sends an ICMP echo request and measures how long the reply takes (RTT). <b>Jitter</b> = how much the delay “wobbles” (bad for video calls). <b>TTL</b> starts at 64 (Linux/Mac), 128 (Windows) or 255 (routers) and drops by 1 at every router — that is how we guess the OS and the number of hops.'],
+  dns:['Το DNS μεταφράζει ονόματα σε IP. <b>A</b> = IPv4, <b>AAAA</b> = IPv6, <b>MX</b> = mail server, <b>CNAME</b> = ψευδώνυμο, <b>TXT</b> = κείμενο (SPF, επαληθεύσεις), <b>PTR</b> = αντίστροφα (IP → όνομα). <b>NXDOMAIN</b> = δεν υπάρχει.','DNS turns names into IPs. <b>A</b> = IPv4, <b>AAAA</b> = IPv6, <b>MX</b> = mail server, <b>CNAME</b> = alias, <b>TXT</b> = text (SPF, verifications), <b>PTR</b> = reverse (IP → name). <b>NXDOMAIN</b> = does not exist.'],
+  dnscmp:['Ρωτάμε το ίδιο όνομα σε πολλούς DNS. Αν ο router σου δίνει άλλη IP από Cloudflare/Google, ή κάτι τοπικό (192.168…), ίσως κάποιος σε «στέλνει» αλλού (DNS hijack) — ή απλώς έχεις Pi-hole/γονικό έλεγχο. Μικρές διαφορές σε μεγάλα sites είναι φυσιολογικές (CDN).','We ask several DNS servers for the same name. If your router returns a different IP than Cloudflare/Google, or something local (192.168…), someone may be redirecting you (DNS hijack) — or you just have Pi-hole/parental controls. Small differences on big sites are normal (CDN).'],
+  ports:['Κάθε υπηρεσία «ακούει» σε μια θύρα (22 SSH, 80 HTTP, 443 HTTPS, 1883 MQTT). <b>Ανοιχτή</b> = απάντησε με SYN-ACK. <b>Κλειστή</b> = απάντησε RST. <b>Φιλτραρισμένη</b> = σιωπή, ένα firewall «πετάει» τα πακέτα. Λιγότερες ανοιχτές = μικρότερη επιφάνεια επίθεσης.','Every service “listens” on a port (22 SSH, 80 HTTP, 443 HTTPS, 1883 MQTT). <b>Open</b> = replied with SYN-ACK. <b>Closed</b> = replied with RST. <b>Filtered</b> = silence, a firewall drops the packets. Fewer open ports = smaller attack surface.'],
+  http:['Τα <b>headers ασφαλείας</b> λένε στον browser πώς να προστατευτεί (HSTS = πάντα HTTPS, CSP = μόνο έμπιστα scripts). Το <b>πιστοποιητικό</b> αποδεικνύει ποιος είναι ο server· self-signed = κανείς τρίτος δεν το εγγυάται (συνηθισμένο σε Proxmox/router).','<b>Security headers</b> tell the browser how to protect itself (HSTS = always HTTPS, CSP = only trusted scripts). The <b>certificate</b> proves who the server is; self-signed = no third party vouches for it (common on Proxmox/routers).'],
+  wol:['Το <b>magic packet</b> είναι 6 × FF και μετά 16 φορές η MAC, σε broadcast UDP. Η κάρτα δικτύου μένει «ξύπνια» και ξυπνά τον υπολογιστή όταν το δει.','The <b>magic packet</b> is 6 × FF followed by the MAC 16 times, sent as broadcast UDP. The network card stays “awake” and wakes the computer when it sees it.'],
+  names:['Οι συσκευές λένε το όνομά τους με διάφορους τρόπους: <b>mDNS</b> (Apple, εκτυπωτές — .local), <b>NetBIOS</b> (Windows), <b>UPnP/SSDP</b> (TV, router — μοντέλο), και το <b>DNS</b> του router (από το DHCP).','Devices announce their name in several ways: <b>mDNS</b> (Apple, printers — .local), <b>NetBIOS</b> (Windows), <b>UPnP/SSDP</b> (TVs, routers — model), and the router’s <b>DNS</b> (from DHCP).'],
+  subnet:['Η <b>μάσκα</b> χωρίζει τη διεύθυνση σε δίκτυο | host (τα bits με |). /24 = 256 διευθύνσεις, 254 hosts (η πρώτη είναι το δίκτυο, η τελευταία broadcast). Το <b>wildcard</b> είναι η «ανάποδη» μάσκα που θέλουν τα Cisco ACL και το OSPF.','The <b>mask</b> splits the address into network | host (the bits with |). /24 = 256 addresses, 254 hosts (the first is the network, the last is broadcast). The <b>wildcard</b> is the “inverted” mask that Cisco ACLs and OSPF want.']};
+const learnTxt=k=>{const x=LEARN_NK[k];return x?`<div class="learn" data-noi18n>💡 ${window.I18N&&I18N.lang==='en'?x[1]:x[0]}</div>`:''};
+function spark(a){a=a.filter(x=>x!=null);if(a.length<2)return'';const w=220,h=28,mx=Math.max(...a)*1.1||1;
+  return `<svg width="${w}" height="${h}" style="margin:4px 0"><polyline fill="none" stroke="#3ec5ff" stroke-width="1.5" points="${a.map((v,i)=>`${i/(a.length-1)*w},${h-v/mx*h}`).join(' ')}"/></svg>`}
+function subnetCalc(s){const m=s.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)\s*(?:\/\s*(\d+)|\s+(\d+\.\d+\.\d+\.\d+))?$/);if(!m)return{error:'Γράψε π.χ. 192.168.1.37/26 ή 10.0.0.5 255.255.255.0'};
+  const o=m.slice(1,5).map(Number);if(o.some(x=>x>255))return{error:'Κάθε αριθμός είναι 0-255'};
+  let p=m[5]!=null?+m[5]:null;if(m[6]){const mm=m[6].split('.').map(Number),v=((mm[0]<<24)|(mm[1]<<16)|(mm[2]<<8)|mm[3])>>>0,bits=v.toString(2).padStart(32,'0');if(!/^1*0*$/.test(bits))return{error:'Μη έγκυρη μάσκα (τα 1 πρέπει να είναι συνεχόμενα)'};p=bits.indexOf('0')<0?32:bits.indexOf('0')}
+  if(p==null)p=o[0]<128?8:o[0]<192?16:24;if(p>32)return{error:'Το prefix είναι 0-32'};
+  const ip=((o[0]<<24)|(o[1]<<16)|(o[2]<<8)|o[3])>>>0,mask=p?(0xffffffff<<(32-p))>>>0:0,net=(ip&mask)>>>0,bc=(net|(~mask>>>0))>>>0;
+  const q=v=>[v>>>24,(v>>>16)&255,(v>>>8)&255,v&255].join('.'),n=p>=31?(p===32?1:2):2**(32-p)-2;
+  const first=p>=31?net:net+1,last=p>=31?bc:bc-1;
+  const kind=o[0]===10||(o[0]===172&&o[1]>=16&&o[1]<=31)||(o[0]===192&&o[1]===168)?'ιδιωτικό (RFC 1918)':o[0]===127?'loopback':o[0]===169&&o[1]===254?'link-local (APIPA — δεν πήρε IP από DHCP)':o[0]>=224&&o[0]<240?'multicast':'δημόσιο';
+  const b=ip.toString(2).padStart(32,'0');
+  return{net:q(net),prefix:p,mask:q(mask),wild:q(~mask>>>0),bc:q(bc),first:q(first),last:q(last),n,kind,bits:(b.slice(0,p)+'|'+b.slice(p)).replace(/(.{8})(?!$)/g,'$1.').replace('.|','|.')}}
+function ptToolsHTML(){
+  let h=`<div class="hgrid">`+NK_TOOLS.map(([t,n,d,ins])=>`<div class="card" data-tool="${t}"><b style="color:#fff">${n}</b><div class="sm" style="margin:2px 0 6px;white-space:normal">${d}</div>
+    <div class="frow">${ins.map(([k,ph,w])=>ph.includes('|')?`<select class="f" data-in="${k}" style="max-width:90px">${ph.split('|').map(o=>`<option${(PTIN[k]||'A')===o?' selected':''}>${o}</option>`).join('')}</select>`:`<input class="f" data-in="${k}" value="${esc(PTIN[k]||'')}" placeholder="${esc(ph)}"${w?` style="max-width:${w}"`:''}>`).join('')}
+    <button class="b" data-run="${t}" ${NK[t]?.loading?'disabled':''}>▶</button></div>${nkResult(t)}</div>`).join('')+'</div>';
+  const I=NK.iface;
+  h+=`<div class="card"><div class="brow"><b style="color:#fff">🖧 Οι κάρτες δικτύου μου</b><button class="b" id="nk-if">↻</button></div>`;
+  if(!I||I.loading)h+='<div class="sm">⏳</div>';else if(I.err)h+=`<div class="sm" style="color:#ff8da0">${esc(I.err)}</div>`;
+  else{const r=I.res;h+=`<div class="kvs">${kv('gateway',r.gateway&&esc(r.gateway+(r.gateway_iface?' ('+r.gateway_iface+')':'')))}${kv('DNS',(r.dns||[]).map(esc).join(', '))}${kv('search',(r.search||[]).map(esc).join(', '))}</div>
+    <div style="overflow-x:auto"><table style="margin-top:4px"><tbody>${r.interfaces.filter(i=>i.ipv4.length||i.ipv6.length).map(i=>`<tr><td style="width:80px">${i.up?'🟢':'⚪'} <b>${esc(i.name)}</b></td><td data-noi18n style="white-space:normal;word-break:break-all">${i.ipv4.map(a=>`<b style="color:#fff">${esc(a.addr)}/${a.prefix}</b>`).join(' ')} ${i.ipv6.slice(0,2).map(a=>`<span class="sm">${esc(a.addr)}/${a.prefix}</span>`).join(' ')}</td><td class="sm">${esc(i.mac||'')}${i.mtu?' · MTU '+i.mtu:''}</td></tr>`).join('')}</tbody></table></div>`}
+  return h+'</div>'}
+function ptToolsBind(el){el.querySelectorAll('[data-run]').forEach(b=>b.onclick=()=>nkRun(b.dataset.run));
+  el.querySelectorAll('[data-copy]').forEach(b=>b.onclick=()=>{const box=b.closest('.nkres'),card=b.closest('[data-tool]');copyText((card?card.querySelector('b').innerText+'\n':'')+box.innerText.replace(/^📋\s*/,''))});const r=$('nk-if');if(r)r.onclick=()=>{nkIface();drawPentest()}}
+
+// ---------- 🌐 Τι βλέπει το Internet ----------
+function ptExpoHTML(){let h=`<div class="card" style="white-space:normal"><b style="color:#fff">🌐 Τι βλέπει το Internet για σένα</b><div class="sm" style="margin:3px 0 6px">Το Shodan σαρώνει συνεχώς όλο το Internet. Δες τι έχει καταγράψει για τη δημόσια IP σου${S.home?.query?' ('+esc(S.home.query)+')':''} — αυτό βλέπει πρώτα ένας επιτιθέμενος. <i>Το κουμπί στέλνει τη δημόσια IP σου στο internetdb.shodan.io.</i></div>
+  <button class="b" id="pt-expo">${expo&&expo.loading?'ρωτάω το Shodan…':'🌐 Έλεγχος έκθεσης'}</button></div>`;
   if(expo&&!expo.loading){if(expo.error)h+=`<div class="sm" style="color:#ff8da0;margin-top:6px">${esc(expo.error)}</div>`;
-    else{h+=`<div class="card" style="margin-top:8px">${expo.demo?'<span class="tag y">demo</span> ':''}<b style="color:#fff">${esc(expo.ip)}</b>
+    else{h+=`<div class="card">${expo.demo?'<span class="tag y">demo</span> ':''}<b style="color:#fff">${esc(expo.ip)}</b>
       <div style="margin-top:4px">${expo.ports.length?`❗ Ανοιχτές θύρες προς το Internet: ${expo.ports.map(p=>`<span class="tag r">${p} ${esc((portInfo(p)||[''])[0])}</span>`).join('')}`:'✅ Το Shodan δεν βλέπει καμία ανοιχτή θύρα — ο router σου δεν εκθέτει τίποτα.'}</div>
       ${expo.vulns?.length?`<div style="margin-top:4px">⚠ Πιθανές ευπάθειες: ${expo.vulns.map(v=>`<a class="mitre" target="_blank" href="https://nvd.nist.gov/vuln/detail/${esc(v)}">${esc(v)}</a>`).join(' ')}</div>`:''}
       ${expo.tags?.length?`<div class="sm" style="margin-top:4px">tags: ${expo.tags.map(esc).join(', ')}</div>`:''}${expo.hostnames?.length?`<div class="sm">hostnames: ${expo.hostnames.map(esc).join(', ')}</div>`:''}${expo.cpes?.length?`<div class="sm">λογισμικό: ${expo.cpes.map(esc).join(', ')}</div>`:''}
       ${expo.ports.length?`<div class="sm" style="margin-top:6px">👉 Κλείσε στο router το port forwarding / UPnP / απομακρυσμένη διαχείριση που δεν χρειάζεσαι και κάνε ενημέρωση firmware.</div>`:''}</div>`}}
-  // --- lab
-  const L=labData,sc=L.scenarios||{},lr=L.status!=='idle'?L:null;
-  h+=`<h3>3 · Purple-team lab</h3><div class="sm" style="margin-bottom:6px">Κάνε μια επίθεση (🔴 red team) και δες αν την πιάνει η άμυνα (🔵 blue team). Τα πακέτα είναι <b>προσομοίωση</b>: περνούν από την ίδια μηχανή ανίχνευσης αλλά δεν στέλνεται τίποτα στο δίκτυο. Δοκίμασε και την αθόρυβη εκδοχή — έτσι μαθαίνεις πώς ξεφεύγουν οι επιτιθέμενοι.</div>`;
+  return h}
+function ptExpoBind(){$('pt-expo').onclick=()=>{expo={loading:true};drawPentest();post('/api/exposure').then(r=>{expo=r;drawPentest()}).catch(e=>{expo={error:String(e)};drawPentest()})}}
+
+// ---------- 🧪 Purple-team lab ----------
+function ptLabHTML(){const L=labData,sc=L.scenarios||{},lr=L.status!=='idle'?L:null;
+  let h=`<div class="card" style="white-space:normal"><b style="color:#fff">🧪 Purple-team lab</b><div class="sm" style="margin-top:3px">Κάνε μια επίθεση (🔴 red team) και δες αν την πιάνει η άμυνα (🔵 blue team). Τα πακέτα είναι <b>προσομοίωση</b>: περνούν από την ίδια μηχανή ανίχνευσης αλλά δεν στέλνεται τίποτα στο δίκτυο. Δοκίμασε και την αθόρυβη εκδοχή — έτσι μαθαίνεις πώς ξεφεύγουν οι επιτιθέμενοι.</div></div>`;
   if(lr){const s=sc[lr.kind]||{},running=lr.status==='running';
     h+=`<div class="card" style="border-color:${running?'#2d3b55':lr.detected?'#3ddc97':'#ff3b5c'}"><div class="brow"><b style="color:#fff">${esc(s.title)} · ${lr.variant==='loud'?'📢 θορυβώδες':'🤫 αθόρυβο'}</b><span class="sm">${lr.pkts} πακέτα</span></div>
       <div class="sm">Εργαλείο επιτιθέμενου: <code>${esc(s.tool)}</code> — ${esc(s[lr.variant])}</div>
@@ -891,17 +1263,32 @@ function drawPentest(){const el=$('t-pentest'),sd=scanData,run=sd.status==='runn
       <div class="sm" style="margin-top:4px">📏 Κανόνας ανίχνευσης: ${esc(lr.rule)}</div>
       ${(lr.alerts||[]).map(a=>`<div class="sm" style="margin-top:3px">⚠ <b style="color:#fff">${esc(a.type)}</b> ${a.mitre?esc(a.mitre.id):''} — ${esc(a.detail)}</div>`).join('')}
       ${running?'':`<div class="edu" style="margin-top:6px"><b>Μάθημα:</b> ${esc(s.lesson)}</div>`}</div>`}
-  h+=Object.entries(sc).map(([k,s])=>`<div class="card"><div class="brow"><b style="color:#fff">${esc(s.title)}</b><code class="sm">${esc(s.tool)}</code></div>
+  h+='<div class="hgrid">'+Object.entries(sc).map(([k,s])=>`<div class="card"><div class="brow"><b style="color:#fff">${esc(s.title)}</b><code class="sm">${esc(s.tool)}</code></div>
     <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><button class="b" data-lab="${k}" data-v="loud" title="${esc(s.loud)}" ${lr&&lr.status==='running'?'disabled':''}>📢 Θορυβώδες</button>${s.quiet?`<button class="b" data-lab="${k}" data-v="quiet" title="${esc(s.quiet)}" ${lr&&lr.status==='running'?'disabled':''}>🤫 Αθόρυβο</button>`:''}</div>
-    <div class="sm" style="margin-top:4px">📢 ${esc(s.loud)}${s.quiet?'<br>🤫 '+esc(s.quiet):''}</div></div>`).join('');
-  el.innerHTML=h;
-  $('pt-target').oninput=e=>ptTarget=e.target.value;
-  $('pt-scan').onclick=()=>post('/api/scan',{target:ptTarget}).then(r=>{if(r.error){scanData={...scanData,status:'error',error:r.error};drawPentest()}else loadScan()});
-  $('pt-expo').onclick=()=>{expo={loading:true};drawPentest();post('/api/exposure').then(r=>{expo=r;drawPentest()}).catch(e=>{expo={error:String(e)};drawPentest()})};
-  el.querySelectorAll('[data-cve]').forEach(b=>b.onclick=()=>{const p=b.dataset.cve,v=b.dataset.ver,k=p+' '+v;if(cveCache[k]&&!cveCache[k].error){delete cveCache[k];drawPentest();return}
-    cveCache[k]={loading:true};drawPentest();fetch('/api/cve?product='+encodeURIComponent(p)+'&version='+encodeURIComponent(v)).then(r=>r.json()).then(j=>{cveCache[k]=j;drawPentest()}).catch(e=>{cveCache[k]={error:String(e)};drawPentest()})});
-  el.querySelectorAll('[data-lab]').forEach(b=>b.onclick=()=>post('/api/lab',{kind:b.dataset.lab,variant:b.dataset.v}).then(r=>{if(r.error)alert(r.error);loadLab()}))}
-setInterval(()=>{if(tab!=='pentest')return;if(scanData?.status==='running')loadScan();if(labData?.status==='running')loadLab()},1000);
+    <div class="sm" style="margin-top:4px;white-space:normal">📢 ${esc(s.loud)}${s.quiet?'<br>🤫 '+esc(s.quiet):''}</div></div>`).join('')+'</div>';
+  return h}
+function ptLabBind(el){el.querySelectorAll('[data-lab]').forEach(b=>b.onclick=()=>post('/api/lab',{kind:b.dataset.lab,variant:b.dataset.v}).then(r=>{if(r.error)alert(r.error);loadLab()}))}
+
+// ---------- 🙋 «Κάνω δοκιμή από άλλη συσκευή» ----------
+let selftest=null;
+function loadSelftest(){return fetch('/api/selftest').then(r=>r.json()).then(j=>{selftest=j;if(tab==='pentest'&&ptSub==='mine'&&!ptBusy())drawPentest()}).catch(()=>{})}
+function ptMineHTML(){const st=selftest||{test_ips:[]},now=Date.now()/1000;
+  let h=`<div class="card" style="white-space:normal"><b style="color:#fff">🙋 Κάνω δοκιμή — μην το μπερδέψεις με επίθεση</b><div class="sm" style="margin-top:3px">Όταν σαρώνεις ή «επιτίθεσαι» από άλλη δική σου συσκευή (π.χ. <code>nmap</code> από το Kali VM, <code>hydra</code> στον broker), δήλωσέ την εδώ. Για όσο διαρκεί, οι ειδοποιήσεις από αυτή τη συσκευή γράφουν <span class="tag" style="background:#10243a;border-color:#4ea8ff;color:#8cc8ff">🧪 Δοκιμή σου</span>: φαίνονται, αλλά δεν στέλνουν ειδοποίηση στο κινητό, δεν τρέχουν playbooks και δεν μετράνε στην κατάσταση. Ό,τι έρχεται από άλλη συσκευή γράφει <span class="tag r">👤 Άλλη συσκευή</span>.</div>
+    <div class="frow" style="margin-top:8px"><input class="f" data-in="st_ip" value="${esc(PTIN.st_ip||'')}" placeholder="IP της συσκευής, π.χ. 192.168.1.19" style="max-width:240px">
+    <select class="f" data-in="st_min" style="max-width:110px">${[15,30,60,120,240].map(m=>`<option value="${m}"${(+PTIN.st_min||30)===m?' selected':''}>${m}′</option>`).join('')}</select>
+    <input class="f" data-in="st_why" value="${esc(PTIN.st_why||'')}" placeholder="τι κάνω (π.χ. nmap από Kali)">
+    <button class="b" id="st-go">🧪 Ξεκίνα</button></div>
+    <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap">${[...S.hosts.values()].filter(x=>x.kind==='local'&&!x.me&&!x.gw&&!isV6(x.ip)&&/vm|pi|computer/.test(x.dtype||'')).slice(0,8).map(x=>`<button class="b" data-stip="${esc(x.ip)}">${esc(x.dicon||'')} ${esc(aliasOf(x)||x.ip)}</button>`).join('')}</div></div>`;
+  if(st.own_tool)h+=`<div class="card" style="border-color:#4ea8ff66">🧪 Τώρα: <b>${esc(st.own_tool.why)}</b> από αυτόν τον υπολογιστή <span class="sm">(ακόμα ${Math.max(0,Math.round(st.own_tool.until-now))}″)</span></div>`;
+  h+=st.test_ips.length?st.test_ips.map(x=>`<div class="card" style="border-color:#4ea8ff66"><div class="brow"><span>🧪 <b style="color:#fff">${esc(x.ip)}</b> ${esc(aliasOf(S.hosts.get(x.ip))||'')} — ${esc(x.why)}</span><span><span class="sm">ακόμα ${Math.max(0,Math.round((x.until-now)/60))}′</span> <button class="b" data-ststop="${esc(x.ip)}">■ Τέλος</button></span></div></div>`).join('')
+    :'<div class="sm">Καμία ενεργή δοκιμή από άλλη συσκευή.</div>';
+  return h}
+function ptMineBind(el){
+  const go=(ip,min,why)=>post('/api/selftest',{ip,minutes:min,why}).then(r=>{if(r.error)return alert(r.error);selftest=r;drawPentest()});
+  $('st-go').onclick=()=>go((PTIN.st_ip||'').trim(),+(PTIN.st_min||30),(PTIN.st_why||'').trim()||undefined);
+  el.querySelectorAll('[data-stip]').forEach(b=>b.onclick=()=>{PTIN.st_ip=b.dataset.stip;drawPentest()});
+  el.querySelectorAll('[data-ststop]').forEach(b=>b.onclick=()=>go(b.dataset.ststop,0))}
+setInterval(()=>{if(tab!=='pentest')return;if(scanData?.status==='running')loadScan();if(labData?.status==='running')loadLab();if(ptSub==='mine')loadSelftest()},1000);
 
 // ================= 🧩 ΚΑΝΟΝΕΣ =================
 let rulesData=null,ruleEd=null,ruleRes=null;const ruleView={};
@@ -1111,6 +1498,46 @@ function drawSensor(){const d=sensData,el=$('t-sensor');if(d.error&&!d.sensors){
   h+=`<h3>Τελευταία γεγονότα</h3>`+(d.events.length?d.events.map(e=>`<div class="card" style="white-space:normal"><b style="color:#ff8da0">${esc(e.title)}</b> <span class="sm">${new Date(e.t*1000).toLocaleTimeString('el-GR')} · ${esc(e.sensor)}</span><div style="color:#9fb4d0;margin-top:3px">${esc(e.detail)}</div></div>`).join(''):'<div class="empty">Ησυχία στον αέρα. 👌</div>');
   h+=`<div class="card sm" style="white-space:normal">📖 Θες να καταλάβεις πώς δουλεύει; <a href="#" data-lesson="iot-9-1">Τελικό project της Ακαδημίας: αισθητήρας → MQTT/TLS → Pi</a> · <a href="#" data-lesson="iot-3-2">Evil twin & deauth</a></div>`;
   el.innerHTML=h;el.querySelectorAll('[data-lesson]').forEach(a=>a.onclick=e=>{e.preventDefault();ACADEMY.openLesson('iot',a.dataset.lesson)})}
+// ---- 🩺 Υγεία homelab ----
+let hlData=null,hlT=0;
+function renderHealth(){if(Date.now()-hlT>5000){hlT=Date.now();fetch('/api/health').then(r=>r.json()).then(j=>{hlData=j;if(tab==='health'&&!tabHover())drawHealth()})}
+  if(!hlData)$('t-health').innerHTML='<div class="empty">φόρτωση…</div>'}
+function spark(h){const v=h.filter(x=>x!=null),mx=Math.max(1,...v),w=120,n=Math.max(1,h.length-1);
+  return `<svg width="${w}" height="22" style="vertical-align:middle">${h.map((x,i)=>x==null?`<rect x="${i/n*w-1}" y="0" width="2" height="22" fill="#ff3b5c"/>`:'').join('')}<polyline fill="none" stroke="#7fd1ff" stroke-width="1.3" points="${h.map((x,i)=>x==null?'':`${(i/n*w).toFixed(1)},${(21-x/mx*19).toFixed(1)}`).filter(Boolean).join(' ')}"/></svg>`}
+function drawHealth(){const d=hlData,el=$('t-health'),ago=s=>s<90?Math.round(s)+'″':s<5400?Math.round(s/60)+'′':Math.round(s/3600)+'ω';
+  let h=`<div class="card" style="white-space:normal"><b style="color:#fff">🩺 Υγεία του homelab</b>${d.demo?' <span class="tag">προσομοίωση</span>':''}
+    <div class="sm" style="margin-top:3px">Κάθε λεπτό ελέγχω αν απαντούν ο router, ο broker και ό,τι άλλο βάλεις στο <code>config.yaml</code> (Proxmox, Home Assistant, ESP32…), πόσο αργούν, και πότε λήγουν τα πιστοποιητικά TLS. Ειδοποίηση όταν κάτι πέσει ή επανέλθει.</div></div>`;
+  h+=d.targets.length?d.targets.map(t=>{const col=t.up===false?'#ff3b5c':t.up?'#3ddc97':'#8ea3bd';
+    return `<div class="card" style="white-space:normal;border-left:3px solid ${col}"><div class="brow"><b style="color:#fff">${t.up===false?'🔴':t.up?'🟢':'⚪'} ${esc(t.name)}</b><span>${t.ms!=null?`<b>${t.ms}</b> ms`:'<span style="color:#ff8da0">—</span>'}</span></div>
+     <div class="sm">${esc(t.url||t.host+(t.port?':'+t.port:''))} · ${t.kind==='ping'?'ping':t.kind==='http'?'HTTP':'TCP'}${t.since?` · ${t.up?'πάνω':'κάτω'} εδώ και ${ago(Date.now()/1000-t.since)}`:''}${t.cert_days!=null?` · πιστοποιητικό: <b style="color:${t.cert_days<14?'#ff3b5c':'#3ddc97'}">${t.cert_days<0?'έληξε':t.cert_days+' μέρες'}</b>`:''}</div>
+     ${t.err&&t.up===false?`<div style="color:#ff8da0">${esc(t.err)}</div>`:''}<div style="margin-top:3px">${spark(t.hist||[])}</div></div>`}).join(''):
+    `<div class="card" style="white-space:normal">Πρόσθεσε στο <code>config.yaml</code>:<pre style="font-size:11.5px;background:#060a12;padding:6px;border-radius:4px;margin:4px 0">health:
+  - {name: Proxmox, host: 192.168.1.16, port: 8006, tls: true}
+  - {name: MQTT broker, host: 192.168.1.17, port: 1883}
+  - {name: Home Assistant, url: "http://192.168.1.30:8123/"}
+  - {name: ESP32 κήπου, host: 192.168.1.20, ping: true}</pre></div>`;
+  el.innerHTML=h}
+// ---- ⚡ Αυτόματες αντιδράσεις (playbooks) ----
+let pbData=null,pbT=0;
+function renderPb(){if(Date.now()-pbT>3000){pbT=Date.now();fetch('/api/playbooks').then(r=>r.json()).then(j=>{pbData=j;if(tab==='pb'&&!tabHover())drawPb()})}
+  if(!pbData)$('t-pb').innerHTML='<div class="empty">φόρτωση…</div>'}
+function drawPb(){const d=pbData,el=$('t-pb');const DO={block:'🚫 μπλόκαρε',notify:'📱 ειδοποίηση',mqtt:'🏠 MQTT/HA'};
+  let h=`<div class="card" style="white-space:normal"><b style="color:#fff">⚡ Αυτόματες αντιδράσεις</b>
+    <div class="sm" style="margin-top:3px">«Όταν συμβεί <b>Χ</b> → κάνε <b>Υ</b>»: π.χ. όποιος αγγίξει το καναρίνι μπλοκάρεται για 1 ώρα. Γράφονται στο <code>config.yaml</code> και είναι <b>κλειστές</b> αν δεν τις γράψεις. Ποτέ δεν μπλοκάρουν εσένα, τον router ή το allowlist, έχουν όριο ενεργειών ανά ώρα, και κάθε ενέργεια αναιρείται με ένα κλικ.</div></div>`;
+  if(d.errors&&d.errors.length)h+=`<div class="card" style="white-space:normal;border-left:3px solid #ff3b5c">${d.errors.map(e=>'❌ '+esc(e)).join('<br>')}</div>`;
+  h+='<h3>Κανόνες</h3>'+(d.playbooks.length?d.playbooks.map(p=>{const w=p.when||{};const t=w.type?[].concat(w.type).join(' / '):'';
+    return `<div class="card" style="white-space:normal"><div class="brow"><b style="color:#fff">${esc(p.name)}</b>${p.dry_run?'<span class="tag y">μόνο δοκιμή</span>':'<span class="tag g">ενεργό</span>'}</div>
+     <div class="sm">όταν: ${t?'ειδοποίηση «'+esc(t)+'…»':''}${w.sev?' · σοβαρότητα ≥ '+esc(w.sev):''}${'local' in w?(w.local?' · από το LAN':' · από το Internet'):''}</div>
+     <div>→ ${p.do.map(x=>DO[x]||esc(x)).join(' + ')}${p.do.includes('block')&&p.block_minutes?` <span class="sm">για ${p.block_minutes}′</span>`:''} <span class="sm">· έως ${p.max_per_hour}/ώρα</span></div></div>`}).join(''):
+    `<div class="card" style="white-space:normal">Δεν έχεις κανόνες. Παράδειγμα για το <code>config.yaml</code>:<pre style="font-size:11.5px;background:#060a12;padding:6px;border-radius:4px;margin:4px 0">playbooks:
+  - name: Καναρίνι → μπλόκαρε
+    when: {type: "Καναρίνι ESP32"}
+    do: [block, notify]
+    block_minutes: 60</pre>Δοκίμασέ το πρώτα με <code>dry_run: true</code>: θα βλέπεις τι <i>θα</i> έκανε, χωρίς να το κάνει.</div>`);
+  h+='<h3>Τι έκαναν</h3>'+(d.runs.length?d.runs.map(r=>`<div class="card" style="white-space:normal;${r.undone?'opacity:.55':''}"><div class="brow"><span><b style="color:#fff">${DO[r.action]||esc(r.action)}</b> ${esc(r.actor)} ${r.ok?'✅':'⚠️'}</span><span class="sm">${new Date(r.t*1000).toLocaleTimeString('el-GR')}</span></div>
+    <div class="sm">${esc(r.playbook)} ← ${esc(r.alert)}</div><div style="color:#9fb4d0">${esc(r.result)}${r.undone?' · αναιρέθηκε':''}</div>
+    ${r.action==='block'&&r.ok&&!r.undone&&!r.dry?`<button class="b" data-undo="${r.id}" style="margin-top:3px">↺ αναίρεση</button>`:''}</div>`).join(''):'<div class="empty">Καμία αυτόματη ενέργεια ακόμα.</div>');
+  el.innerHTML=h;el.querySelectorAll('[data-undo]').forEach(b=>b.onclick=()=>post('/api/playbooks',{undo:+b.dataset.undo}).then(j=>{pbData=j;drawPb()}))}
 // ---- 📨 Φύλακας MQTT broker ----
 let mqData=null,mqT=0;
 function renderMqtt(){if(Date.now()-mqT>3000){mqT=Date.now();fetch('/api/mqtt').then(r=>r.json()).then(j=>{mqData=j;if(tab==='mqtt'&&!tabHover())drawMqtt()})}
@@ -1188,18 +1615,19 @@ function drawPriv(){const d=privData,r=d.result,el=$('t-priv'),icon={ok:'✅',wa
 
 // ================= 🧭 ΞΕΚΙΝΑ: οδηγός + διαδρομή κίνησης =================
 let routeIp=null;const traceCache={};
-setInterval(()=>{if(tab==='home'&&!tabHover())renderHome()},3000);
+setInterval(()=>{const ae=document.activeElement;if(tab==='home'&&!tabHover()&&!(ae&&ae.tagName==='INPUT'&&ae.closest('#t-home')))renderHome()},3000);
 function homeLoad(){if(!wifiData)loadWifi();if(!privData)loadPriv();if(!auditData)loadAudit()}
 function step(n,q,ans,col,go,label,where){return`<div class="card" style="display:flex;gap:10px;align-items:flex-start">
   <div style="flex:none;width:26px;height:26px;border-radius:50%;background:${col}22;border:2px solid ${col};color:${col};display:flex;align-items:center;justify-content:center;font-weight:700">${n}</div>
   <div style="flex:1;min-width:0;white-space:normal"><b style="color:#fff">${q}</b><div style="color:${col};margin-top:2px">${ans}</div>
   <div class="sm" style="margin-top:3px">${where}</div></div>
   <button class="b" data-go="${go}" style="flex:none">${label} →</button></div>`}
-function renderHome(){homeLoad();const el=$('t-home'),G='#3ddc97',Y='#ffd23f',R='#ff3b5c',D='#6d7f99';
-  const al=S.alerts.filter(a=>!a.lab&&!a.benign),hi=al.filter(a=>a.sev==='high').length,me=al.filter(a=>a.sev==='med').length;
+function renderHomeLearn(){homeLoad();const el=$('t-home'),G='#3ddc97',Y='#ffd23f',R='#ff3b5c',D='#6d7f99';
+  const al=S.alerts.filter(a=>!a.lab&&!a.benign&&!a.selftest),hi=al.filter(a=>a.sev==='high').length,me=al.filter(a=>a.sev==='med').length;
   const devs=[...S.hosts.values()].filter(h=>h.kind==='local'&&!h.me&&!h.gw&&!h.ip.includes(':')),newD=devs.filter(h=>h.threat===1).length;
   const w=wifiData&&wifiData.result,pr=privData&&privData.result,au=auditData;
-  let h=`<div class="card" style="white-space:normal"><b style="color:#fff">🧭 Από πού ξεκινάω;</b><div class="sm" style="margin-top:3px">Ακολούθησε τα βήματα με τη σειρά. Κάθε κουμπί σε πάει στη σωστή καρτέλα· εκεί, κάθε ειδοποίηση έχει «Πες μου περισσότερα» με εξήγηση.</div></div>`;
+  let h=(MODE?'':chooserHTML())+learnCardHTML()+`<div class="card" style="white-space:normal"><b style="color:#fff">🧭 Από πού ξεκινάω;</b><div class="sm" style="margin-top:3px">Ακολούθησε τα βήματα με τη σειρά. Κάθε κουμπί σε πάει στη σωστή καρτέλα· εκεί, κάθε ειδοποίηση έχει «Πες μου περισσότερα» με εξήγηση.</div></div>`;
+  h+='<div class="hgrid">';
   h+=step(1,'Είμαι ασφαλής σε αυτό το Wi‑Fi;',w?`${{ok:'✅',warn:'⚠️',bad:'❌'}[w.level]} ${esc(w.verdict)}${w.wifi&&w.wifi.ssid?' — «'+esc(w.wifi.ssid)+'»':''}`:'δεν έχει ελεγχθεί ακόμα',w?{ok:G,warn:Y,bad:R}[w.level]:D,'wifi','☕ Wi‑Fi','Εκεί: κρυπτογράφηση, ψεύτικα δίκτυα (evil twin), DNS/TLS παγίδες, firewall & VPN του Mac — με οδηγίες διόρθωσης.');
   h+=step(2,'Μου επιτίθεται κάποιος τώρα;',hi?`🔴 ${hi} σοβαρές ειδοποιήσεις`:me?`🟡 ${me} μέτριες ειδοποιήσεις`:al.length?`🟢 μόνο ${al.length} χαμηλές (συνήθως αθώες)`:'🟢 τίποτα ύποπτο',hi?R:me?Y:G,'alerts','⚠ Επιθέσεις','Εκεί: κάθε ειδοποίηση λέει με απλά λόγια αν είναι κακό και τι να κάνεις. «Ποιος είναι;» → όλα για την IP.');
   h+=step(3,'Ποιος είναι στο δίκτυό μου;',`${devs.length} συσκευές${newD?` · <b>${newD} νέες</b> — τις αναγνωρίζεις;`:''}`,newD?Y:G,'devs','📟 Συσκευές','Εκεί: κάθε συσκευή με MAC, κατασκευαστή, τι κάνει. Και στο κουτί «🏠 Το δίκτυό σου» κάτω αριστερά στον χάρτη.');
@@ -1207,24 +1635,32 @@ function renderHome(){homeLoad();const el=$('t-home'),G='#3ddc97',Y='#ffd23f',R=
   h+=step(5,'Φαίνομαι στο Internet;',pr?`${['❌','⚠️','🟡','✅'][pr.level]} ανωνυμία: ${esc(pr.label)}`:'πάτα «Έλεγχος διαρροών»',pr?LVL[pr.level][0]:D,'priv','🕵 Ανωνυμία','Εκεί: τι ξέρει κάθε site για σένα, Tor/VPN, διαρροές DNS / IPv6 / WebRTC.');
   h+=step(6,'Πόσο ασφαλές είναι το σπίτι μου;',au?`βαθμός <b>${au.grade}</b> (${au.score}/100)`:'υπολογίζεται…',au?(au.score>=75?G:au.score>=50?Y:R):D,'audit','🛡 Έλεγχος','Εκεί: κωδικοί χωρίς κρυπτογράφηση, επικίνδυνες υπηρεσίες στο LAN, τι να διορθώσεις.');
   h+=step(7,'Θέλω να μάθω / να εξασκηθώ','🎓 → ❓ → 🔴 → 🚩','#b388ff','academy','🎓 Ακαδημία','Σειρά: 🎓 Ακαδημία (CCNA από το μηδέν & IoT security με ESP32/Raspberry Pi, με animations και labs) → ❓ Κουίζ → 🔴 Pentest (σκάναρε το δίκτυό σου, purple-team lab) → 🧩 Κανόνες → 🚩 CTF.');
+  h+='</div>';
+  // ζωντανά, με μια ματιά: οι 4 τελευταίες ειδοποιήσεις + οι δύο χάρτες (το πλήρες σε δική του οθόνη)
+  const last=S.alerts.filter(a=>!a.benign&&!a.lab&&!a.selftest).slice(0,4);
+  h+=`<div class="hgrid" style="margin-top:6px"><div class="card"><div class="brow"><b style="color:#fff">⚠ Τελευταίες ειδοποιήσεις</b><button class="b" data-go="alerts">Όλες →</button></div>
+    ${last.length?last.map(a=>`<div class="hal ${a.sev}"><span class="sev ${a.sev}">${a.sev.toUpperCase()}</span> <b style="color:#fff">${esc(a.type)}</b>${whoTag(a)}<div class="sm">${esc(a.actor)} → ${esc(String(a.target))} · ${fmtT(a.t)}</div></div>`).join(''):'<div class="sm" style="margin-top:6px">Καμία — όλα ήσυχα. 👀</div>'}</div>
+    <div class="card"><b style="color:#fff">👁 Δες ζωντανά</b>
+      <div class="hgo" data-go="map"><span>🗺</span><div><b>Ζωντανός χάρτης</b><div class="sm">πού μιλάει κάθε συσκευή στον κόσμο, επιθέσεις σε πραγματικό χρόνο</div></div></div>
+      <div class="hgo" data-go="lan"><span>🏠</span><div><b>Δίκτυο σπιτιού</b><div class="sm">όλες οι συσκευές σε ομάδες: router, υπολογιστές, κινητά, IoT</div></div></div>
+      <div class="hgo" data-go="pentest"><span>🧰</span><div><b>Εργαλεία τεχνικού</b><div class="sm">σάρωση, ping, DNS, θύρες, HTTP/TLS, Wake-on-LAN</div></div></div></div></div>`;
   h+=`<h3 id="route-h">🛣 Πού πάει η κίνησή σου — βήμα-βήμα</h3>`+routeHTML();
-  h+=`<h3>Όλες οι ενότητες</h3>`+cardsHTML();
   el.innerHTML=h;
   el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>{const g=b.dataset.go;if(g==='route'){$('route-h').scrollIntoView({behavior:'smooth'});return}showTab(g)});
   el.querySelectorAll('.mcard[data-t]').forEach(c=>c.onclick=()=>showTab(c.dataset.t));
   el.querySelectorAll('[data-route]').forEach(b=>b.onclick=()=>{routeIp=b.dataset.route;S.sel=routeIp;renderHome()});
   const tb=$('rt-trace');if(tb)tb.onclick=()=>{const ip=tb.dataset.ip;traceCache[ip]={loading:true};renderHome();
     post('/api/trace',{ip}).then(j=>{traceCache[ip]=j;if(tab==='home')renderHome()}).catch(e=>{traceCache[ip]={error:String(e)};renderHome()})};
-  bindCommon(el)}
-function routeHTML(){
+  homeBind(el);bindCommon(el)}
+function routeHTML(fromH){
   const pub=[...S.hosts.values()].filter(h=>h.kind==='public').sort((a,b)=>(b.bytes_in+b.bytes_out)-(a.bytes_in+a.bytes_out));
   if(!pub.length)return'<div class="sm">Δεν υπάρχει ακόμα κίνηση προς το Internet.</div>';
-  if(S.sel&&S.hosts.get(S.sel)?.kind==='public')routeIp=S.sel;
+  if(!fromH&&S.sel&&S.hosts.get(S.sel)?.kind==='public')routeIp=S.sel;
   if(!routeIp||!S.hosts.has(routeIp))routeIp=pub[0].ip;
-  const d=S.hosts.get(routeIp),g=d.geo||{},nm=hname(d)||d.ip,hm=S.home||{},meH=[...S.hosts.values()].find(h=>h.me&&!h.ip.includes(':')),gw=S.hosts.get(S.gw);
+  const d=S.hosts.get(routeIp),g=d.geo||{},nm=hname(d)||d.ip,hm=S.home||{},meH=fromH||[...S.hosts.values()].find(h=>h.me&&!h.ip.includes(':')),gw=S.hosts.get(S.gw);
   const w=wifiData&&wifiData.result,wf=w&&w.wifi,pr=privData&&privData.result,vpn=pr&&pr.vpn;
   const ports=(d.ports||[]).map(p=>p[0]),https=ports.some(p=>[443,8443,853,993,995,465].includes(p))||(d.protos&&(d.protos.HTTPS||d.protos.QUIC)),http=ports.includes(80);
-  const dnsH=[...S.hosts.values()].filter(h=>!h.me&&(h.ports||[]).some(p=>p[0]===53)).sort((a,b)=>(b.pkts_in+b.pkts_out)-(a.pkts_in+a.pkts_out))[0];
+  const dnsH=[...S.hosts.values()].filter(h=>!h.me&&h!==fromH&&(h.ports||[]).some(p=>p[0]===53)).sort((a,b)=>(b.pkts_in+b.pkts_out)-(a.pkts_in+a.pkts_out))[0];
   const chips=pub.slice(0,10).map(h=>`<button class="b" data-route="${esc(h.ip)}" style="${h.ip===routeIp?'border-color:#3ec5ff;background:#3ec5ff22':''}">${flag(h.geo?.countryCode)} ${esc((hname(h)||h.ip).slice(0,26))}</button>`).join(' ');
   const sees=(t,c)=>`<span class="tag ${c}">${t}</span>`;
   const node=(ic,title,sub,who,extra)=>`<div style="display:flex;gap:10px"><div style="flex:none;width:30px;text-align:center;font-size:18px">${ic}</div>
@@ -1237,8 +1673,8 @@ function routeHTML(){
   else if(tr.error)trHTML=`<div class="sm" style="color:#ff8da0">${esc(tr.error)}</div>`;
   else trHTML=`<div style="margin:4px 0 2px;padding:6px 8px;border-left:2px dashed #3ec5ff55">${tr.hops.map(x=>{const gg=x.geo;return`<div class="sm" style="white-space:normal">${x.n}. ${x.ip?`<b style="color:#cfe0f5">${esc(x.ip)}</b>`:'<span style="color:#6d7f99">* (δεν απαντά)</span>'} ${x.ms!=null?x.ms.toFixed(0)+' ms':''} ${gg?`· ${flag(gg.countryCode)} ${esc(gg.city||'')} · ${esc(gg.isp||'')}`:x.ip&&/^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.)/.test(x.ip)?'· ιδιωτική (σπίτι ή δίκτυο παρόχου)':''}</div>`}).join('')}
     ${tr.reached?'':'<div class="sm" style="margin-top:3px">Τα τελευταία βήματα δεν απαντούν — πολλοί servers (π.χ. GitHub) μπλοκάρουν το traceroute. Συνηθισμένο.</div>'}${tr.demo?' <span class="tag">προσομοίωση</span>':''}</div>`;
-  let r=`<div class="sm" style="margin-bottom:6px">Διάλεξε προορισμό (ή κάνε κλικ σε σημείο στον χάρτη):</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${chips}</div><div class="card">`;
-  r+=node('💻','Εσύ',`${esc(meH?.ip||'')}${hm.query?' · δημόσια IP '+esc(hm.query):''}`,'','<div class="sm" style="margin-top:2px">Εδώ ξεκινά: ο browser ή μια εφαρμογή θέλει να μιλήσει με το '+esc(nm)+'.</div>');
+  let r=fromH?'<div class="card">':`<div class="sm" style="margin-bottom:6px">Διάλεξε προορισμό (ή κάνε κλικ σε σημείο στον χάρτη):</div><div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">${chips}</div><div class="card">`;
+  r+=fromH?node(fromH.dicon||'📟',esc(hname(fromH)||'Συσκευή'),esc(fromH.ip)+(fromH.mac?' · '+esc(fromH.mac):''),'','<div class="sm" style="margin-top:2px">Εδώ ξεκινά: αυτή η συσκευή του δικτύου σου θέλει να μιλήσει με το '+esc(nm)+'.</div>'):node('💻','Εσύ',`${esc(meH?.ip||'')}${hm.query?' · δημόσια IP '+esc(hm.query):''}`,'','<div class="sm" style="margin-top:2px">Εδώ ξεκινά: ο browser ή μια εφαρμογή θέλει να μιλήσει με το '+esc(nm)+'.</div>');
   r+=arrow(dnsH?`① Πρώτα ρωτάς τον DNS <b>${esc(who(dnsH.ip))}</b>: «ποια IP έχει το ${esc(nm)};» → <b>${esc(d.ip)}</b>. Αυτό το ερώτημα πάει ${S.hosts.get(dnsH.ip)?.kind==='public'?'στο Internet':'στον router'} συνήθως χωρίς κρυπτογράφηση.`:'① Πρώτα ο υπολογιστής βρίσκει την IP του site μέσω DNS.');
   r+=node('📶',wf?`Wi‑Fi «${esc(wf.ssid||'?')}»`:'Τοπικό δίκτυο (Wi‑Fi / καλώδιο)',wf?esc(SECL[wf.security]||wf.security):'',
     wf&&wf.security==='none'?sees('όλη την κίνηση που δεν είναι HTTPS — το δίκτυο είναι ανοιχτό','r'):sees('ότι υπάρχεις και πόση κίνηση στέλνεις','y')+(w&&w.public?' · σε δημόσιο Wi‑Fi όποιος ξέρει τον κωδικό μπορεί να δει ποια sites':''));
@@ -1252,6 +1688,168 @@ function routeHTML(){
     `<div class="sm" style="margin-top:2px">θύρες ${esc(ports.slice(0,5).join(', ')||'—')} · ↑ ${fmtB(d.bytes_out)} ↓ ${fmtB(d.bytes_in)}</div>`);
   r+=`<div style="margin-top:8px;padding:6px 8px;border-radius:6px;white-space:normal;${http&&!https?'background:#ff3b5c18;border-left:3px solid #ff3b5c':'background:#3ddc9714;border-left:3px solid #3ddc97'}">${http&&!https?'🔓 <b>HTTP χωρίς κρυπτογράφηση</b>: όλοι οι παραπάνω μπορούν να διαβάσουν το περιεχόμενο (σελίδες, φόρμες, κωδικούς).':https?'🔒 <b>Κρυπτογραφημένο (HTTPS/TLS)</b>: σε όλη τη διαδρομή κανείς ενδιάμεσος δεν διαβάζει το περιεχόμενο — βλέπουν μόνο ότι μιλάς με «'+esc(nm)+'» και πόσα δεδομένα.':'ℹ️ Δεν είναι σαφές αν είναι κρυπτογραφημένο — δες τις θύρες στις 🔎 Λεπτομέρειες.'}</div></div>`;
   return r}
+
+// ================= 👷 Τεχνικός / 🎓 Μαθαίνω: δύο αρχικές οθόνες =================
+let homeFirst=true;
+function renderHome(){const el=$('t-home');(MODE==='tech'?renderHomeTech:renderHomeLearn)();
+  if(homeFirst||el.classList.contains('enter')){homeFirst=false;countUp(el)}}
+function chooserHTML(){return`<div class="card" style="white-space:normal"><b style="color:#fff">👋 Πώς θα το χρησιμοποιήσεις;</b><div class="sm" style="margin-top:3px">Αλλάζει μόνο η οργάνωση της οθόνης — μπορείς να το αλλάξεις όποτε θες από το κουμπί πάνω δεξιά.</div>
+  <div class="chooser"><button data-mode="tech"><b>👷 Είμαι τεχνικός δικτύου</b>Πυκνή εικόνα: αριθμοί, κατάσταση homelab, γρήγορα εργαλεία (ping, DNS, θύρες…), ⌘K για εντολές.</button>
+  <button data-mode="learn"><b>🎓 Μαθαίνω (CCNA / IoT security)</b>Οδηγός βήμα-βήμα, εξηγήσεις σε κάθε αποτέλεσμα, Ακαδημία και ασκήσεις πρώτα.</button></div></div>`}
+function learnCardHTML(){if(MODE==='tech')return'';return`<div class="card" style="white-space:normal"><div class="brow"><b style="color:#fff">🎓 Συνέχισε να μαθαίνεις</b><button class="b" data-daily>▶ Το 10λεπτο σήμερα</button></div>
+  <div class="qrow"><button class="b" data-go="academy">📚 Μαθήματα</button><button class="b" data-go="quiz">❓ Κουίζ</button><button class="b" data-go="ws">🦈 Wireshark</button><button class="b" data-pt="tools">🧰 Δοκίμασε τα εργαλεία</button><button class="b" data-pt="lab">🧪 Lab επίθεσης</button></div>
+  <div class="sm" style="margin-top:6px">Συμβουλή: πάτα <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd> και γράψε π.χ. <code>ping 192.168.1.1</code> ή <code>dns github.com</code> — τρέχει αμέσως και σου εξηγεί τι είδες.</div></div>`}
+function homeBind(el){
+  el.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{setMode(b.dataset.mode);showTab('home')});
+  el.querySelectorAll('[data-daily]').forEach(b=>b.onclick=()=>window.ACADEMY&&ACADEMY.openDaily());
+  el.querySelectorAll('[data-pt]').forEach(b=>b.onclick=()=>{ptSub=b.dataset.pt;try{localStorage.setItem('nw-ptsub',ptSub)}catch(e){}showTab('pentest')});
+  el.querySelectorAll('[data-wsf]').forEach(b=>b.onclick=()=>setFeedFilter(b.dataset.wsf))}
+function hlLoad(){if(Date.now()-hlT>15000){hlT=Date.now();fetch('/api/health').then(r=>r.json()).then(j=>{hlData=j}).catch(()=>{})}}
+const ago=s=>s<90?Math.round(s)+'″':s<5400?Math.round(s/60)+'′':s<172800?Math.round(s/3600)+'ω':Math.round(s/86400)+'μ';
+// γρήγορο εργαλείο από οπουδήποτε: γεμίζει το πεδίο του εργαλείου και το τρέχει
+const QT_IN={ping:'ping_host',dns:'dns_name',dnscmp:'dnscmp_name',ports:'ports_host',http:'url',wol:'mac',names:'names_target',subnet:'subnet_in'};
+function qtRun(t,target,extra){if(!QT_IN[t])return;PTIN[QT_IN[t]]=target;Object.assign(PTIN,extra||{});
+  ptSub='tools';try{localStorage.setItem('nw-ptsub','tools')}catch(e){}showTab('pentest');nkRun(t);
+  setTimeout(()=>{const c=document.querySelector(`#t-pentest [data-tool="${t}"]`);if(c)c.scrollIntoView({behavior:'smooth',block:'center'})},60)}
+function renderHomeTech(){const el=$('t-home');hlLoad();if(!scanData)loadScan();const now=Date.now()/1000;
+  const devs=[...S.hosts.values()].filter(h=>h.kind==='local'&&!h.me&&!h.ip.includes(':')),newD=devs.filter(h=>h.threat===1).length;
+  const real=S.alerts.filter(a=>!a.lab&&!a.benign&&!a.selftest),hi1=real.filter(a=>a.sev==='high'&&now-a.t<3600).length,med1=real.filter(a=>a.sev==='med'&&now-a.t<3600).length;
+  const T=hlData&&hlData.targets||[],up=T.filter(x=>x.up).length,down=T.filter(x=>x.up===false);
+  const sc=scanData||{},d=sc.diff,dn=d?d.new_ports.length+d.new_hosts.length:0,pub=[...S.hosts.values()].filter(h=>h.kind==='public').length;
+  const kpi=(go,v,l,c)=>`<div class="kpi" data-go="${go}"><b data-count style="color:${c||'#fff'}">${v}</b><span>${l}</span></div>`;
+  let h=(MODE?'':chooserHTML())+`<div class="kpis tk">`+
+    kpi('devs',devs.length,newD?`συσκευές · ${newD} νέες`:'συσκευές στο LAN',newD?'#ffd23f':'')+
+    kpi('alerts',hi1,`σοβαρές την τελευταία ώρα${med1?` · ${med1} μέτριες`:''}`,hi1?'#ff3b5c':med1?'#ffd23f':'#3ddc97')+
+    kpi('health',T.length?`${up}/${T.length}`:'—',down.length?`homelab · εκτός: ${down.map(x=>x.name).join(', ')}`:'homelab πάνω',down.length?'#ff3b5c':'#3ddc97')+
+    kpi('pentest',sc.finished?ago(now-sc.finished):'—',sc.finished?`από τη σάρωση${dn?` · ${dn} αλλαγές`:''}`:'καμία σάρωση ακόμα',dn?'#ffd23f':'')+
+    kpi('map',pub,'servers στο Internet τώρα')+`</div>`;
+  h+=`<div class="card"><div class="brow"><b style="color:#fff">⚡ Γρήγορο εργαλείο</b><span class="sm kbdhint">ή <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd> από οπουδήποτε</span></div>
+    <div class="frow" style="margin-top:6px"><input class="f" id="qt-in" value="${esc(PTIN.qt||'')}" placeholder="IP, όνομα, URL ή MAC — π.χ. 192.168.1.17" spellcheck="false" autocomplete="off">
+    ${[['ping','📶 ping'],['dns','🔤 dns'],['ports','🚪 θύρες'],['http','🌐 http/tls'],['names','🏷 ονόματα'],['wol','⏰ WoL']].map(([t,l])=>`<button class="b" data-qt="${t}">${l}</button>`).join('')}</div>
+    <div class="qrow">${[['dns','DNS'],['tls.handshake.extensions_server_name','SNI / HTTPS'],['tcp.flags.syn==1 && tcp.flags.ack==0','SYN (scans)'],['mqtt || tcp.port==1883','MQTT'],['arp','ARP'],['!(ip.dst==192.168.0.0/16)','προς Internet']].map(([f,l])=>`<button class="b" data-wsf="${esc(f)}" title="🦈 ${esc(f)}">🦈 ${l}</button>`).join('')}</div></div>`;
+  const last=S.alerts.filter(a=>!a.benign&&!a.lab).slice(0,8);
+  h+=`<div class="hgrid"><div class="card"><div class="brow"><b style="color:#fff">⚠ Ειδοποιήσεις</b><button class="b" data-go="alerts">Όλες →</button></div>
+    ${last.length?last.map(a=>`<div class="hal ${a.sev}"><span class="sev ${a.sev}">${a.sev.toUpperCase()}</span> <b style="color:#fff">${esc(a.type)}</b>${whoTag(a)} <span class="sm">${esc(a.actor)} → ${esc(String(a.target))} · ${fmtT(a.t)}</span></div>`).join(''):'<div class="sm" style="margin-top:6px">Καμία.</div>'}</div>
+    <div class="card"><div class="brow"><b style="color:#fff">🩺 Homelab</b><button class="b" data-go="health">→</button></div>
+    ${T.length?T.map(x=>`<div class="sm" style="display:flex;gap:6px;margin-top:4px"><span>${x.up?'🟢':x.up===false?'🔴':'⚪'}</span><b style="color:#fff;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis">${esc(x.name)}</b><span data-noi18n>${esc(x.host)}${x.port?':'+x.port:''}</span><span style="min-width:52px;text-align:right">${x.ms!=null?x.ms.toFixed(0)+' ms':'—'}</span>${x.cert_days!=null&&x.cert_days<14?`<span class="tag y">cert ${x.cert_days}μ</span>`:''}</div>`).join(''):'<div class="sm" style="margin-top:6px">φόρτωση…</div>'}</div>
+    <div class="card"><div class="brow"><b style="color:#fff">🔍 Τελευταία σάρωση</b><button class="b" data-go="pentest">→</button></div>
+    ${sc.finished?`<div class="sm" style="margin-top:4px"><span data-noi18n>${esc(sc.target||'')}</span> · ${(sc.hosts||[]).length} hosts · πριν ${ago(now-sc.finished)}</div>`+(d?(dn||d.gone_hosts.length||d.closed_ports.length?`<div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">${d.new_hosts.map(x=>`<span class="tag y">＋ ${esc(x.ip||x)}</span>`).join('')}${d.new_ports.map(p=>`<span class="tag r">＋ ${esc(p.ip)}:${p.port}/${p.proto}</span>`).join('')}${d.closed_ports.map(p=>`<span class="tag g">− ${esc(p.ip)}:${p.port}/${p.proto}</span>`).join('')}</div>`:'<div class="sm" style="margin-top:4px">καμία αλλαγή από την προηγούμενη ✔</div>'):''):'<div class="sm" style="margin-top:6px">Δεν έχει γίνει σάρωση. <button class="b" data-pt="scan">Σάρωσε →</button></div>'}</div></div>`;
+  el.innerHTML=h;
+  el.querySelectorAll('[data-go]').forEach(b=>b.onclick=()=>showTab(b.dataset.go));
+  const qi=$('qt-in');qi.oninput=()=>{PTIN.qt=qi.value};
+  qi.onkeydown=e=>{if(e.key==='Enter'){const v=qi.value.trim();qtRun(/^https?:/.test(v)?'http':/^([0-9a-f]{2}[:-]){5}[0-9a-f]{2}$/i.test(v)?'wol':'ping',v)}};
+  el.querySelectorAll('[data-qt]').forEach(b=>b.onclick=()=>{const v=qi.value.trim();if(!v){qi.focus();return}const t=b.dataset.qt;
+    qtRun(t,t==='http'&&!/^https?:/.test(v)?'http://'+v:v)});
+  homeBind(el)}
+
+// ================= 🛰 Πού στέλνει πακέτα κάθε συσκευή του δικτύου σου (όσο είναι ανοιχτή η σελίδα) =================
+const UNENC={21:'FTP',23:'Telnet',80:'HTTP',110:'POP3',143:'IMAP',1883:'MQTT',5900:'VNC',8080:'HTTP'};
+function trackOut(it){const a=S.hosts.get(it.s);if(!a||a.kind!=='local'||!it.d||/^(224\.|239\.|255\.|ff0)/i.test(it.d)||it.d.endsWith('.255'))return;
+  let m=S.out.get(it.s);if(!m){m=new Map();S.out.set(it.s,m)}
+  let o=m.get(it.d);if(!o){if(m.size>300)return;o={b:0,pk:0,ports:new Set(),first:Date.now()/1000};m.set(it.d,o)}
+  o.b+=it.l||0;o.pk++;o.last=Date.now()/1000;if(it.dp&&o.ports.size<8)o.ports.add(it.dp);if(it.n)o.n=it.n;if(it.x)o.x=1;o.p=it.a||it.p}
+function outHTML(h){const m=S.out.get(h.ip),rows=m?[...m.entries()].sort((a,b)=>b[1].b-a[1].b):[];
+  const pub=rows.filter(([d])=>S.hosts.get(d)?.kind==='public'),lan=rows.filter(([d])=>S.hosts.get(d)?.kind==='local');
+  const ctry=new Set(pub.map(([d])=>S.hosts.get(d)?.geo?.countryCode).filter(Boolean)),bad=rows.filter(([,o])=>o.x).length,unenc=rows.filter(([,o])=>[...o.ports].some(p=>UNENC[p])).length;
+  let x=`<h3>🛰 Πού στέλνει πακέτα αυτή η συσκευή</h3><div class="card" style="white-space:normal">`;
+  x+=`<div class="frow" style="margin-bottom:6px"><button class="b" data-ofilter="${esc(h.ip)}">🦈 Δες μόνο τα πακέτα της</button><button class="b" data-omap="${esc(h.ip)}">🗺 Στον χάρτη</button></div>`;
+  if(!rows.length){x+=h.me?'<div class="sm">Δεν έχω δει ακόμα κίνηση από εσένα σε αυτή τη συνεδρία.</div>':
+    `<div class="sm">Δεν βλέπω ακόμα πακέτα <b>από</b> αυτή τη συσκευή προς άλλους — μόνο broadcast/ARP.</div>`+seeHowHTML()}
+  else{x+=`<div class="sm">Από τότε που άνοιξες τη σελίδα: <b>${pub.length}</b> servers στο Internet σε <b>${ctry.size}</b> χώρες · <b>${lan.length}</b> συσκευές στο LAN${bad?` · <b style="color:#ff3b5c">${bad} ύποπτοι προορισμοί</b>`:''}${unenc?` · <b style="color:#ffd23f">${unenc} χωρίς κρυπτογράφηση</b>`:''}</div>`;
+    x+=`<div style="margin-top:6px;overflow-x:auto"><table><thead><tr><th>Προορισμός</th><th>θύρες</th><th>δεδομένα</th><th></th></tr></thead><tbody>`+rows.slice(0,25).map(([d,o])=>{const dh=S.hosts.get(d),g=dh?.geo,pu=dh?.kind==='public';
+      const ue=[...o.ports].filter(p=>UNENC[p]);
+      return`<tr${o.x?' style="background:#ff3b5c14"':''}><td><span data-sel="${esc(d)}" style="cursor:pointer">${pu?flag(g?.countryCode):'🏠'} <b style="color:#fff" data-noi18n>${esc(o.n||(dh&&hname(dh))||d)}</b></span><div class="sm"><span data-noi18n>${esc(d)}</span>${g?.isp?' · '+esc(g.isp):''}${o.x?' · <span style="color:#ff3b5c">⚠ ύποπτο</span>':''}</div></td>
+        <td class="sm">${[...o.ports].join(', ')||'—'}${ue.length?`<div style="color:#ffd23f">🔓 ${ue.map(p=>UNENC[p]).join(', ')}</div>`:''}</td><td class="sm">${fmtB(o.b)}<div>${o.pk} πακ. · ${fmtDur(Date.now()/1000-o.last)} πριν</div></td>
+        <td style="white-space:nowrap">${pu?`<button class="b" data-oroute="${esc(d)}" title="Από πού περνά και ποιος βλέπει τι">🛣</button>`:''}<button class="b" data-ofilter="${esc(h.ip)}|${esc(d)}" title="Μόνο αυτή η συνομιλία στα πακέτα">🦈</button></td></tr>`}).join('')+'</tbody></table></div>';
+    if(rows.length>25)x+=`<div class="sm">…και ${rows.length-25} ακόμα</div>`;
+    if(!h.me)x+='<details style="margin-top:6px"><summary class="sm" style="cursor:pointer">Γιατί μπορεί να μη βλέπω όλη την κίνησή της;</summary>'+seeHowHTML()+'</details>'}
+  return x+'</div>'}
+function seeHowHTML(){return`<div class="sm" style="margin-top:6px;line-height:1.6">Ο υπολογιστής σου «ακούει» μόνο τα δικά του πακέτα και ό,τι στέλνεται σε όλους (broadcast). Το Wi‑Fi και ο switch στέλνουν την κίνηση κάθε συσκευής <b>μόνο</b> στον router. Για να τη δεις:<br>
+  ① <b>Τρέξε το NetWatch εκεί που περνά όλη η κίνηση</b> — στον router (OpenWrt), ή σε VM/LXC του Proxmox: η γέφυρα <code>vmbr0</code> βλέπει όλα τα VM.<br>
+  ② <b>Port mirroring (SPAN)</b> σε managed switch: αντιγράφει την κίνηση μιας θύρας στη θύρα του υπολογιστή σου (CCNA: <code>monitor session 1 source interface Gi0/1</code> → <code>destination interface Gi0/2</code>).<br>
+  ③ <b>Βάλε τη συσκευή σε δικό της δίκτυο</b> (VLAN/guest Wi‑Fi για IoT) με τον υπολογιστή σου ως gateway ή με καταγραφή στον router (<code>tcpdump -i br-lan host 192.168.1.20 -w esp.pcap</code>) και άνοιξε το .pcap στο Wireshark.<br>
+  ④ Από τον router: πολλοί δείχνουν «συνδέσεις»/DNS ανά συσκευή· ένα <b>Pi-hole</b> ως DNS δείχνει τι ονόματα ζητά κάθε συσκευή.<br>
+  <span style="color:#ff8da0">Όχι ARP spoofing σε δίκτυο που δεν είναι δικό σου — είναι επίθεση MITM.</span></div>`}
+function outBind(el,h){
+  el.querySelectorAll('[data-ofilter]').forEach(b=>b.onclick=()=>{const [a,d]=b.dataset.ofilter.split('|');setFeedFilter(d?`ip.addr == ${a} && ip.addr == ${d}`:`ip.addr == ${a}`)});
+  el.querySelectorAll('[data-omap]').forEach(b=>b.onclick=()=>{S.sel=b.dataset.omap;showTab('lan')});
+  el.querySelectorAll('[data-oroute]').forEach(b=>b.onclick=()=>routeBox(h.ip,b.dataset.oroute))}
+function routeBox(from,to){const o=pktBox(),fh=S.hosts.get(from);routeIp=to;
+  const draw=()=>{o.innerHTML=`<div class="card" style="max-width:820px;width:100%;white-space:normal"><div class="brow"><b style="color:#fff">🛣 Διαδρομή: ${esc(hname(fh)||from)} → ${esc(who(to))}</b><button class="b" data-x>✕</button></div>
+    <div class="sm" style="margin:4px 0 8px">Από πού περνούν τα πακέτα αυτής της συσκευής και ποιος βλέπει τι σε κάθε βήμα.</div>${routeHTML(fh)}</div>`;
+    o.querySelector('[data-x]').onclick=()=>o.remove();
+    const tb=o.querySelector('#rt-trace');if(tb)tb.onclick=()=>{const ip=tb.dataset.ip;traceCache[ip]={loading:true};draw();
+      post('/api/trace',{ip}).then(j=>{traceCache[ip]=j;if(o.isConnected)draw()}).catch(e=>{traceCache[ip]={error:String(e)};draw()})}};
+  draw()}
+
+// ================= ⌘K: παλέτα εντολών =================
+const fold=s=>String(s||'').normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase();
+const CMD_ALIAS={ping:'ping',dns:'dns',dig:'dns',nslookup:'dns',host:'dns',dnscmp:'dnscmp',hijack:'dnscmp',ports:'ports',port:'ports',nc:'ports',telnet:'ports',
+  http:'http',https:'http',curl:'http',tls:'http',cert:'http',wol:'wol',wake:'wol',names:'names',mdns:'names',nbt:'names',subnet:'subnet',ipcalc:'subnet',calc:'subnet',
+  scan:'scan',nmap:'scan',filter:'filter',ws:'filter',wireshark:'filter',f:'filter'};
+const CMD_HELP=[['ping 192.168.1.1','📶 ping — απαντά; ms; απώλειες'],['dns github.com MX','🔤 DNS lookup (dig/nslookup)'],['dnscmp example.com','🧭 σύγκριση DNS servers'],['ports 192.168.1.17 22,1883','🚪 έλεγχος θυρών (nc)'],
+  ['http https://192.168.1.16:8006','🌐 HTTP headers + πιστοποιητικό (curl -I)'],['wol aa:bb:cc:dd:ee:ff','⏰ Wake-on-LAN'],['names 192.168.1.0/24','🏷 ονόματα συσκευών'],['subnet 10.0.0.37/27','🧮 υπολογιστής subnet (ipcalc)'],
+  ['scan 192.168.1.0/24','🔍 σάρωση δικτύου (nmap)'],['filter dns','🦈 φίλτρο Wireshark στα πακέτα']];
+let ckSel=0,ckItems=[];
+function cmdItems(q){const out=[],qt=q.trim(),m=qt.match(/^(\S+)\s*(.*)$/),c=m&&CMD_ALIAS[m[1].toLowerCase()],arg=m?m[2].trim():'';
+  if(c&&arg){const a=arg.split(/\s+/);
+    const run={ping:()=>qtRun('ping',a[0]),dns:()=>qtRun('dns',a[0],a[1]?{dns_type:a[1].toUpperCase()}:{}),dnscmp:()=>qtRun('dnscmp',a[0]),ports:()=>qtRun('ports',a[0],a[1]?{ports_list:a.slice(1).join(',')}:{}),
+      http:()=>qtRun('http',/^https?:/.test(a[0])?a[0]:'http://'+a[0]),wol:()=>qtRun('wol',a[0]),names:()=>qtRun('names',a[0]),subnet:()=>qtRun('subnet',a[0]),
+      scan:()=>{PTIN.target=ptTarget=a[0];ptSub='scan';try{localStorage.setItem('nw-ptsub','scan')}catch(e){}showTab('pentest')},
+      filter:()=>setFeedFilter(arg)}[c];
+    if(c==='filter'){const F=WS.compile(arg);out.push({t:`🦈 ${arg}`,d:F.ok?'εφάρμοσε στα ζωντανά πακέτα':F.err,go:F.ok?run:null})}
+    else out.push({t:`▶ ${c} ${arg}`,d:c==='scan'?'άνοιξε τη σάρωση με αυτόν τον στόχο':'τρέξε τώρα',go:run})}
+  const f=fold(qt);
+  if(!c||!arg){for(const [ex,d] of CMD_HELP)if(!f||fold(ex).startsWith(f.split(' ')[0])||(m&&CMD_ALIAS[m[1].toLowerCase()]===CMD_ALIAS[ex.split(' ')[0]]))out.push({t:ex,d,fill:ex.split(' ')[0]+' '})}
+  const secs=[['home','🧭 Αρχική','']].concat(SECTIONS.flatMap(([,l])=>l)),sm=[];
+  for(const [t,n,d] of secs){const hay=fold(n+' '+(d||'')+' '+(window.I18N?I18N.t(n)+' '+I18N.t(d||''):''));if(!f||hay.includes(f))sm.push({t:n,d:d||'',go:()=>showTab(t)})}
+  out.push(...sm.slice(0,f?8:30));
+  if(f.length>1&&window.WS){let k=0;for(const cat of WS.SHEET)for(const [code,el,en] of cat.items){if(k>=8)break;if(fold(code+' '+el+' '+en).includes(f)){k++;
+    const lv=cat.kind==='display'&&WS.live(code);out.push({t:`🦈 ${code}`,d:(I18N.lang==='en'?en:el),code:1,go:lv?()=>setFeedFilter(code):()=>{wsQ=code;wsCat='all';showTab('ws')}})}}}
+  return out.slice(0,40)}
+function cmdkDraw(){const q=$('cmdk-in').value;ckItems=cmdItems(q);ckSel=Math.min(ckSel,Math.max(0,ckItems.length-1));
+  $('cmdk-list').innerHTML=ckItems.length?ckItems.map((x,i)=>`<div class="cmdk-it${i===ckSel?' on':''}" data-i="${i}"><b${x.code?' data-noi18n':''}>${esc(x.t)}</b><span${x.code&&I18N.lang==='en'?' data-noi18n':''}>${esc(x.d)}</span></div>`).join(''):'<div class="sm" style="padding:10px">Τίποτα. Δοκίμασε «ping 192.168.1.1».</div>';
+  $('cmdk-list').querySelectorAll('[data-i]').forEach(r=>{r.onclick=()=>cmdkGo(+r.dataset.i);r.onmousemove=()=>{if(ckSel!==+r.dataset.i){ckSel=+r.dataset.i;$('cmdk-list').querySelectorAll('.cmdk-it').forEach((x,i)=>x.classList.toggle('on',i===ckSel))}}});
+  const on=$('cmdk-list').querySelector('.on');if(on)on.scrollIntoView({block:'nearest'})}
+function cmdkGo(i){const x=ckItems[i];if(!x)return;if(x.fill){$('cmdk-in').value=x.fill;ckSel=0;cmdkDraw();$('cmdk-in').focus();return}if(!x.go)return;cmdkClose();x.go()}
+function cmdkOpen(){$('cmdk').hidden=false;$('cmdk-in').value='';ckSel=0;cmdkDraw();setTimeout(()=>$('cmdk-in').focus(),0)}
+function cmdkClose(){$('cmdk').hidden=true}
+$('cmdk-btn').onclick=cmdkOpen;$('cmdk').onclick=e=>{if(e.target.id==='cmdk')cmdkClose()};$('cmdk-in').oninput=()=>{ckSel=0;cmdkDraw()};
+$('cmdk-in').onkeydown=e=>{if(e.key==='ArrowDown'){ckSel=Math.min(ckItems.length-1,ckSel+1);cmdkDraw();e.preventDefault()}else if(e.key==='ArrowUp'){ckSel=Math.max(0,ckSel-1);cmdkDraw();e.preventDefault()}
+  else if(e.key==='Enter'){cmdkGo(ckSel);e.preventDefault()}else if(e.key==='Escape')cmdkClose();else if(e.key==='Tab'&&ckItems[ckSel]){e.preventDefault();const x=ckItems[ckSel];$('cmdk-in').value=x.fill||x.t.replace(/^(▶|🦈)\s*/,'');cmdkDraw()}};
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();$('cmdk').hidden?cmdkOpen():cmdkClose()}
+  else if(e.key==='/'&&!/INPUT|TEXTAREA|SELECT/.test((document.activeElement||{}).tagName||'')&&$('cmdk').hidden){e.preventDefault();cmdkOpen()}});
+function copyText(t){(navigator.clipboard?navigator.clipboard.writeText(t):Promise.reject()).then(()=>toastMsg('📋 Αντιγράφηκε')).catch(()=>{const a=document.createElement('textarea');a.value=t;document.body.appendChild(a);a.select();try{document.execCommand('copy')}catch(e){}a.remove();toastMsg('📋 Αντιγράφηκε')})}
+function toastMsg(m){let t=$('mini-toast');if(!t){t=document.createElement('div');t.id='mini-toast';t.style.cssText='position:fixed;left:50%;bottom:22px;transform:translateX(-50%);background:#0f1a2c;border:1px solid #3ec5ff66;color:#fff;padding:7px 14px;border-radius:8px;z-index:300;font-size:12px;transition:opacity .25s';document.body.appendChild(t)}
+  t.textContent=m;t.style.opacity=1;clearTimeout(t._h);t._h=setTimeout(()=>t.style.opacity=0,1400)}
+
+// ================= 🦈 Wireshark: σημειώσεις + δοκιμή ζωντανά =================
+let wsQ='',wsCat='all';try{wsCat=localStorage.getItem('nw-wscat')||'all'}catch(e){}
+function renderWs(){if(!$('t-ws').dataset.drawn)drawWs()}
+function drawWs(){const el=$('t-ws'),en=window.I18N&&I18N.lang==='en',W=window.WS;el.dataset.drawn=1;
+  if(!W){el.innerHTML='<div class="empty">Δεν φορτώθηκε το wireshark.js</div>';return}
+  const f=fold(wsQ),cats=W.SHEET,n=cats.reduce((a,c)=>a+c.items.length,0);
+  let h=`<div class="card" style="white-space:normal"><div class="brow"><b style="color:#fff">🦈 Wireshark — σημειώσεις τεχνικού</b><span class="sm">${n} φίλτρα & εντολές</span></div>
+    <div class="sm" style="margin-top:3px">Τα <b>display filters</b> (πάνω μπάρα του Wireshark) κρύβουν πακέτα <i>αφού</i> τα πιάσεις· τα <b>capture filters</b> (BPF, tcpdump) αποφασίζουν τι θα πιαστεί. Όσα έχουν <b>▶ Στα πακέτα</b> τα τρέχει και το NetWatch πάνω στη ζωντανή κίνηση.</div>
+    <div class="frow" style="margin-top:8px"><input class="f" id="ws-q" value="${esc(wsQ)}" placeholder="🔎 αναζήτηση: dns, syn, retransmission, http, arp, mqtt…" spellcheck="false" autocomplete="off"></div>
+    <div class="chips"><button data-cat="all" class="${wsCat==='all'?'on':''}">Όλα</button>${cats.map(c=>`<button data-cat="${c.id}" class="${wsCat===c.id?'on':''}"><span>${c.icon}</span> <span data-noi18n>${esc(en?c.en:c.el)}</span></button>`).join('')}</div></div>`;
+  let shown=0;
+  for(const c of cats){if(wsCat!=='all'&&wsCat!==c.id)continue;const its=c.items.filter(([code,a,b])=>!f||fold(code+' '+a+' '+b).includes(f));if(!its.length)continue;shown+=its.length;
+    h+=`<h3>${c.icon} <span data-noi18n>${esc(en?c.en:c.el)}</span> <span class="sm">· ${its.length}</span></h3><div class="wsg">`+its.map(([code,a,b])=>{const lv=c.kind==='display'&&W.live(code);
+      return`<div class="wsi"><code>${esc(code)}</code><div class="sm" data-noi18n>${esc(en?b:a)}</div><div class="row"><button class="b" data-wcopy="${esc(code)}" title="Αντιγραφή">📋</button>${lv?`<button class="b" data-wlive="${esc(code)}" title="Εφάρμοσε στα ζωντανά πακέτα">▶ Στα πακέτα</button>`:''}</div></div>`}).join('')+'</div>';}
+  if(!shown)h+=`<div class="empty">Τίποτα για «${esc(wsQ)}».</div>`;
+  h+=`<h3>🧩 Τελεστές</h3><div class="card"><table><tbody>${W.OPS_HELP.map(([o,a,b])=>`<tr><td><code>${esc(o)}</code></td><td data-noi18n>${esc(en?b:a)}</td></tr>`).join('')}</tbody></table>
+    <div class="sm" style="margin-top:6px;white-space:normal">Παράδειγμα: <code>ip.addr == 192.168.1.0/24 && tcp.port in {22 80 443} && !(tcp.flags.reset == 1)</code></div></div>`;
+  el.innerHTML=h;
+  const q=$('ws-q');q.oninput=()=>{wsQ=q.value;const p=q.selectionStart;drawWs();const n2=$('ws-q');n2.focus();n2.setSelectionRange(p,p)};
+  el.querySelectorAll('[data-cat]').forEach(b=>b.onclick=()=>{wsCat=b.dataset.cat;try{localStorage.setItem('nw-wscat',wsCat)}catch(e){}drawWs()});
+  el.querySelectorAll('[data-wcopy]').forEach(b=>b.onclick=()=>copyText(b.dataset.wcopy));
+  el.querySelectorAll('[data-wlive]').forEach(b=>b.onclick=()=>setFeedFilter(b.dataset.wlive))}
+
+// αρχική οθόνη: όπου ήσουν την προηγούμενη φορά (αλλιώς η Αρχική)
+(()=>{let v='page',t='home';try{[v,t]=(localStorage.getItem('nw-view')||'page|home').split('|')}catch(e){}
+  if(!['page','map','lan'].includes(v)||!$('t-'+t))[v,t]=['page','home'];
+  setView(v);showTab(v==='page'?t:v)})();
 </script>
 </body>
 </html>

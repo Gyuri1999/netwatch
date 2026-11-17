@@ -1,0 +1,4 @@
+# Το ιδιωτικό κλειδί υπογραφής δεν μπαίνει ΠΟΤΕ στο git (κανονικά ζει στο ~/.netwatch-ota)
+ota_signing.pem
+*.pem.tmp
+ota-repo/

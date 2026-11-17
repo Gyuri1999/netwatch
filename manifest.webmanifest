@@ -1,0 +1,20 @@
+{
+  "name": "NetWatch Ακαδημία",
+  "short_name": "Ακαδημία",
+  "description": "CCNA 200-301 και IoT security στα ελληνικά — μαθήματα, κάρτες, κουίζ και το 10λεπτο της ημέρας.",
+  "lang": "el",
+  "start_url": "academy.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#05080f",
+  "theme_color": "#05080f",
+  "icons": [
+    {"src": "academy/icon-192.png", "sizes": "192x192", "type": "image/png"},
+    {"src": "academy/icon-512.png", "sizes": "512x512", "type": "image/png"},
+    {"src": "academy/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"},
+    {"src": "academy/icon.svg", "sizes": "any", "type": "image/svg+xml"}
+  ],
+  "shortcuts": [
+    {"name": "⏱ 10′ σήμερα", "short_name": "10′ σήμερα", "url": "academy.html?daily=1", "icons": [{"src": "academy/icon-192.png", "sizes": "192x192"}]}
+  ]
+}

@@ -766,3 +766,36 @@ def test_lan_device_on_tor_port(state):
     c = Clock()
     feed(state, c, src="192.168.1.20", dst="51.15.0.1", proto="TCP", sp=50000, dp=9001, flags="S")
     assert any(a["type"] == "Tor από συσκευή του δικτύου" and a["actor"] == "192.168.1.20" for a in state.alerts)
+
+
+# ---------------- «το έκανα εγώ» ή «κάποιος άλλος»; ----------------
+def _scan(s, c, src, dst):
+    for port in range(1, 25):
+        feed(s, c, src=src, dst=dst, proto="TCP", sp=44444, dp=port, flags="S")
+    return next(a for a in s.alerts if a["type"] == "Port scan" and a["actor"] == src)
+
+
+def test_own_tool_scan_is_marked_as_your_test(state):
+    state.note_own_tool("έλεγχος θυρών (🔴 Pentest)", seconds=60)
+    state.alert("Port scan", "high", ME, EVIL, "δοκιμή", Clock()())
+    a = state.alerts[0]
+    assert a["selftest"] == "έλεγχος θυρών (🔴 Pentest)"
+    assert state.status()["alerts"] == 0  # δεν μετρά ως συναγερμός
+    assert state.hosts[ME]["threat"] == 0
+
+
+def test_declared_test_device(state):
+    state.test_from(EVIL, 30, "nmap από το Kali")
+    a = _scan(state, Clock(), EVIL, ME)
+    assert a["selftest"] == "nmap από το Kali"
+    assert state.selftest_status()["test_ips"][0]["ip"] == EVIL
+    state.test_from(EVIL, 0)
+    assert state.selftest_status()["test_ips"] == []
+
+
+def test_someone_else_is_not_your_test(state):
+    state.note_own_tool("σάρωση", seconds=60)  # εσύ σαρώνεις — αλλά η επίθεση έρχεται από άλλον
+    state.test_from("192.168.1.77", 30)
+    a = _scan(state, Clock(), EVIL, ME)
+    assert "selftest" not in a
+    assert state.status()["alerts"] == 1

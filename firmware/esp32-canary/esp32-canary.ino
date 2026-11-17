@@ -1,5 +1,5 @@
 // =============================================================================
-//  NetWatch Canary  v1.0.0
+//  NetWatch Canary  v1.1.0
 // -----------------------------------------------------------------------------
 //  "Καναρίνι" / παγίδα (honeypot) για ESP32. Προσποιείται μια ξεχασμένη
 //  IP κάμερα στο δίκτυο (συνήθως στο IoT VLAN). Κανείς νόμιμος δεν έχει λόγο
@@ -26,6 +26,9 @@
 //    - Οι WiFiServer είναι non-blocking (accept() επιστρέφει αμέσως).
 //    - Κάθε σύνδεση έχει μια μικρή μηχανή καταστάσεων με timeout. Διαβάζουμε
 //      μόνο ό,τι έχει ήδη φτάσει (available()), ποτέ δεν περιμένουμε.
+//    - Εξαίρεση: το (προαιρετικό) υπογεγραμμένο OTA (OTA_ENABLE 1) μπλοκάρει
+//      το loop() όσο κατεβαίνει νέο firmware (δευτερόλεπτα, κάθε 6 ώρες), και
+//      ΜΟΝΟ όταν δεν υπάρχει ενεργή σύνδεση στην παγίδα. Βλ. τμήμα 7.
 // =============================================================================
 
 #include <WiFi.h>
@@ -37,10 +40,22 @@
 #include "secrets.h"       // ΔΕΝ είναι στο git, βλ. secrets.example.h
 #include "canary_types.h"  // struct/enum του firmware
 
+// Υπογεγραμμένο OTA: προαιρετικό. Ένα παλιό secrets.h χωρίς OTA_ENABLE
+// συνεχίζει να μεταγλωττίζεται (OTA ανενεργό).
+#ifndef OTA_ENABLE
+#define OTA_ENABLE 0
+#endif
+#if OTA_ENABLE
+// Από τη βιβλιοθήκη firmware/common (NetWatchSignedOta). Μεταγλώττιση με
+//   arduino-cli compile --library ../common ...   (βλ. README)
+#include <signed_ota.h>
+#endif
+
 // -----------------------------------------------------------------------------
 //  Σταθερές & προεπιλογές (αν δεν ορίζονται στο secrets.h)
 // -----------------------------------------------------------------------------
-#define FW_VERSION "1.0.0"
+#define FW_VERSION "1.1.0"      // ΙΔΙΑ με το --version του tools/ota/ota_sign.py
+#define OTA_DEVICE_CLASS "canary"
 
 #ifndef CANARY_HOSTNAME
 #define CANARY_HOSTNAME "camera-salon"
@@ -65,6 +80,12 @@
 #endif
 #ifndef HTTP_TIMEOUT_S
 #define HTTP_TIMEOUT_S 5
+#endif
+#ifndef OTA_INTERVAL_H
+#define OTA_INTERVAL_H 6      // έλεγχος για νέο firmware: στην εκκίνηση + κάθε τόσες ώρες
+#endif
+#ifndef OTA_SELFTEST_S
+#define OTA_SELFTEST_S 300    // νέο firmware: αν δεν συνδεθεί στο MQTT μέσα σε τόσα s -> rollback
 #endif
 
 static const size_t   MAX_CLIENTS        = 4;      // ταυτόχρονες συνδέσεις
@@ -742,7 +763,58 @@ static void wifiTick() {
 }
 
 // =============================================================================
-//  7. SETUP & LOOP
+//  7. ΥΠΟΓΕΓΡΑΜΜΕΝΟ OTA (μόνο με OTA_ENABLE 1, βλ. tools/ota/README.md)
+// -----------------------------------------------------------------------------
+//  - Self-test: το νέο firmware είναι "υπό δοκιμή" μέχρι να συνδεθεί στον
+//    MQTT broker (TLS). Αν δεν τα καταφέρει σε OTA_SELFTEST_S, rollback.
+//  - Έλεγχος: μόλις συνδεθεί το MQTT (=στην εκκίνηση) και μετά κάθε
+//    OTA_INTERVAL_H ώρες, ΜΟΝΟ όταν καμία σύνδεση της παγίδας δεν είναι ενεργή.
+//  - Αποτέλεσμα στο event topic: {"type":"ota","result":"updated|up_to_date|
+//    rejected|error","reason":"..."}. Το "updated" στέλνεται από το ΝΕΟ
+//    firmware, αφού περάσει το self-test (άρα αποδεικνύει ότι δουλεύει).
+// =============================================================================
+#if OTA_ENABLE
+static bool     g_otaChecked = false;
+static uint32_t g_otaLastMs  = 0;
+
+static void publishOta(const SignedOtaStatus &st) {
+  char reason[sizeof st.reason * 2];
+  char ver[sizeof st.version * 2];
+  jsonEscape(st.reason, reason, sizeof reason);
+  jsonEscape(st.version, ver, sizeof ver);
+  char buf[400];
+  snprintf(buf, sizeof buf,
+           "{\"type\":\"ota\",\"id\":\"%s\",\"result\":\"%s\",\"reason\":\"%s\",\"version\":\"%s\","
+           "\"fw\":\"%s\",\"t\":%lu}",
+           g_id, signedOtaResultName(st.result), reason, ver, FW_VERSION, (unsigned long)uptimeS());
+  if (mqttEnqueue(g_topicEvent, buf, /*retain=*/false)) Serial.printf("[mqtt] event  -> %s\n", buf);
+}
+
+static bool trapIdle() {
+  for (auto &s : g_slots) if (s.phase != PH_FREE) return false;
+  return true;
+}
+
+static void otaTick() {
+  signedOtaSelfTestTick(OTA_SELFTEST_S);
+  if (!g_mqttConnected) return;
+  signedOtaMarkHealthy();   // Wi-Fi + MQTT/TLS δουλεύουν: το self-test πέρασε
+
+  SignedOtaStatus report;
+  if (signedOtaTakeReport(report)) publishOta(report);
+
+  if (g_otaChecked && millis() - g_otaLastMs < (uint32_t)OTA_INTERVAL_H * 3600000UL) return;
+  if (!trapIdle()) return;   // όχι την ώρα που "μιλάμε" με επισκέπτη
+  g_otaChecked = true;
+  g_otaLastMs = millis();
+  // ΜΠΛΟΚΑΡΕΙ όσο κατεβαίνει firmware. Αν εγκατασταθεί νέο, κάνει restart εδώ.
+  signedOtaCheck(OTA_BASE_URL, OTA_DEVICE_CLASS, FW_VERSION, MQTT_CA_PEM, OTA_PUBKEY_PEM);
+  publishOta(signedOtaLastStatus());
+}
+#endif
+
+// =============================================================================
+//  8. SETUP & LOOP
 // =============================================================================
 void setup() {
   Serial.begin(115200);
@@ -763,6 +835,10 @@ void setup() {
   Serial.printf (" NetWatch Canary v%s  id=%s\n", FW_VERSION, g_id);
   Serial.println(" Honeypot tripwire: listens only, never stores passwords");
   Serial.println("=============================================");
+
+#if OTA_ENABLE
+  signedOtaBegin(FW_VERSION);   // διαβάζει NVS: προηγήθηκε update ή rollback;
+#endif
 
   parseIgnoreList();
   Serial.printf("[cfg] broker %s  hostname %s  ignore-list %u IP(s)\n",
@@ -802,6 +878,9 @@ void loop() {
   }
   flushEvents();
   heartbeatTick();
+#if OTA_ENABLE
+  otaTick();
+#endif
   // 1 tick παραχώρηση στο RTOS (όχι αναμονή): αφήνει χρόνο στα tasks Wi-Fi/MQTT
   // και στο idle task, χωρίς να καθυστερεί αισθητά καμία σύνδεση.
   vTaskDelay(1);
