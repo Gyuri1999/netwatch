@@ -1,0 +1,6 @@
+# Μυστικά (κωδικοί Wi-Fi/MQTT, CA): ΠΟΤΕ στο git.
+# Αντέγραψε το secrets.example.h σε secrets.h και συμπλήρωσέ το.
+secrets.h
+
+# Έξοδοι build του arduino-cli (αν χρησιμοποιηθεί --output-dir / --build-path)
+build/

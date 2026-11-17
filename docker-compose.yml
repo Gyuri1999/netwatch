@@ -6,4 +6,5 @@ services:
     volumes:
       - ./data:/app/data        # history DB + cached blocklists survive restarts
       # - ./config.yaml:/app/config.yaml:ro   # optional: cp config.example.yaml config.yaml first
+    command: ["--agent"]        # HTTPS + token on port 8765 — open https://<this-server>:8765 from your Mac (docs/agent.md)
     restart: unless-stopped

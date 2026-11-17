@@ -8,6 +8,7 @@ from http.server import BaseHTTPRequestHandler, HTTPServer
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 
+import detect  # noqa: E402
 import netwatch as nw  # noqa: E402
 import privacy as pv  # noqa: E402
 
@@ -139,14 +140,14 @@ def test_capturing_on_the_tunnel_itself_is_not_a_leak():
 
 
 def test_own_tor_relay_connection_is_marked_expected(monkeypatch):
-    monkeypatch.setattr(nw, "local_tor_running", lambda: True)
+    monkeypatch.setattr(detect, "local_tor_running", lambda: True)
     s = nw.NetState("live", "en0", ["192.168.1.50"], "192.168.1.1", geo=False, rdns=False)
     s.process({"t": 1.0, "len": 60, "src": "192.168.1.50", "dst": "195.154.170.135", "proto": "TCP",
                "sp": 50000, "dp": 9001, "flags": "S"})
     a = next(a for a in s.alerts if a["type"] == "Ύποπτη εξερχόμενη θύρα")
     assert "δικό σου Tor" in a["benign"]
     assert s.hosts["195.154.170.135"]["threat"] == 0 and s.status()["alerts"] == 0
-    monkeypatch.setattr(nw, "local_tor_running", lambda: False)
+    monkeypatch.setattr(detect, "local_tor_running", lambda: False)
     s.process({"t": 2.0, "len": 60, "src": "192.168.1.50", "dst": "5.6.7.8", "proto": "TCP",
                "sp": 50001, "dp": 9001, "flags": "S"})
     other = next(a for a in s.alerts if a["actor"] == "5.6.7.8")

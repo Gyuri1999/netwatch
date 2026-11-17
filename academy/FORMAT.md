@@ -34,7 +34,7 @@ ACADEMY.track({ ...track... });          // μια διαδρομή μαθημά
 | `quiz` | `q, opts:[..], ok:index, why` | Ερώτηση πολλαπλής επιλογής (μία σωστή). `why` = εξήγηση που φαίνεται μετά. |
 | `cli` | `title, prompt, banner, steps:[{task, expect, ans, out, next, err}], done` | Καθοδηγούμενο lab Cisco IOS. `expect` = regex (string, case-insensitive) για την εντολή του χρήστη, `ans` = η σωστή εντολή (για το 💡), `out` = τι τυπώνει ο «router», `next` = νέο prompt (π.χ. `R1(config)#`). |
 | `subnet` | — | Γεννήτρια ασκήσεων subnetting (άπειρες ερωτήσεις). |
-| `netwatch` | `tab, md` | Σύνδεσμος σε καρτέλα του NetWatch (`home`, `alerts`, `wifi`, `priv`, `devs`, `hosts`, `apps`, `feed`, `stats`, `pentest`, `rules`, `honey`…). |
+| `netwatch` | `tab, md` | Σύνδεσμος σε καρτέλα του NetWatch (`home`, `alerts`, `wifi`, `priv`, `devs`, `hosts`, `apps`, `feed`, `stats`, `pentest`, `rules`, `honey`, `iot`, `sensor`, `mqtt`…). Η πλήρης λίστα είναι το `TABS` στο `tools/check_academy.js`. |
 
 ## Scene (animation)
 

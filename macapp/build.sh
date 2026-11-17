@@ -27,7 +27,7 @@ iconutil -c icns "$ICONSET" -o "$OUT/Contents/Resources/NetWatch.icns"
 
 echo "▸ αρχεία NetWatch"
 cp macapp/Info.plist "$OUT/Contents/Info.plist"
-rsync -a --exclude '__pycache__' --exclude '*.md' netwatch.py pentest.py rules.py ctf.py wifiguard.py privacy.py apps.py honeypot.py blocker.py \
+rsync -a --exclude '__pycache__' --exclude '*.md' ./*.py \
   index.html edu.js academy config.example.yaml requirements.txt rules ctf samples "$OUT/Contents/Resources/netwatch/"
 rm -f "$OUT/Contents/Resources/netwatch/rules/local.yaml"
 
@@ -40,18 +40,19 @@ if [ ! -x "$VENV/bin/python" ]; then
   echo "▸ Python περιβάλλον στο $VENV"
   mkdir -p "$(dirname "$VENV")"
   /usr/bin/python3 -m venv "$VENV"
-  "$VENV/bin/pip" install -q -r requirements.txt
 fi
+"$VENV/bin/pip" install -q --disable-pip-version-check -r requirements.txt   # και για νέες εξαρτήσεις (π.χ. paho-mqtt)
 
-if [ "${1:-}" = "--dmg" ]; then
+case " $* " in *" --dmg "*)
   echo "▸ δίσκος εγκατάστασης (.dmg)"
   STAGE="$BUILD/dmg"
   rm -rf "$STAGE" dist/NetWatch.dmg && mkdir -p "$STAGE"
   cp -R "$OUT" "$STAGE/"
   ln -s /Applications "$STAGE/Applications"   # σύρε το NetWatch εδώ
   hdiutil create -quiet -volname NetWatch -srcfolder "$STAGE" -ov -format UDZO dist/NetWatch.dmg
-  echo "✔ $ROOT/dist/NetWatch.dmg ($(du -h dist/NetWatch.dmg | cut -f1))"
-elif [ "${1:-}" = "--install" ]; then
+  echo "✔ $ROOT/dist/NetWatch.dmg ($(du -h dist/NetWatch.dmg | cut -f1))";;
+esac
+if [[ " $* " == *" --install "* ]]; then
   mkdir -p "$HOME/Applications"
   rm -rf "$HOME/Applications/NetWatch.app"
   cp -R "$OUT" "$HOME/Applications/"

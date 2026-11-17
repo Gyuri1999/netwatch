@@ -172,6 +172,9 @@ a.mitre:hover{border-color:#b388ff}
     <div class="tab" id="t-apps"></div>
     <div class="tab" id="t-honey"></div>
     <div class="tab" id="t-block"></div>
+    <div class="tab" id="t-iot"></div>
+    <div class="tab" id="t-sensor"></div>
+    <div class="tab" id="t-mqtt"></div>
     <div class="tab" id="t-tips"></div>
     <div class="tab" id="t-hist"></div>
     <div class="tab" id="t-audit"></div>
@@ -419,7 +422,7 @@ cv.addEventListener('click',e=>{const[n]=pick(e);if(n)select(n.ip);else if(S.sel
 let tab='home';
 // Ενότητες σε κάρτες: μία σειρά καρτελών + μενού «☰ Ενότητες» (και πλέγμα στην Αρχική)
 const SECTIONS=[
-  ['🛡 Προστασία',[['alerts','⚠ Επιθέσεις','τι ύποπτο έγινε, με απλά λόγια'],['wifi','☕ Wi‑Fi','είμαι ασφαλής σε αυτό το δίκτυο;'],['priv','🕵 Ανωνυμία','Tor, VPN, διαρροές'],['audit','🛡 Έλεγχος','βαθμός ασφάλειας του σπιτιού'],['honey','🪤 Παγίδα','ψεύτικες θύρες που πιάνουν όποιον ψάχνει'],['block','🚫 Μπλοκ','IP που έκοψες με το τείχος']]],
+  ['🛡 Προστασία',[['alerts','⚠ Επιθέσεις','τι ύποπτο έγινε, με απλά λόγια'],['wifi','☕ Wi‑Fi','είμαι ασφαλής σε αυτό το δίκτυο;'],['priv','🕵 Ανωνυμία','Tor, VPN, διαρροές'],['audit','🛡 Έλεγχος','βαθμός ασφάλειας του σπιτιού'],['honey','🪤 Παγίδα','ψεύτικες θύρες που πιάνουν όποιον ψάχνει'],['block','🚫 Μπλοκ','IP που έκοψες με το τείχος'],['iot','🔌 IoT μου','ESP32 & Raspberry Pi: πόσο ασφαλή είναι'],['sensor','📡 Αισθητήρες','ESP32 που φυλάνε τον αέρα (deauth, evil twin)'],['mqtt','📨 MQTT','ο broker σου: ποιος μπαίνει, τι στέλνει']]],
   ['🌐 Το δίκτυό μου',[['devs','📟 Συσκευές','ποιος είναι συνδεδεμένος'],['hosts','🌍 Προορισμοί','πού μιλάει ο υπολογιστής'],['apps','📱 Εφαρμογές','ποια app μιλάει με ποιον · trackers'],['stats','📊 Στατιστικά','πρωτόκολλα, κίνηση, MITRE'],['feed','📦 Πακέτα','ζωντανά πακέτα & στρώματα OSI'],['det','🔎 Λεπτομέρειες','όλα για μία IP'],['hist','🕓 Ιστορικό','παλιές ειδοποιήσεις & συσκευές']]],
   ['🔴 Εργαλεία',[['pentest','🔴 Pentest','σάρωση LAN, CVE, purple-team lab'],['rules','🧩 Κανόνες','γράψε δικούς σου ανιχνευτές'],['ctf','🚩 CTF','ασκήσεις ανάλυσης κίνησης']]],
   ['📚 Μάθηση',[['academy','🎓 Ακαδημία','CCNA & IoT security, από το μηδέν'],['learn','📚 Μάθε','πώς δουλεύουν οι επιθέσεις'],['tips','💡 Συμβουλές','τι να κάνεις τώρα'],['quiz','❓ Κουίζ','τεστάρισε τι έμαθες']]]];
@@ -435,7 +438,7 @@ function showTab(t){tab=t;document.querySelectorAll('nav [data-t]').forEach(b=>b
   $('curtab').textContent=t==='home'||t==='alerts'?'':SECT_NAME[t]||'';
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
   if(t==='alerts'){S.unread=0;$('ac').style.display='none'}renderTab()}
-function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,rules:renderRules,ctf:renderCtf,wifi:renderWifi,priv:renderPriv,home:renderHome,academy:renderAcademy,apps:renderApps,honey:renderHoney,block:renderBlock})[tab]()}
+function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,rules:renderRules,ctf:renderCtf,wifi:renderWifi,priv:renderPriv,home:renderHome,academy:renderAcademy,apps:renderApps,honey:renderHoney,block:renderBlock,iot:renderIot,sensor:renderSensor,mqtt:renderMqtt})[tab]()}
 function renderAcademy(){const el=$('t-academy');if(el.dataset.r)return;el.dataset.r=1;window.ACADEMY?ACADEMY.render(el):el.innerHTML='<div class="empty">Δεν φορτώθηκε η Ακαδημία</div>'}
 function tabHover(){return document.querySelector('.tab.on:hover')}
 
@@ -546,7 +549,9 @@ function systemHTML(){const f=S.features;if(!f)return'';const it=f.intel||{};
    <div>🧠 Ανιχνευτές: <b>${on}/${det.length}</b> ενεργοί ${det.filter(d=>!d[1]).map(d=>`<span class="tag">${esc(d[0])} off</span>`).join('')}</div>
    <div>⛔ Threat intel: ${it.loaded?`<b>${(it.entries||0).toLocaleString('el-GR')}</b> δίκτυα`:'φόρτωση…'} ${(it.feeds||[]).map(x=>`<span class="tag ${x.ok?'g':'r'}" title="${esc(x.error||x.source||'')}">${esc(x.name)} ${x.ok?x.entries:'✖'}</span>`).join('')}</div>
    <div>🛡 AbuseIPDB: ${f.abuseipdb?'<span class="tag g">ενεργό</span>':'<span class="sm">βάλε abuseipdb_key στο config.yaml</span>'}</div>
-   <div>🔔 Ειδοποιήσεις: ${f.notify?`${f.notify.macos?'<span class="tag g">macOS</span>':''}${f.notify.telegram?'<span class="tag g">Telegram</span>':''} <span class="sm">από ${esc(f.notify.min_severity)}</span>`:'<span class="sm">ανενεργές (μόνο σε live ή με --notify)</span>'}</div>
+   <div>🔔 Ειδοποιήσεις: ${f.notify?`${f.notify.macos?'<span class="tag g">macOS</span>':''}${f.notify.telegram?'<span class="tag g">Telegram</span>':''}${f.notify.ntfy?'<span class="tag g">ntfy 📱</span>':''} <span class="sm">από ${esc(f.notify.min_severity)}</span>`:'<span class="sm">ανενεργές (μόνο σε live ή με --notify)</span>'}
+     <button class="b" onclick="testNotify(this)">📱 δοκιμή</button>
+     ${f.notify&&!f.notify.telegram&&!f.notify.ntfy?`<div class="sm" style="margin-top:3px">Για ειδοποιήσεις στο <b>κινητό</b>: εγκατέστησε την εφαρμογή <b>ntfy</b>, κάνε subscribe σε ένα μεγάλο τυχαίο topic, και στο <code>config.yaml</code> βάλε <code>notify: {ntfy: {topic: "netwatch-…τυχαίο…"}}</code>. Στο δημόσιο ntfy.sh όποιος ξέρει το topic διαβάζει τα μηνύματα — γι' αυτό τυχαίο, ή στήσε δικό σου ntfy server στο Proxmox.</div>`:''}</div>
    <div>🗄 Ιστορικό: <span class="sm">${esc(f.history===':memory:'?'στη μνήμη (χάνεται στο κλείσιμο)':f.history)}</span></div>
    <div>⚙ Ρυθμίσεις: <span class="sm">${esc(f.config||'προεπιλογές (φτιάξε config.yaml από το config.example.yaml)')}</span> · allowlist ${f.allowlist?.ips||0} IP / ${f.allowlist?.macs||0} MAC / ${f.allowlist?.domains||0} domains</div></div>`}
 const TACTICS=['Reconnaissance','Initial Access','Discovery','Credential Access','Lateral Movement','Command and Control','Exfiltration','Impact'];
@@ -629,7 +634,7 @@ function renderDet(){
   const al=S.alerts.filter(a=>a.actor===h.ip||a.target===h.ip);const ip=encodeURIComponent(h.ip);
   const hits=h.hits||[],mx=Math.max(1,...hits.map(x=>x[1]));const atk=h.threat>=2;
   el.innerHTML=`<h2>${flag(g?.countryCode)} ${esc(h.ip)}</h2><div>${tags.join('')}</div>
-  <div style="margin-top:6px">${g?`<button class="b" data-map="${esc(h.ip)}">📍 Δείξε στον χάρτη</button>`:''}</div>
+  <div style="margin-top:6px">${g?`<button class="b" data-map="${esc(h.ip)}">📍 Δείξε στον χάρτη</button> `:''}<button class="b" onclick="pktOpen('${esc(h.ip)}')" title="Σπάσε ένα πραγματικό πακέτο σε επίπεδα OSI, με εξήγηση για κάθε πεδίο (CCNA)">🔬 Εξήγησέ μου ένα πακέτο</button></div>
   ${verdict(h,al)}
   ${hits.length?`<h3>🎯 ${atk?'Τι χτυπάει':'Πού συνδέεται / τι ζητάει'}</h3><div class="sm" style="margin-bottom:6px">${atk?'Οι θύρες/υπηρεσίες που δοκίμασε και γιατί τις θέλει ένας επιτιθέμενος:':'Οι υπηρεσίες στις οποίες ξεκίνησε συνδέσεις:'}</div>`+
     hits.slice(0,15).map(([p,c,s])=>{const pi=portInfo(p);return `<div class="hit"><div class="brow"><span><b>${esc(p)}</b> ${esc(pi?pi[0]:s||'')} <span class="sm">${esc(pi?pi[1]:'')}</span></span><span>×${c}</span></div><div class="bar"><i style="width:${c/mx*100}%;background:${atk?'#ff3b5c':'#3ec5ff'}"></i></div>${atk&&pi?`<div class="why">→ ${esc(pi[2])}</div>`:''}</div>`}).join(''):''}
@@ -663,6 +668,28 @@ function renderDet(){
   const wb=$('wb');if(wb)wb.onclick=()=>{wb.textContent='φόρτωση…';fetch('/api/whois?ip='+ip).then(r=>r.json()).then(j=>{if(S.sel===j.ip){S.whois=j.text;renderDet()}})};
 }
 
+// ---- 🔬 «Εξήγησέ μου αυτό το πακέτο» (OSI, για CCNA) ----
+const OSI_C={2:'#7fd1ff',3:'#c9a8ff',4:'#ffd23f',7:'#3ddc97'},OSI_N={2:'Layer 2 · Data Link',3:'Layer 3 · Network',4:'Layer 4 · Transport',7:'Layer 7 · Application'};
+function pktBox(){let o=$('pkt-ov');if(!o){o=document.createElement('div');o.id='pkt-ov';o.style.cssText='position:fixed;inset:0;z-index:60;background:rgba(3,7,14,.82);display:flex;align-items:flex-start;justify-content:center;overflow:auto;padding:24px 12px';
+  o.onclick=e=>{if(e.target===o)o.remove()};document.body.appendChild(o)}return o}
+function pktOpen(ip){const o=pktBox();o.innerHTML='<div class="card" style="max-width:820px;width:100%;white-space:normal">φόρτωση…</div>';
+  fetch('/api/packet?ip='+encodeURIComponent(ip)).then(r=>r.json()).then(j=>{const f=j.flows||[];
+    o.innerHTML=`<div class="card" style="max-width:820px;width:100%;white-space:normal"><div class="brow"><b style="color:#fff">🔬 Πακέτα της ${esc(ip)}</b><button class="b" onclick="$('pkt-ov').remove()">✕</button></div>
+    <div class="sm" style="margin:4px 0 8px">Διάλεξε μια σύνδεση για να δεις ένα πακέτο της «ανοιγμένο» σε επίπεδα OSI. Από τα δεδομένα δείχνω μόνο το μέγεθος, ποτέ το περιεχόμενο.</div>
+    ${f.length?f.map(x=>`<div class="r" style="cursor:pointer" data-f="${esc(x.src)}|${esc(x.dst)}">${esc(who(x.src))} → ${esc(who(x.dst))} <span class="tag">${esc(x.proto||'?')}${x.dp?' :'+x.dp:''}</span>${x.flags?` <span class="sm">${esc(x.flags)}</span>`:''} <span class="sm">${x.len||''} B${x.real?'':' · ανακατασκευή'}</span></div>`).join(''):'<div class="empty">Δεν έχω δει ακόμα πακέτα της.</div>'}</div>`;
+    o.querySelectorAll('[data-f]').forEach(d=>d.onclick=()=>{const [a,b]=d.dataset.f.split('|');pktShow(ip,a,b)})})}
+function pktShow(ip,a,b){const o=pktBox();fetch(`/api/packet?src=${encodeURIComponent(a)}&dst=${encodeURIComponent(b)}`).then(r=>r.json()).then(d=>{
+  if(d.error){alert(d.error);return}
+  const lay=d.layers.slice().reverse();
+  o.innerHTML=`<div class="card" style="max-width:820px;width:100%;white-space:normal"><div class="brow"><b style="color:#fff">🔬 ${esc(d.summary)}</b><span><button class="b" id="pkt-back">← πίσω</button> <button class="b" onclick="$('pkt-ov').remove()">✕</button></span></div>
+   <div class="sm" style="margin:4px 0 8px">${d.real?'Πραγματικό πακέτο από το δίκτυό σου':'Ανακατασκευή από όσα ξέρω (σε demo ή όταν δεν κράτησα τα bytes)'} · ${d.total} bytes συνολικά. Η <b>ενθυλάκωση</b>: κάθε επίπεδο «τυλίγει» το από πάνω του — διάβασέ το από πάνω (εφαρμογή) προς τα κάτω (καλώδιο/Wi‑Fi). <a href="#" data-lesson="ccna-1-2">📖 OSI & ενθυλάκωση</a></div>
+   ${d.payload?`<div style="border:1px dashed #3ddc97;border-radius:6px;padding:6px 8px;margin-bottom:6px"><b style="color:#3ddc97">Δεδομένα εφαρμογής</b> <span class="sm">${d.payload} bytes · το περιεχόμενο δεν το δείχνω (μπορεί να είναι κρυπτογραφημένο ή να έχει κωδικούς)</span></div>`:''}
+   ${lay.map(l=>`<div style="border:1px solid ${OSI_C[l.osi]||'#1f3352'};border-radius:6px;padding:6px 8px;margin-bottom:6px">
+     <div class="brow"><b style="color:${OSI_C[l.osi]||'#fff'}">${esc(l.name)}</b><span class="sm">${OSI_N[l.osi]||''} · κεφαλίδα ${l.bytes} B</span></div>
+     ${l.info?`<div style="color:#9fb4d0;margin:2px 0 4px">${esc(l.info)}${l.lesson?` <a href="#" data-lesson="${esc(l.lesson)}">📖</a>`:''}</div>`:''}
+     <table style="width:100%;border-collapse:collapse">${l.fields.map(f=>`<tr style="border-top:1px solid #12233a"><td style="padding:2px 6px;white-space:nowrap;color:#cfe0f5;vertical-align:top"><code>${esc(f.name)}</code></td><td style="padding:2px 6px;white-space:normal;word-break:break-all;color:#fff;vertical-align:top">${esc(f.value)}</td><td style="padding:2px 6px;white-space:normal;color:#9fb4d0;font-size:12px">${f.info?esc(f.info):''}${f.lesson?` <a href="#" data-lesson="${esc(f.lesson)}">📖</a>`:''}</td></tr>`).join('')}</table></div>`).join('')}</div>`;
+  $('pkt-back').onclick=()=>pktOpen(ip);
+  o.querySelectorAll('[data-lesson]').forEach(x=>x.onclick=e=>{e.preventDefault();o.remove();ACADEMY.openLesson('ccna',x.dataset.lesson)})})}
 let histHours=24,histData=null,histQ='',histBusy=false;
 function loadHist(){if(histBusy)return;histBusy=true;fetch('/api/history?hours='+histHours).then(r=>r.json()).then(j=>{histData=j;histBusy=false;if(tab==='hist')drawHist()}).catch(()=>{histBusy=false})}
 function renderHist(){loadHist();if(histData)drawHist();else $('t-hist').innerHTML='<div class="empty">φόρτωση…</div>'}
@@ -673,7 +700,7 @@ function drawHist(){const d=histData,el=$('t-hist');if(!d)return;const focus=doc
   const mx=Math.max(1,...agg.map(([,o])=>o.high+o.med+o.low));
   const q=histQ.toLowerCase();const rows=d.alerts.filter(a=>!q||(a.type+' '+a.actor+' '+a.target+' '+a.detail+' '+(a.mitre||'')).toLowerCase().includes(q));
   const fmtD=t=>new Date(t*1000).toLocaleString('el-GR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-  el.innerHTML=`<div style="display:flex;gap:4px;margin-bottom:8px">${[[1,'1 ώρα'],[24,'24 ώρες'],[168,'7 μέρες'],[720,'30 μέρες']].map(([h,l])=>`<button class="b" data-h="${h}" style="${h===histHours?'border-color:var(--cyan);color:#fff':''}">${l}</button>`).join('')}</div>
+  el.innerHTML=`<div style="display:flex;gap:4px;margin-bottom:8px">${[[1,'1 ώρα'],[24,'24 ώρες'],[168,'7 μέρες'],[720,'30 μέρες']].map(([h,l])=>`<button class="b" data-h="${h}" style="${h===histHours?'border-color:var(--cyan);color:#fff':''}">${l}</button>`).join('')}<a class="b" href="/report?days=7" target="_blank" style="margin-left:auto;text-decoration:none" title="Μία σελίδα με βαθμό, τι έγινε και τι να κάνεις — εκτυπώνεται σε PDF">📄 Αναφορά εβδομάδας</a></div>
    <div class="sm">Αποθηκεύονται μόνιμα σε SQLite: ${esc(S.features?.history||'')} · σύνολο ${d.total_alerts} ειδοποιήσεις${d.since_ever?' από '+fmtD(d.since_ever):''}</div>
    <h3>Ειδοποιήσεις ανά ώρα</h3><div style="display:flex;align-items:flex-end;gap:1px;height:70px">${agg.map(([b,o])=>`<div title="${fmtD(b)}: ${o.high} high / ${o.med} med / ${o.low} low" style="flex:1;display:flex;flex-direction:column-reverse;height:70px">${['low','med','high'].map(k=>`<div style="height:${o[k]/mx*70}px;background:${sevCol[k]}"></div>`).join('')}</div>`).join('')}</div>
    <div class="brow sm"><span>${agg.length?fmtD(agg[0][0]):''}</span><span>τώρα</span></div>
@@ -1037,6 +1064,80 @@ function drawHoney(){const d=honeyData,el=$('t-honey');if(d.error){el.innerHTML=
   el.querySelectorAll('[data-hp]').forEach(c=>c.onchange=()=>{c.checked?honeySel.add(+c.dataset.hp):honeySel.delete(+c.dataset.hp)});
   el.querySelectorAll('[data-ip]').forEach(x=>x.onclick=e=>{e.preventDefault();select(x.dataset.ip)});
   $('hp-tg').onclick=()=>post('/api/honeypot',on?{enable:false}:{enable:true,ports:[...honeySel]}).then(j=>{honeyData=j;drawHoney()})}
+// ---- 🔌 IoT μου: ESP32 / Raspberry Pi στο δίκτυο + έλεγχος ----
+let iotData=null,iotT=0;const iotCve={};
+function renderIot(){if(Date.now()-iotT>(iotData&&iotData.running?1200:5000)){iotT=Date.now();fetch('/api/iot').then(r=>r.json()).then(j=>{const chg=!iotData||iotData.running!==j.running||iotData.t!==j.t;iotData=j;if(tab==='iot'&&(chg||!tabHover()))drawIot()})}
+  if(!iotData)$('t-iot').innerHTML='<div class="empty">φόρτωση…</div>'}
+function drawIot(){const d=iotData,el=$('t-iot');if(d.error){el.innerHTML=`<div class="empty">${esc(d.error)}</div>`;return}
+  const r=d.result,icon={ok:'✅',warn:'⚠️',bad:'❌',info:'ℹ️'},K=d.kinds,LV={ok:'#3ddc97',warn:'#ffd23f',bad:'#ff3b5c'};
+  let h=`<div class="card" style="white-space:normal"><b style="color:#fff">🔌 Οι IoT συσκευές σου</b>${d.demo?' <span class="tag">προσομοίωση</span>':''}
+    <div class="sm" style="margin-top:3px">Βρίσκω <b>ESP32/ESP8266</b> και <b>Raspberry Pi</b> από τον κατασκευαστή της κάρτας δικτύου (MAC) και το όνομά τους — και με το ▶ Έλεγχος ψάχνω όλο το δίκτυό σου για <b>MQTT brokers</b> και <b>Telnet</b>, ό,τι μηχάνημα κι αν είναι (π.χ. VM). Ελέγχω τι αφήνουν ανοιχτό: Telnet, MQTT χωρίς κωδικό ή TLS, σελίδες χωρίς HTTPS… Δεν δοκιμάζω κωδικούς. Κάθε πρόβλημα έχει κουμπί για το μάθημα της 🎓 Ακαδημίας που δείχνει πώς φτιάχνεται.</div>
+    <div style="margin-top:6px">${d.found.length?d.found.map(f=>`<span class="tag">${K[f.kind][1]} ${esc(f.name||f.ip)}</span>`).join(' '):'<span class="sm">Δεν αναγνώρισα ακόμα καμία. Πάτα ▶ Έλεγχος για σάρωση του δικτύου, ή γράψε την IP:</span>'}</div>
+    <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap"><input id="iot-ips" placeholder="προαιρετικά: IP, π.χ. 192.168.1.60, 192.168.1.70" style="flex:1;min-width:180px;background:#060a12;border:1px solid #1f3352;border-radius:4px;color:#fff;padding:3px 6px">
+    <button class="b" id="iot-run" ${d.running?'disabled':''}>${d.running?'⏳ ελέγχω…':'▶ Έλεγχος'}</button></div></div>`;
+  if(r){if(!r.length)h+='<div class="empty">Δεν βρέθηκε καμία IoT συσκευή για έλεγχο.</div>';
+    h+=r.map(x=>`<div class="card" style="white-space:normal;border-left:3px solid ${LV[x.level]}"><div class="brow"><b style="color:#fff">${K[x.kind][1]} ${esc(x.name||K[x.kind][0])}</b><span style="color:${LV[x.level]};font-weight:700">${x.score}/100</span></div>
+      <div class="sm">${esc(K[x.kind][0])} · <a href="#" data-ip="${esc(x.ip)}">${esc(x.ip)}</a>${x.mac?' · '+esc(x.mac):''}</div>
+      ${x.findings.map(f=>`<div style="margin-top:6px">${icon[f.status]} <b style="color:#fff">${esc(f.title)}</b>${f.port?` <span class="sm">θύρα ${f.port}</span>`:''}<div style="color:#9fb4d0">${esc(f.detail)}</div>${f.fix?`<div class="sm">👉 ${esc(f.fix)}</div>`:''}${f.lesson?`<button class="b" data-lesson="${esc(f.lesson)}" style="margin-top:3px">📖 Πώς το φτιάχνω</button>`:''}</div>`).join('')}
+      ${(x.versions||[]).length?`<div class="sm" style="margin-top:8px">🧩 Λογισμικό: ${x.versions.map(v=>{const k=v.product+' '+v.version,c=iotCve[k];return `<span class="tag ${v.known.length?'y':''}">${esc(k)}</span> <button class="b" data-cve="${esc(v.product)}|${esc(v.version)}" title="ψάξε γνωστές ευπάθειες στο NVD">🔎 CVE</button>${c?`<div style="margin:4px 0 0 8px">${c.loading?'ψάχνω στο NVD…':c.error?esc(c.error):c.cves.length?c.cves.slice(0,5).map(e=>`<div><b style="color:${(e.score||0)>=7?'#ff3b5c':'#ffd23f'}">${esc(e.id)}</b> ${e.score??''} — ${esc(e.summary.slice(0,140))}</div>`).join('')+`<div class="sm">ενδεικτικά (αναζήτηση με λέξεις)· ${c.total} συνολικά</div>`:'καμία γνωστή στο NVD 👍'}</div>`:''}`}).join(' ')}</div>`:''}
+      <div class="sm" style="margin-top:8px;border-top:1px solid #1f3352;padding-top:6px">Δεν φαίνονται από το δίκτυο, αλλά μέτρα:<ul style="margin:3px 0 0 16px;padding:0">${x.tips.map(t=>`<li>${esc(t)}</li>`).join('')}</ul></div></div>`).join('');
+    h+=`<div class="sm" style="margin:4px 2px">τελευταίος έλεγχος ${new Date(d.t*1000).toLocaleTimeString('el-GR')}</div>`}
+  el.innerHTML=h;
+  el.querySelectorAll('[data-lesson]').forEach(b=>b.onclick=()=>ACADEMY.openLesson('iot',b.dataset.lesson));
+  el.querySelectorAll('[data-cve]').forEach(b=>b.onclick=()=>{const [p,v]=b.dataset.cve.split('|'),k=p+' '+v;if(iotCve[k]&&!iotCve[k].error)return;iotCve[k]={loading:true};drawIot();
+    fetch('/api/cve?product='+encodeURIComponent(p)+'&version='+encodeURIComponent(v)).then(r=>r.json()).then(j=>{iotCve[k]=j.error?{error:j.error}:j;drawIot()}).catch(e=>{iotCve[k]={error:String(e)};drawIot()})});
+  el.querySelectorAll('[data-ip]').forEach(x=>x.onclick=e=>{e.preventDefault();select(x.dataset.ip)});
+  $('iot-run').onclick=()=>{const ips=$('iot-ips').value.split(/[\s,]+/).filter(Boolean);post('/api/iot',{ips}).then(j=>{if(j.error&&!j.found)return alert(j.error);iotData=j;iotT=0;drawIot()})}}
+// ---- 📡 Αισθητήρες ESP32 (NetWatch Sentinel μέσω MQTT) ----
+let sensData=null,sensT=0;
+function renderSensor(){if(Date.now()-sensT>4000){sensT=Date.now();fetch('/api/sensor').then(r=>r.json()).then(j=>{sensData=j;if(tab==='sensor'&&!tabHover())drawSensor()})}
+  if(!sensData)$('t-sensor').innerHTML='<div class="empty">φόρτωση…</div>'}
+function drawSensor(){const d=sensData,el=$('t-sensor');if(d.error&&!d.sensors){el.innerHTML=`<div class="empty">${esc(d.error)}</div>`;return}
+  let h=`<div class="card" style="white-space:normal"><b style="color:#fff">📡 Αισθητήρες Wi‑Fi (ESP32)</b>${d.demo?' <span class="tag">προσομοίωση</span>':''}
+    <div class="sm" style="margin-top:3px">Ο υπολογιστής σου δεν μπορεί να «ακούσει» όλο τον αέρα. Ένα ESP32 με το firmware <b>NetWatch Sentinel</b> μπορεί: πιάνει <b>deauth επιθέσεις</b> (κάποιος πετάει συσκευές από το Wi‑Fi) και <b>evil twins</b> του δικτύου σου, και τα στέλνει εδώ μέσω MQTT με TLS. Είναι μόνο παθητικό· δεν εκπέμπει ποτέ επιθέσεις.</div>
+    <div style="margin-top:6px">${d.configured?`${d.connected?'<span class="tag g">συνδεδεμένο στο broker</span>':'<span class="tag y">αποσυνδεδεμένο</span>'} ${d.broker?`<span class="sm">${esc(d.broker)}</span>`:''}`:'<span class="tag">δεν έχει ρυθμιστεί</span>'}${d.error?`<div style="color:#ff8da0;margin-top:4px">${esc(d.error)}</div>`:''}</div></div>`;
+  if(!d.configured)h+=`<div class="card" style="white-space:normal"><b style="color:#fff">Πώς το στήνω</b><ol style="margin:6px 0 0 18px;padding:0;line-height:1.7">
+    <li>Mosquitto με TLS στο Raspberry Pi — <a href="#" data-lesson="iot-4-3">📖 μάθημα: Δική σου CA και TLS στο 8883</a></li>
+    <li>Firmware: <code>firmware/esp32-sentinel/</code> → αντίγραψε <code>secrets.example.h</code> σε <code>secrets.h</code>, συμπλήρωσε, και <code>arduino-cli compile --fqbn esp32:esp32:esp32 firmware/esp32-sentinel</code> + upload (οδηγίες στο README του φακέλου)</li>
+    <li>Στο <code>config.yaml</code> του NetWatch:<pre style="font-size:11.5px;background:#060a12;padding:6px;border-radius:4px;margin:4px 0">sensor:
+  mqtt_host: pi-broker.local
+  mqtt_port: 8883
+  ca_file: ~/iot-ca/ca.crt
+  username: netwatch
+  password: "…"</pre></li><li>Επανεκκίνηση του NetWatch.</li></ol></div>`;
+  if(d.sensors.length)h+='<h3>Αισθητήρες</h3>'+d.sensors.map(x=>`<div class="card" style="white-space:normal"><div class="brow"><b style="color:#fff">${x.kind==='canary'?'🐤':'📟'} ${esc(x.id)}</b>${x.online?'<span class="tag g">online</span>':'<span class="tag r">offline</span>'}</div>
+    <div class="sm">${x.ip?esc(x.ip)+' · ':''}fw ${esc(x.fw||'?')} · σήμα ${x.rssi??'?'} dBm · μνήμη ${x.heap?Math.round(x.heap/1024)+' KB':'?'} · σε λειτουργία ${x.uptime?Math.round(x.uptime/60)+'′':'?'} · τελευταίο νέο πριν ${x.ago}″</div>
+    <div style="margin-top:4px">${x.kind==='canary'?`🐤 καναρίνι · αγγίχτηκε: <b style="color:${x.canary_hits?'#ff3b5c':'#3ddc97'}">${x.canary_hits||0}</b> φορές${x.suppressed?` <span class="sm">(+${x.suppressed} περιορίστηκαν)</span>`:''}`:`⚡ deauth: <b style="color:${x.deauth_total?'#ff3b5c':'#3ddc97'}">${x.deauth_total||0}</b> · 👯 evil twins/άγνωστα AP: <b style="color:${x.twins_total?'#ff3b5c':'#3ddc97'}">${x.twins_total||0}</b>`}</div></div>`).join('');
+  h+=`<h3>Τελευταία γεγονότα</h3>`+(d.events.length?d.events.map(e=>`<div class="card" style="white-space:normal"><b style="color:#ff8da0">${esc(e.title)}</b> <span class="sm">${new Date(e.t*1000).toLocaleTimeString('el-GR')} · ${esc(e.sensor)}</span><div style="color:#9fb4d0;margin-top:3px">${esc(e.detail)}</div></div>`).join(''):'<div class="empty">Ησυχία στον αέρα. 👌</div>');
+  h+=`<div class="card sm" style="white-space:normal">📖 Θες να καταλάβεις πώς δουλεύει; <a href="#" data-lesson="iot-9-1">Τελικό project της Ακαδημίας: αισθητήρας → MQTT/TLS → Pi</a> · <a href="#" data-lesson="iot-3-2">Evil twin & deauth</a></div>`;
+  el.innerHTML=h;el.querySelectorAll('[data-lesson]').forEach(a=>a.onclick=e=>{e.preventDefault();ACADEMY.openLesson('iot',a.dataset.lesson)})}
+// ---- 📨 Φύλακας MQTT broker ----
+let mqData=null,mqT=0;
+function renderMqtt(){if(Date.now()-mqT>3000){mqT=Date.now();fetch('/api/mqtt').then(r=>r.json()).then(j=>{mqData=j;if(tab==='mqtt'&&!tabHover())drawMqtt()})}
+  if(!mqData)$('t-mqtt').innerHTML='<div class="empty">φόρτωση…</div>'}
+function drawMqtt(){const d=mqData,el=$('t-mqtt');if(d.error&&!d.devices){el.innerHTML=`<div class="empty">${esc(d.error)}</div>`;return}
+  const ago=s=>s<90?s+'″':s<5400?Math.round(s/60)+'′':Math.round(s/3600)+'ω',tm=t=>new Date(t*1000).toLocaleTimeString('el-GR');
+  let h=`<div class="card" style="white-space:normal"><b style="color:#fff">📨 Φύλακας του MQTT broker</b>${d.demo?' <span class="tag">προσομοίωση</span>':''}
+    <div class="sm" style="margin-top:3px">Συνδέομαι στον broker σου με δικό μου χρήστη που <b>μόνο διαβάζει</b>, μαθαίνω ποιοι clients μπαίνουν και ποια topics χρησιμοποιεί κάθε συσκευή, και σε ειδοποιώ για <b>άγνωστο client</b>, <b>νέο topic</b>, <b>εντολή μέσα στη νύχτα</b> ή συσκευή που <b>σιώπησε</b>.</div>
+    <div style="margin-top:6px">${d.configured?`${d.connected?'<span class="tag g">συνδεδεμένος</span>':'<span class="tag y">αποσυνδεδεμένος</span>'} ${d.broker?`<span class="sm">${esc(d.broker)}</span>`:''} ${d.info.version?`<span class="sm">· ${esc(d.info.version)}</span>`:''} ${d.info.clients?`<span class="sm">· ${esc(d.info.clients)} clients τώρα</span>`:''}
+      ${d.learning?`<span class="tag y">μαθαίνω ακόμα ${Math.ceil(d.learn_left/60)}′</span>`:'<span class="tag g">ξέρω τι είναι φυσιολογικό</span>'} <button class="b" id="mq-relearn" title="ξέχνα ό,τι έμαθα και ξεκίνα από την αρχή">↺ ξαναμάθε</button>`:'<span class="tag">δεν έχει ρυθμιστεί</span>'}
+    ${d.error?`<div style="color:#ff8da0;margin-top:4px">${esc(d.error)}</div>`:''}</div></div>`;
+  if(!d.configured)h+=`<div class="card" style="white-space:normal"><b style="color:#fff">Πώς το στήνω</b><ol style="margin:6px 0 0 18px;padding:0;line-height:1.7">
+    <li>Στον broker: χρήστης <code>netwatch</code> (<code>mosquitto_passwd /etc/mosquitto/passwd netwatch</code>) με ACL μόνο ανάγνωσης: <code>user netwatch</code> / <code>topic read #</code> / <code>topic read $SYS/#</code></li>
+    <li>Για να βλέπω <b>ποιος συνδέεται</b>: <code>log_dest topic</code> στο <code>mosquitto.conf</code> και restart</li>
+    <li>Στο <code>config.yaml</code> του NetWatch:<pre style="font-size:11.5px;background:#060a12;padding:6px;border-radius:4px;margin:4px 0">mqtt_guard:
+  host: 192.168.1.17
+  port: 1883          # 8883 + ca_file όταν βάλεις TLS
+  username: netwatch
+  password: "…"</pre></li><li>Επανεκκίνηση του NetWatch. <a href="#" data-lesson="iot-4-8">📖 Αναλυτικά στην Ακαδημία</a></li></ol></div>`;
+  if(d.configured&&d.connected&&!d.has_log)h+=`<div class="card sm" style="white-space:normal">ℹ️ Δεν βλέπω το log του broker, άρα δεν ξέρω <b>ποιος</b> συνδέεται — μόνο τι στέλνεται. Πρόσθεσε <code>log_dest topic</code> στο mosquitto.conf.</div>`;
+  if(d.clients.length)h+='<h3>Clients που ξέρω</h3>'+d.clients.map(c=>`<div class="card"><div class="brow"><b style="color:#fff">${esc(c.id)}</b><span class="sm">${c.n} συνδέσεις · τελευταία πριν ${ago(Math.round(Date.now()/1000-c.last))}</span></div><div class="sm">${c.user?'χρήστης '+esc(c.user)+' · ':''}από ${c.ips.map(esc).join(', ')}</div></div>`).join('');
+  if(d.devices.length)h+='<h3>Συσκευές (από τα topics)</h3>'+d.devices.map(x=>`<div class="card"><div class="brow"><b style="color:#fff">${esc(x.id)}</b>${x.silent?'<span class="tag r">σιωπά</span>':'<span class="tag g">στέλνει</span>'}</div><div class="sm">${x.n} μηνύματα${x.gap?` · κάθε ~${Math.round(x.gap)}″`:''} · τελευταίο πριν ${ago(x.ago)}</div></div>`).join('');
+  if(d.configured)h+=`<h3>Ζωντανά μηνύματα</h3>`+(d.msgs.length?`<div class="card" style="font-family:inherit;max-height:340px;overflow:auto">${d.msgs.map(m=>`<div style="padding:2px 0;border-bottom:1px solid #12233a"><span class="sm">${tm(m.t)}</span> <b style="color:${/(^|\/)(set|cmd|command|relay|switch)(\/|$)/i.test(m.topic)?'#ffd23f':'#7fd1ff'}">${esc(m.topic)}</b>${m.retained?' <span class="tag">retained</span>':''} <span style="color:#cfe0f5">${esc(m.payload)}</span></div>`).join('')}</div>`:'<div class="empty">Περιμένω μηνύματα…</div>');
+  el.innerHTML=h;el.querySelectorAll('[data-lesson]').forEach(a=>a.onclick=e=>{e.preventDefault();ACADEMY.openLesson('iot',a.dataset.lesson)});
+  const rb=$('mq-relearn');if(rb)rb.onclick=()=>{if(confirm('Να ξεχάσω ό,τι έμαθα για τον broker και να ξαναμάθω από την αρχή (15′);'))post('/api/mqtt',{relearn:true}).then(j=>{mqData=j;drawMqtt()})}}
+function testNotify(b){b.disabled=true;b.textContent='στέλνω…';post('/api/notify',{test:true}).then(j=>{b.disabled=false;b.textContent='📱 δοκιμή';
+  alert('Δοκιμαστική ειδοποίηση:\n'+Object.entries(j.result||{}).map(([k,v])=>`• ${k}: ${v}`).join('\n')+(Object.keys(j.result||{}).length?'':'κανένα κανάλι δεν έχει ρυθμιστεί'))})}
 let privData=null,privBrowser=null;
 function loadPriv(){return fetch('/api/privacy').then(r=>r.json()).then(j=>{privData=j;if(tab==='priv')drawPriv();if(j.running)setTimeout(loadPriv,1500)})}
 function renderPriv(){if(!privData){$('t-priv').innerHTML='<div class="empty">φόρτωση…</div>';loadPriv();return}drawPriv()}

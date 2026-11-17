@@ -157,6 +157,35 @@
     show();
   }
 
+  // ---------- πραγματικό τερματικό (ασφαλείς εντολές δικτύου, μέσω /api/shell) ----------
+  const termHist = [];
+  function Term(host, code) {
+    if (host.innerHTML) { host.innerHTML = ''; return; }  // 2ο κλικ = κλείσιμο
+    const cmds = String(code).split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#')).map(l => l.replace(/\s+#.*$/, ''));
+    host.innerHTML = `<div class="ac-cli ac-real"><div class="sm" style="font-family:-apple-system,sans-serif;margin-bottom:6px">Πατάς μια εντολή → μπαίνει στη γραμμή → <b>Enter</b>. Τρέχει <b>στο Mac σου</b>, ως ο χρήστης σου, μόνο ασφαλείς εντολές δικτύου (χωρίς sudo). Για εντολές του Raspberry Pi σού λέω την αντίστοιχη του Mac.</div>
+      <div class="ac-chips">${cmds.map((c, i) => `<button class="b ac-chip" data-i="${i}" title="βάλ' την στη γραμμή">${E(c)}</button>`).join('')}</div>
+      <div class="ac-term"></div><div style="display:flex;gap:6px;margin-top:6px"><span class="ac-prompt">you@mac ~ %</span><input class="ac-in" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="γράψε εντολή και Enter (↑ ιστορικό)"></div></div>`;
+    const term = host.querySelector('.ac-term'), inp = host.querySelector('.ac-in');
+    const print = (t, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = t; term.appendChild(d); term.scrollTop = 1e9; return d; };
+    host.querySelectorAll('.ac-chip').forEach(b => b.onclick = () => { inp.value = cmds[+b.dataset.i]; inp.focus(); });
+    let hi = termHist.length;
+    inp.onkeydown = e => {
+      if (e.key === 'ArrowUp') { if (hi > 0) inp.value = termHist[--hi]; e.preventDefault(); return; }
+      if (e.key === 'ArrowDown') { inp.value = hi < termHist.length - 1 ? termHist[++hi] : (hi = termHist.length, ''); e.preventDefault(); return; }
+      if (e.key !== 'Enter' || inp.disabled) return;
+      const v = inp.value.trim(); if (!v) return; inp.value = ''; termHist.push(v); hi = termHist.length;
+      if (v === 'clear') { term.innerHTML = ''; return; }
+      print('you@mac ~ % ' + v, 'ac-cmd'); const wait = print('⏳ τρέχει…', 'sm'); inp.disabled = true;
+      fetch('/api/shell', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cmd: v }) }).then(r => r.json()).then(j => {
+        wait.remove();
+        if (j.blocked) { const d = print('', 'ac-hint'); d.innerHTML = '💡 ' + inline(j.out);
+          if (j.suggest) { const b = document.createElement('button'); b.className = 'b ac-chip'; b.style.marginTop = '4px'; b.textContent = '↪ ' + j.suggest; b.title = 'βάλ\' την στη γραμμή και πάτα Enter'; b.onclick = () => { inp.value = j.suggest; inp.focus(); }; d.appendChild(document.createElement('br')); d.appendChild(b); } }
+        else { print(j.out || '(καμία έξοδος)', j.ok ? 'ac-out' : 'ac-err'); print(`[${j.ok ? '✔' : '✖ κωδικός ' + j.code} · ${(j.ms / 1000).toFixed(1)}″]`, 'sm'); }
+      }).catch(er => { wait.remove(); print('Σφάλμα: ' + er, 'ac-err'); }).finally(() => { inp.disabled = false; inp.focus(); });
+    };
+    inp.focus();
+  }
+
   // ---------- εξάσκηση subnetting ----------
   function Subnet(host) {
     const ip2n = s => s.split('.').reduce((a, x) => a * 256 + (+x), 0), n2ip = n => [24, 16, 8, 0].map(b => Math.floor(n / 2 ** b) % 256).join('.');
@@ -189,7 +218,7 @@
       case 'warn': return `<div class="ac-box ac-warn">⚠️ ${md(b.md)}</div>`;
       case 'exam': return `<div class="ac-box ac-exam">🎯 <b>Για την εξέταση:</b> ${md(b.md)}</div>`;
       case 'table': return `<table class="ac-table"><thead><tr>${b.head.map(h => `<th>${inline(h)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr>${r.map(c => `<td>${inline(c)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
-      case 'code': return `<div class="ac-code"><div class="ac-codeh"><span>${E(b.title || b.lang || 'κώδικας')}</span><span class="sm">${E(b.lang || '')}</span><button class="b" data-copy="${id}">📋 Αντιγραφή</button></div><pre id="cp-${id}">${hl(b.code, b.lang)}</pre>${b.explain ? `<div class="ac-explain">${md(b.explain)}</div>` : ''}</div>`;
+      case 'code': return `<div class="ac-code"><div class="ac-codeh"><span>${E(b.title || b.lang || 'κώδικας')}</span><span class="sm">${E(b.lang || '')}</span><span>${b.lang === 'bash' ? `<button class="b" data-term="${id}">▶ Τερματικό</button> ` : ''}<button class="b" data-copy="${id}">📋 Αντιγραφή</button></span></div><pre id="cp-${id}">${hl(b.code, b.lang)}</pre><div class="ac-termh" id="tm-${id}"></div>${b.explain ? `<div class="ac-explain">${md(b.explain)}</div>` : ''}</div>`;
       case 'anim': return `<div class="ac-animh" data-anim="${id}"></div>${b.caption ? `<div class="sm" style="margin:-4px 0 10px">${inline(b.caption)}</div>` : ''}`;
       case 'cli': return `<div class="ac-blockt">🖥 ${E(b.title || 'Lab στον προσομοιωτή IOS')}</div><div data-cli="${id}"></div>`;
       case 'subnet': return `<div class="ac-blockt">🧮 Εξάσκηση subnetting</div><div data-subnet="${id}"></div>`;
@@ -225,12 +254,13 @@
     }
     const all = lessonsOf(t), nextL = all.find(l => !P.done[l.id]);
     el.innerHTML = `<div style="display:flex;gap:6px;align-items:center;margin-bottom:8px"><button class="b" data-back>← Όλα τα μαθήματα</button>${nextL ? `<button class="b" data-open="${E(nextL.id)}" style="border-color:#3ddc97">▶ Συνέχεια: ${E(nextL.title.slice(0, 32))}</button>` : '<span class="tag g">✅ ολοκληρώθηκε</span>'}</div>
-      <div class="card" style="white-space:normal"><b style="color:#fff;font-size:13px">${E(t.title)}</b><div class="sm" style="margin:3px 0 6px">${E(t.desc || '')}</div>${bar(pct(all))}</div>` +
+      <div class="card" style="white-space:normal"><b style="color:#fff;font-size:13px">${E(t.title)}</b><div class="sm" style="margin:3px 0 6px">${E(t.desc || '')}</div>${bar(pct(all))}</div>${toolsHTML(t)}` +
       t.modules.map((m, mi) => { const p = pct(m.lessons);
         return `<div class="card" style="white-space:normal"><div style="display:flex;justify-content:space-between;gap:6px"><b style="color:#fff">${mi + 1}. ${E(m.title)}</b><span class="sm">${p}%</span></div>${m.exam ? `<div class="sm" style="color:#b388ff">🎯 ${E(m.exam)}</div>` : ''}${m.desc ? `<div class="sm" style="margin-top:2px">${E(m.desc)}</div>` : ''}
         <div style="margin-top:6px">${m.lessons.map((l, li) => `<div class="ac-li" data-open="${E(l.id)}">${P.done[l.id] ? '✅' : '○'} <span>${mi + 1}.${li + 1} ${E(l.title)}</span><span class="sm">${l.minutes ? l.minutes + "′" : ''}${l.blocks.some(b => b.t === 'anim') ? ' 🎬' : ''}${l.blocks.some(b => b.t === 'code') ? ' 💻' : ''}${l.blocks.some(b => b.t === 'cli') ? ' 🖥' : ''}</span></div>`).join('')}</div></div>`; }).join('');
     el.querySelector('[data-back]').onclick = () => { view.track = null; A.render(el); };
     el.querySelectorAll('[data-open]').forEach(x => x.onclick = () => openLesson(t, x.dataset.open, () => A.render(el)));
+    bindTools(el, t, () => A.render(el));
   };
   const bar = p => `<div style="height:6px;background:#1f3352;border-radius:3px;overflow:hidden"><div style="height:100%;width:${p}%;background:linear-gradient(90deg,#3ec5ff,#3ddc97)"></div></div>`;
 
@@ -257,6 +287,7 @@
     ov.querySelectorAll('[data-anim]').forEach(h => { const n = +h.dataset.anim.split('-').pop(); Anim(h, l.blocks[n].scene); });
     ov.querySelectorAll('[data-cli]').forEach(h => { const n = +h.dataset.cli.split('-').pop(); Cli(h, l.blocks[n]); });
     ov.querySelectorAll('[data-subnet]').forEach(h => Subnet(h));
+    ov.querySelectorAll('[data-term]').forEach(b => b.onclick = () => { const n = +b.dataset.term.split('-').pop(); Term($('tm-' + b.dataset.term), l.blocks[n].code); });
     ov.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => { const txt = $('cp-' + b.dataset.copy).innerText; navigator.clipboard && navigator.clipboard.writeText(txt).then(() => { b.textContent = '✔ Αντιγράφηκε'; setTimeout(() => b.textContent = '📋 Αντιγραφή', 1500); }); });
     ov.querySelectorAll('[data-gotab]').forEach(b => b.onclick = () => { close(); window.showTab && window.showTab(b.dataset.gotab); });
     ov.querySelectorAll('[data-quiz]').forEach(q => { const qid = q.dataset.quiz, n = +qid.split('-').pop(), bq = l.blocks[n];
@@ -264,7 +295,178 @@
         q.querySelectorAll('.ac-opt').forEach((x, j) => { x.disabled = true; if (j === bq.ok) x.classList.add('ok'); else if (j === i) x.classList.add('bad'); });
         q.querySelector('.ac-why').innerHTML = (i === bq.ok ? '✅ ' : '❌ ') + md(bq.why || ''); }); });
   }
-  A.openLesson = (trackId, lid) => { const t = A.tracks.find(x => x.id === trackId); if (t) openLesson(t, lid); };
+  A.load = load;
+  A.openLesson = (trackId, lid) => load(() => { const t = A.tracks.find(x => x.id === trackId); if (t) openLesson(t, lid); });
+
+
+  // =====================================================================
+  // Εργαλεία μελέτης: κάρτες (spaced repetition), πρόγραμμα, διαγώνισμα με χρόνο
+  // =====================================================================
+  A.decks = [];
+  A.deck = d => { const i = A.decks.findIndex(x => x.id === d.id); if (i >= 0) A.decks[i] = d; else A.decks.push(d); };
+  P.cards = P.cards || {}; P.exams = P.exams || []; P.newDay = P.newDay || {};
+  const DAY = 864e5, BOX_DAYS = [0, 1, 3, 7, 14, 30], NEW_PER_DAY = 20;
+  const today = () => new Date().toISOString().slice(0, 10);
+  const domainOf = m => ((m && m.exam) || '').match(/^(\d\.0)/)?.[1] || null;
+  const WEIGHTS = { '1.0': 20, '2.0': 20, '3.0': 25, '4.0': 10, '5.0': 15, '6.0': 10 };
+  const DNAME = { '1.0': 'Network Fundamentals', '2.0': 'Network Access', '3.0': 'IP Connectivity', '4.0': 'IP Services', '5.0': 'Security Fundamentals', '6.0': 'Automation' };
+  const decksOf = t => A.decks.filter(d => d.track === t.id);
+  function dueCards(d) {
+    const now = Date.now(), nd = P.newDay[d.id] && P.newDay[d.id].day === today() ? P.newDay[d.id].n : 0;
+    const due = d.cards.filter(c => P.cards[c.id] && P.cards[c.id].due <= now);
+    const fresh = d.cards.filter(c => !P.cards[c.id]).slice(0, Math.max(0, NEW_PER_DAY - nd));
+    return { due, fresh, all: due.concat(fresh) };
+  }
+  const mastery = (cards) => cards.length ? Math.round(100 * cards.filter(c => (P.cards[c.id] || {}).box >= 3).length / cards.length) : 0;
+
+  function toolsHTML(t) {
+    const ds = decksOf(t), quizzes = examPool(t);
+    if (!ds.length && quizzes.length < 20) return '';
+    const dueN = ds.reduce((a, d) => a + dueCards(d).all.length, 0);
+    const days = P.examDate ? Math.ceil((new Date(P.examDate) - new Date(today())) / DAY) : null;
+    const last = P.exams.filter(x => x.track === t.id).slice(-1)[0];
+    return `<div class="ac-tools">
+      ${ds.length ? `<div class="card ac-tool" data-tool="cards"><b>🃏 Κάρτες</b><span class="ac-big">${dueN}</span><span class="sm">για σήμερα · κατάκτηση ${mastery(ds.flatMap(d => d.cards))}%</span></div>` : ''}
+      <div class="card ac-tool" data-tool="plan"><b>📅 Πρόγραμμα</b><span class="ac-big">${days == null ? '—' : days < 0 ? '✓' : days}</span><span class="sm">${days == null ? 'βάλε ημερομηνία εξέτασης' : days < 0 ? 'η εξέταση πέρασε' : 'μέρες ως την εξέταση'}</span></div>
+      ${quizzes.length >= 20 ? `<div class="card ac-tool" data-tool="exam"><b>⏱ Διαγώνισμα</b><span class="ac-big">${last ? last.score + '%' : '—'}</span><span class="sm">${last ? 'τελευταίο · ' + new Date(last.t).toLocaleDateString('el-GR') : quizzes.length + ' ερωτήσεις στην τράπεζα'}</span></div>` : ''}
+    </div>${domainBars(t)}`;
+  }
+  function domainBars(t) {
+    const ds = decksOf(t); if (!ds.length && !P.exams.some(x => x.track === t.id)) return '';
+    const cards = ds.flatMap(d => d.cards), lastEx = P.exams.filter(x => x.track === t.id).slice(-1)[0];
+    const rows = Object.keys(WEIGHTS).map(k => {
+      const cm = mastery(cards.filter(c => c.d === k)), ex = lastEx && lastEx.per[k];
+      return `<div class="ac-dom"><span>${k} ${E(DNAME[k])} <span class="sm">(${WEIGHTS[k]}%)</span></span><span class="ac-dbar" title="κάρτες που ξέρεις καλά">${bar(cm)}</span><span class="sm" style="width:92px;text-align:right">🃏 ${cm}%${ex ? ` · ⏱ ${Math.round(100 * ex[0] / ex[1])}%` : ''}</span></div>`; }).join('');
+    return `<div class="card" style="white-space:normal"><b style="color:#fff">Πού είσαι ανά τομέα της εξέτασης</b><div style="margin-top:6px">${rows}</div><div class="sm" style="margin-top:4px">🃏 = κάρτες που ξέρεις σταθερά · ⏱ = σωστές στο τελευταίο διαγώνισμα. Ο πιο «κοντός» τομέας με το μεγαλύτερο βάρος είναι αυτός που διαβάζεις πρώτα.</div></div>`;
+  }
+  function bindTools(el, t, rerender) {
+    el.querySelectorAll('[data-tool]').forEach(c => c.onclick = () => ({ cards: () => openCards(t, rerender), plan: () => openPlan(t, rerender), exam: () => openExamSetup(t, rerender) })[c.dataset.tool]());
+  }
+  function panel(title, html, onClose) {
+    let ov = $('ac-overlay'); if (!ov) { ov = document.createElement('div'); ov.id = 'ac-overlay'; document.body.appendChild(ov); }
+    ov.innerHTML = `<div class="ac-win"><div class="ac-top"><span class="sm">${title}</span><button class="b" data-x>✕ Κλείσιμο</button></div><div class="ac-body">${html}</div></div>`;
+    ov.style.display = 'flex';
+    const close = () => { ov.style.display = 'none'; ov.innerHTML = ''; document.removeEventListener('keydown', ov._key || (() => { })); onClose && onClose(); };
+    ov.querySelector('[data-x]').onclick = close; ov.onclick = e => { if (e.target === ov) close(); };
+    return { ov, body: ov.querySelector('.ac-body'), close };
+  }
+
+  // ---------- 🃏 κάρτες ----------
+  function openCards(t, onClose) {
+    const ds = decksOf(t); let queue = ds.flatMap(d => { const x = dueCards(d); return x.all.map(c => ({ c, d })); });
+    const total = queue.length; let flipped = false, done = 0, again = 0;
+    const W = panel('🃏 Κάρτες · ' + E(t.title), '', onClose);
+    const lessonTitle = id => { const l = lessonsOf(t).find(l => l.id === id); return l ? l.title : null; };
+    function show() {
+      if (!queue.length) { W.body.innerHTML = `<div class="ac-cardwrap"><div class="ac-card"><div style="font-size:40px">🎉</div><b style="color:#fff">Τελείωσες τις κάρτες της ημέρας!</b><div class="sm" style="margin-top:6px">${done} επαναλήψεις${again ? ` · ${again} «δεν το ήξερα»` : ''}. Οι επόμενες εμφανίζονται όταν «ωριμάσουν» (1, 3, 7, 14, 30 μέρες).</div></div></div>`; return; }
+      const { c } = queue[0], st = P.cards[c.id], lt = c.lesson && lessonTitle(c.lesson);
+      W.body.innerHTML = `<div class="ac-cardwrap"><div class="sm" style="display:flex;justify-content:space-between"><span>${total - queue.length + 1}/${total}${st ? ' · κουτί ' + st.box : ' · νέα'}</span><span>${c.d ? c.d + ' ' + E(DNAME[c.d] || '') : ''}</span></div>
+        <div class="ac-card ${flipped ? 'flip' : ''}"><div class="ac-front">${md(c.front)}</div>${flipped ? `<div class="ac-back">${md(c.back)}${lt ? `<div class="sm" style="margin-top:8px">📖 Μάθημα: <a href="#" data-l="${E(c.lesson)}">${E(lt)}</a></div>` : ''}</div>` : ''}</div>
+        <div class="ac-cardbtns">${flipped ? `<button class="b" data-g="0" style="border-color:#ff3b5c">❌ Δεν το ήξερα <span class="sm">1</span></button><button class="b" data-g="1" style="border-color:#ffd23f">🤔 Δύσκολο <span class="sm">2</span></button><button class="b" data-g="2" style="border-color:#3ddc97">✅ Το ήξερα <span class="sm">3</span></button>` : `<button class="b" data-flip>👁 Δείξε την απάντηση <span class="sm">space</span></button>`}</div></div>`;
+      const f = W.body.querySelector('[data-flip]'); if (f) f.onclick = () => { flipped = true; show(); };
+      W.body.querySelectorAll('[data-g]').forEach(b => b.onclick = () => grade(+b.dataset.g));
+      const a = W.body.querySelector('[data-l]'); if (a) a.onclick = e => { e.preventDefault(); W.close(); openLesson(t, c.lesson, onClose); };
+    }
+    function grade(g) {
+      const { c, d } = queue.shift(), st = P.cards[c.id] || { box: 0 }, isNew = !P.cards[c.id];
+      if (isNew) { const nd = P.newDay[d.id] && P.newDay[d.id].day === today() ? P.newDay[d.id] : { day: today(), n: 0 }; nd.n++; P.newDay[d.id] = nd; }
+      if (g === 0) { st.box = 1; st.due = Date.now() + 6e5; queue.splice(Math.min(3, queue.length), 0, { c, d }); again++; }  // ξανά σε λίγο
+      else { st.box = g === 2 ? Math.min(5, st.box + 1) : Math.max(1, st.box); st.due = Date.now() + BOX_DAYS[st.box] * DAY - 36e5; }
+      st.seen = (st.seen || 0) + 1; P.cards[c.id] = st; save(); done++; flipped = false; show();
+    }
+    W.ov._key = e => { if (e.target.tagName === 'INPUT') return; if (e.key === ' ' && !flipped) { e.preventDefault(); flipped = true; show(); } else if (flipped && '123'.includes(e.key)) grade(+e.key - 1); else if (e.key === 'Escape') W.close(); };
+    document.addEventListener('keydown', W.ov._key);
+    show();
+  }
+
+  // ---------- 📅 πρόγραμμα ----------
+  function openPlan(t, onClose) {
+    const W = panel('📅 Πρόγραμμα μελέτης · ' + E(t.title), '', onClose);
+    function show() {
+      const all = lessonsOf(t), left = all.filter(l => !P.done[l.id]), mins = left.reduce((a, l) => a + (l.minutes || 15), 0);
+      const days = P.examDate ? Math.ceil((new Date(P.examDate) - new Date(today())) / DAY) : null;
+      const studyDays = days != null ? Math.max(1, days - 7) : null;  // η τελευταία εβδομάδα: μόνο επανάληψη & διαγωνίσματα
+      const perDay = studyDays ? Math.ceil(left.length / studyDays) : null;
+      const dueN = decksOf(t).reduce((a, d) => a + dueCards(d).all.length, 0);
+      let h = `<h2 class="ac-title">📅 Το πρόγραμμά σου</h2>
+        <div class="ac-box ac-goal">Ημερομηνία εξέτασης: <input type="date" id="ac-date" value="${E(P.examDate || '')}" min="${today()}" style="background:#060a12;border:1px solid #1f3352;color:#fff;border-radius:4px;padding:2px 6px"> <span class="sm">(κλείνεις ραντεβού στο Pearson VUE)</span></div>`;
+      if (days == null) h += `<div class="ac-text"><p>Βάλε μια ημερομηνία-στόχο (ακόμα κι αν δεν έχεις κλείσει εξέταση) και θα σου μοιράσω τα μαθήματα ανά μέρα. Μια ρεαλιστική πρώτη επαφή με το CCNA είναι <b>8–12 εβδομάδες</b> με 1 ώρα τη μέρα.</p></div>`;
+      else {
+        const warn = days < 0 ? 'Η ημερομηνία πέρασε.' : perDay > 4 ? `⚠️ ${perDay} μαθήματα τη μέρα είναι πολλά — σκέψου να μεταθέσεις λίγο την ημερομηνία.` : '';
+        h += `<div class="ac-tools"><div class="card ac-tool"><b>Μέρες</b><span class="ac-big">${Math.max(0, days)}</span></div><div class="card ac-tool"><b>Μαθήματα που μένουν</b><span class="ac-big">${left.length}</span><span class="sm">~${Math.round(mins / 60)} ώρες</span></div><div class="card ac-tool"><b>Ανά μέρα</b><span class="ac-big">${perDay}</span><span class="sm">+ κάρτες ~15′</span></div></div>
+          ${warn ? `<div class="ac-box ac-warn">${warn}</div>` : ''}
+          <h3 class="ac-h">Σήμερα</h3><div class="ac-text"><ul>${left.slice(0, perDay).map(l => `<li><a href="#" data-l="${E(l.id)}">${E(l.title)}</a> <span class="sm">${l.minutes || 15}′</span></li>`).join('') || '<li>Όλα τα μαθήματα τελείωσαν — τώρα διαγωνίσματα & κάρτες!</li>'}${dueN ? `<li>🃏 ${dueN} κάρτες</li>` : ''}</ul></div>
+          <h3 class="ac-h">Πώς μοιράζεται</h3><div class="ac-text"><ul><li><b>Μέρες 1–${studyDays}:</b> ${perDay} μάθημα/τα τη μέρα με τη σειρά, και κάθε μέρα οι κάρτες που «ωρίμασαν».</li><li><b>Κάθε Κυριακή:</b> ένα διαγώνισμα 30 ερωτήσεων — δες ποιος τομέας πέφτει.</li><li><b>Τελευταία εβδομάδα:</b> κανένα νέο μάθημα· διαγωνίσματα 60 ερωτήσεων, επανάληψη στον πιο αδύναμο τομέα, labs στο Packet Tracer.</li><li><b>Την παραμονή:</b> μόνο κάρτες και ύπνος.</li></ul></div>`;
+      }
+      W.body.innerHTML = h;
+      $('ac-date').onchange = e => { P.examDate = e.target.value || null; save(); show(); };
+      W.body.querySelectorAll('[data-l]').forEach(a => a.onclick = e => { e.preventDefault(); W.close(); openLesson(t, a.dataset.l, onClose); });
+    }
+    show();
+  }
+
+  // ---------- ⏱ διαγώνισμα ----------
+  function examPool(t) {
+    const out = [];
+    t.modules.forEach(m => m.lessons.forEach(l => l.blocks.forEach((b, n) => { if (b.t === 'quiz') out.push({ ...b, d: domainOf(m), lesson: l.id, key: l.id + '-' + n }); })));
+    return out;
+  }
+  function pickExam(pool, n) {
+    const by = {}; pool.forEach(q => (by[q.d || '-'] = by[q.d || '-'] || []).push(q));
+    const shuf = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.random() * (i + 1) | 0; [a[i], a[j]] = [a[j], a[i]]; } return a; };
+    let out = [];
+    for (const k in WEIGHTS) out = out.concat(shuf(by[k] || []).slice(0, Math.round(n * WEIGHTS[k] / 100)));
+    const rest = shuf(pool.filter(q => !out.includes(q)));
+    while (out.length < n && rest.length) out.push(rest.pop());
+    return shuf(out.slice(0, n));
+  }
+  function openExamSetup(t, onClose) {
+    const pool = examPool(t), hist = P.exams.filter(x => x.track === t.id).slice(-5).reverse();
+    const W = panel('⏱ Διαγώνισμα · ' + E(t.title), `<h2 class="ac-title">⏱ Διαγώνισμα με χρόνο</h2>
+      <div class="ac-text"><p>Ερωτήσεις από όλα τα μαθήματα, μοιρασμένες όπως στην εξέταση (1.0 20%, 2.0 20%, 3.0 25%, 4.0 10%, 5.0 15%, 6.0 10%). Ο χρόνος είναι ~1,2′ ανά ερώτηση, όπως στο πραγματικό τεστ. Στο τέλος βλέπεις ποσοστό ανά τομέα και τα λάθη σου με εξήγηση.</p>
+      <p class="sm">Η Cisco δεν δημοσιεύει επίσημο όριο επιτυχίας· στόχευε σε <b>85%+</b> σε αυτά τα διαγωνίσματα πριν κλείσεις εξέταση.</p></div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">${[[20, 25], [30, 36], [60, 72]].filter(([n]) => n <= pool.length).map(([n, m]) => `<button class="b" data-n="${n}" data-m="${m}" style="padding:10px 14px">${n} ερωτήσεις · ${m}′</button>`).join('')}</div>
+      ${hist.length ? `<h3 class="ac-h">Προηγούμενα</h3><table class="ac-table"><tr><th>ημερομηνία</th><th>ερωτήσεις</th><th>σκορ</th></tr>${hist.map(x => `<tr><td>${new Date(x.t).toLocaleString('el-GR')}</td><td>${x.n}</td><td><b style="color:${x.score >= 85 ? '#3ddc97' : x.score >= 70 ? '#ffd23f' : '#ff3b5c'}">${x.score}%</b></td></tr>`).join('')}</table>` : ''}`, onClose);
+    W.body.querySelectorAll('[data-n]').forEach(b => b.onclick = () => runExam(t, W, pickExam(pool, +b.dataset.n), +b.dataset.m, onClose));
+  }
+  function runExam(t, W, qs, minutes, onClose) {
+    const ans = new Array(qs.length).fill(null), flag = new Set(); let i = 0; const end = Date.now() + minutes * 6e4;
+    const timer = setInterval(() => { const el = W.body.querySelector('.ac-timer'); if (!document.body.contains(W.body)) return clearInterval(timer);
+      const s = Math.max(0, Math.round((end - Date.now()) / 1000)); if (el) { el.textContent = `⏱ ${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; el.style.color = s < 300 ? '#ff3b5c' : '#cfe0f5'; } if (!s) finish(); }, 1000);
+    function show() {
+      const q = qs[i];
+      W.body.innerHTML = `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><b class="ac-timer" style="font-size:16px"></b><span class="sm">Ερώτηση ${i + 1}/${qs.length} · απαντημένες ${ans.filter(x => x != null).length}</span><button class="b" data-fin>🏁 Παράδοση</button></div>
+        <div class="ac-qnav">${qs.map((_, k) => `<button class="${k === i ? 'cur ' : ''}${ans[k] != null ? 'ans ' : ''}${flag.has(k) ? 'flag' : ''}" data-k="${k}">${k + 1}</button>`).join('')}</div>
+        <div class="ac-quiz"><div class="ac-q">${inline(q.q)}</div>${q.opts.map((o, k) => `<button class="b ac-opt${ans[i] === k ? ' sel' : ''}" data-o="${k}">${String.fromCharCode(65 + k)}. ${inline(o)}</button>`).join('')}</div>
+        <div style="display:flex;justify-content:space-between;margin-top:8px"><button class="b" data-mv="-1" ${i ? '' : 'disabled'}>← Προηγούμενη</button><button class="b" data-flag>${flag.has(i) ? '🚩 Σημειωμένη' : '🏳 Σημείωσε για μετά'}</button><button class="b" data-mv="1" ${i < qs.length - 1 ? '' : 'disabled'}>Επόμενη →</button></div>`;
+      W.body.querySelectorAll('[data-o]').forEach(b => b.onclick = () => { ans[i] = +b.dataset.o; if (i < qs.length - 1) i++; show(); });
+      W.body.querySelectorAll('[data-k]').forEach(b => b.onclick = () => { i = +b.dataset.k; show(); });
+      W.body.querySelectorAll('[data-mv]').forEach(b => b.onclick = () => { i += +b.dataset.mv; show(); });
+      W.body.querySelector('[data-flag]').onclick = () => { flag.has(i) ? flag.delete(i) : flag.add(i); show(); };
+      W.body.querySelector('[data-fin]').onclick = () => { const un = ans.filter(x => x == null).length; if (!un || confirm(`Έχεις ${un} αναπάντητες. Παράδοση;`)) finish(); };
+    }
+    let finished = false;
+    function finish() {
+      if (finished) return; finished = true; clearInterval(timer);
+      const per = {}; let ok = 0;
+      qs.forEach((q, k) => { const good = ans[k] === q.ok; ok += good; if (q.d) { per[q.d] = per[q.d] || [0, 0]; per[q.d][1]++; per[q.d][0] += good; } });
+      const score = Math.round(100 * ok / qs.length), used = Math.round((minutes * 6e4 - Math.max(0, end - Date.now())) / 6e4);
+      P.exams.push({ track: t.id, t: Date.now(), n: qs.length, score, per }); save();
+      const col = score >= 85 ? '#3ddc97' : score >= 70 ? '#ffd23f' : '#ff3b5c';
+      const weak = Object.entries(per).sort((a, b) => a[1][0] / a[1][1] - b[1][0] / b[1][1] || WEIGHTS[b[0]] - WEIGHTS[a[0]])[0];  // ισοπαλία → ο τομέας με το μεγαλύτερο βάρος
+      W.body.innerHTML = `<div style="text-align:center;margin:10px 0 16px"><div style="font-size:44px;font-weight:800;color:${col}">${score}%</div><div class="sm">${ok}/${qs.length} σωστές · ${used}′ από ${minutes}′</div>
+        <div style="margin-top:6px">${score >= 85 ? '🟢 Έτοιμος/η — κράτα το σταθερό σε 2–3 διαγωνίσματα και κλείσε ραντεβού.' : score >= 70 ? '🟡 Κοντά. Δούλεψε τον πιο αδύναμο τομέα και ξαναδοκίμασε.' : '🔴 Χρειάζεται ακόμα μελέτη — δες τα λάθη από κάτω, ένα-ένα.'}</div></div>
+        <div class="card" style="white-space:normal">${Object.keys(WEIGHTS).filter(k => per[k]).map(k => { const p = Math.round(100 * per[k][0] / per[k][1]); return `<div class="ac-dom"><span>${k} ${E(DNAME[k])}</span><span class="ac-dbar">${bar(p)}</span><span class="sm" style="width:92px;text-align:right">${per[k][0]}/${per[k][1]} · ${p}%</span></div>`; }).join('')}
+        ${weak ? `<div class="sm" style="margin-top:6px">👉 Πιο αδύναμος τομέας: <b>${weak[0]} ${E(DNAME[weak[0]] || '')}</b></div>` : ''}</div>
+        <h3 class="ac-h">Τα λάθη σου (${qs.length - ok})</h3>${qs.map((q, k) => ans[k] === q.ok ? '' : `<div class="ac-quiz"><div class="ac-q">${inline(q.q)}</div><div class="sm">Απάντησες: ${ans[k] == null ? '—' : inline(q.opts[ans[k]])}</div><div style="color:#3ddc97">✔ ${inline(q.opts[q.ok])}</div><div class="ac-why">${md(q.why || '')}</div><a href="#" class="sm" data-l="${E(q.lesson)}">📖 στο μάθημα</a></div>`).join('')}
+        <div style="text-align:center;margin-top:12px"><button class="b" data-again>↻ Νέο διαγώνισμα</button></div>`;
+      W.body.querySelectorAll('[data-l]').forEach(a => a.onclick = e => { e.preventDefault(); W.close(); openLesson(t, a.dataset.l, onClose); });
+      W.body.querySelector('[data-again]').onclick = () => openExamSetup(t, onClose);
+      W.body.scrollTop = 0;
+    }
+    show();
+  }
+  A._test = { pickExam, examPool, dueCards, domainOf };
 
   // ---------- στυλ ----------
   const css = document.createElement('style');
@@ -296,6 +498,14 @@
   .ac-term{max-height:240px;overflow:auto;white-space:pre-wrap;color:#cfe0f5}.ac-out{color:#9fb4d0}.ac-err{color:#ff8da0}
   .ac-task{margin-top:8px;font-family:-apple-system,sans-serif;font-size:12.5px}.ac-prompt{color:#3ddc97;align-self:center}
   .ac-in{flex:1;background:#0b111c;border:1px solid #1f3352;border-radius:4px;color:#fff;padding:4px 6px;font:inherit}
+  .ac-termh .ac-cli{border:0;border-top:1px solid #1f3352;border-radius:0}.ac-chips{display:flex;flex-wrap:wrap;gap:4px}.ac-chip{font:11.5px ui-monospace,Menlo,monospace;text-align:left;white-space:normal;max-width:100%}
+  .ac-cmd{color:#3ddc97;margin-top:6px}.ac-hint{color:#ffd23f;font-family:-apple-system,sans-serif;white-space:normal}.ac-hint code{background:#1a2538;padding:0 4px;border-radius:3px}.ac-real .ac-term{max-height:340px}
+  .ac-tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:8px}.ac-tool{cursor:pointer;display:flex;flex-direction:column;gap:2px;margin:0!important;white-space:normal}.ac-tool:hover{border-color:#3ec5ff}.ac-tool b{color:#fff}
+  .ac-big{font-size:24px;font-weight:800;color:#3ec5ff;line-height:1.2}.ac-dom{display:flex;gap:8px;align-items:center;margin:3px 0;font-size:12px}.ac-dom>span:first-child{width:210px}.ac-dbar{flex:1}
+  .ac-cardwrap{max-width:620px;margin:20px auto}.ac-card{background:#101828;border:1px solid #1f3352;border-radius:12px;padding:26px 24px;min-height:150px;margin:8px 0;text-align:center;font-size:15px}.ac-card p{margin:0 0 6px}
+  .ac-back{border-top:1px dashed #2a4466;margin-top:14px;padding-top:14px;color:#cfe0f5;text-align:left;font-size:14px}.ac-cardbtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}.ac-cardbtns .b{padding:9px 14px}
+  .ac-qnav{display:flex;flex-wrap:wrap;gap:3px;margin:10px 0}.ac-qnav button{width:28px;height:24px;font-size:11px;background:#101828;border:1px solid #1f3352;color:#9fb4d0;border-radius:4px;cursor:pointer}.ac-qnav .ans{background:#3ec5ff33;color:#fff}.ac-qnav .flag{border-color:#ffd23f}.ac-qnav .cur{outline:2px solid #3ec5ff}
+  .ac-opt.sel{border-color:#3ec5ff;background:#3ec5ff22}
   .ac-sub{background:#101828;border:1px solid #1f3352;border-radius:8px;padding:10px 12px}.ac-row{display:flex;gap:8px;align-items:center;margin:3px 0}.ac-row span{width:190px;font-size:12px;color:#9fb4d0}
   .ac-row input{flex:1;background:#060a12;border:1px solid #1f3352;border-radius:4px;color:#fff;padding:4px 6px;font:12.5px ui-monospace,Menlo,monospace}
   .ac-foot{display:flex;justify-content:space-between;gap:8px;margin-top:24px;padding-top:12px;border-top:1px solid #1f3352}.ac-done{border-color:#3ddc97}

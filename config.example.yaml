@@ -61,6 +61,45 @@ notify:                         # live mode (or --notify)
   telegram:
     bot_token: ""               # from @BotFather
     chat_id: ""                 # your chat id
+  ntfy:                         # push to your phone with the free ntfy app (https://ntfy.sh)
+    topic: ""                   # a LONG RANDOM name: on public ntfy.sh anyone who knows it can read your alerts
+    # server: https://ntfy.sh   # or your own ntfy server (e.g. an LXC on Proxmox)
+    # token: ""                 # access token if your server requires one
 
 history:
   path: data/netwatch.db        # SQLite — alerts, traffic per minute, known devices
+
+# Academy terminal: runs only safe, read-only network commands (ping, nmap -sT on private ranges, dig, curl…),
+# never with sudo and never as root. Set to false to disable it.
+academy_terminal: true
+
+# ESP32 Wi‑Fi sensors (firmware/esp32-sentinel): NetWatch subscribes to their MQTT broker over TLS.
+# sensor:
+#   mqtt_host: pi-broker.local
+#   mqtt_port: 8883
+#   ca_file: ~/iot-ca/ca.crt
+#   username: netwatch
+#   password: "change-me"
+#   topic: netwatch/sensor/#
+
+# MQTT guard (📨 MQTT tab): NetWatch connects to your broker with a READ-ONLY user and learns what is normal.
+# Broker side: mosquitto_passwd + acl_file "user netwatch / topic read # / topic read $SYS/#", and `log_dest topic`
+# in mosquitto.conf so NetWatch can see who connects.
+# mqtt_guard:
+#   host: 192.168.1.17
+#   port: 1883            # 8883 + ca_file once you enable TLS
+#   username: netwatch
+#   password: ""
+#   # ca_file: ~/iot-ca/ca.crt
+
+# Home Assistant (MQTT discovery): NetWatch appears as a device "NetWatch" with entities
+#   binary_sensor.netwatch_attack, sensor.netwatch_last_alert, _alerts_hour, _devices, _score
+# and every alert is also published as JSON on netwatch/alerts (use it as an MQTT trigger).
+# Use a SEPARATE broker user from mqtt_guard, with ACL:
+#   user netwatch-ha / topic write homeassistant/# / topic readwrite netwatch/ha/# / topic write netwatch/alerts
+# homeassistant:
+#   host: 192.168.1.17
+#   port: 1883
+#   username: netwatch-ha
+#   password: ""
+#   # ca_file: ~/iot-ca/ca.crt

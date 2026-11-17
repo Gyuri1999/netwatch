@@ -27,3 +27,33 @@ jobs:
           n.pcap_replay(s, '/tmp/ci.pcap', speed=0)
           assert s.alert_seq >= 8, s.alert_seq
           "
+
+  academy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Lessons load and are consistent
+        run: node tools/check_academy.js
+
+  firmware:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: arduino/setup-arduino-cli@v2
+      - name: Install the ESP32 core
+        run: |
+          arduino-cli config init
+          arduino-cli config add board_manager.additional_urls https://espressif.github.io/arduino-esp32/package_esp32_index.json
+          arduino-cli core update-index
+          arduino-cli core install esp32:esp32
+      - name: Compile NetWatch Sentinel
+        run: |
+          cp firmware/esp32-sentinel/secrets.example.h firmware/esp32-sentinel/secrets.h
+          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings default firmware/esp32-sentinel
+      - name: Compile NetWatch Canary
+        run: |
+          cp firmware/esp32-canary/secrets.example.h firmware/esp32-canary/secrets.h
+          arduino-cli compile --fqbn esp32:esp32:esp32 --warnings default firmware/esp32-canary

@@ -1,0 +1,21 @@
+name: Release
+
+# Push a tag like v1.2.0 to build NetWatch.app on macOS and attach NetWatch.dmg to a GitHub Release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  dmg:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build NetWatch.app and NetWatch.dmg
+        run: ./macapp/build.sh --dmg
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/NetWatch.dmg --title "NetWatch $GITHUB_REF_NAME" --generate-notes

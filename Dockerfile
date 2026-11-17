@@ -1,13 +1,13 @@
 # NetWatch in a container — Linux hosts only (needs the host network to see real traffic).
-#   docker compose up            → live capture on the host's default interface
+#   docker compose up            → live capture on the host's default interface, agent mode (HTTPS + token on the LAN)
 #   docker compose run --rm netwatch --pcap samples/lan-attack.pcap
 FROM python:3.12-slim
-RUN apt-get update && apt-get install -y --no-install-recommends tcpdump whois iproute2 net-tools \
+RUN apt-get update && apt-get install -y --no-install-recommends tcpdump whois iproute2 net-tools openssl \
     && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY netwatch.py pentest.py rules.py ctf.py wifiguard.py privacy.py apps.py honeypot.py blocker.py index.html edu.js config.example.yaml ./
+COPY *.py index.html edu.js config.example.yaml ./
 COPY academy ./academy
 COPY samples ./samples
 COPY rules ./rules

@@ -8,6 +8,8 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, ROOT)
 sys.path.insert(0, os.path.join(ROOT, "tools"))
 
+import capture  # noqa: E402
+import detect  # noqa: E402
 import netwatch as nw  # noqa: E402
 
 ME, GW = "192.168.1.50", "192.168.1.1"
@@ -638,7 +640,7 @@ def test_default_rules_load_and_fire_with_mitre(state):
 
 
 def test_rule_test_save_and_delete(state, tmp_path, monkeypatch):
-    monkeypatch.setattr(nw, "RULES_DIR", str(tmp_path))
+    monkeypatch.setattr(detect, "RULES_DIR", str(tmp_path))
     c = Clock()
     for p in range(1, 8):
         feed(state, c, src=EVIL, dst=ME, proto="TCP", sp=1, dp=p, flags="S")
@@ -701,7 +703,7 @@ def test_ctf_level3_is_silent_and_rule_challenge_needs_precision():
 
 
 def test_ctf_load_and_exit_switch_the_data_source(state, monkeypatch):
-    monkeypatch.setattr(nw, "pcap_replay", lambda st, path, speed=1.0, **k: None)
+    monkeypatch.setattr(capture, "pcap_replay", lambda st, path, speed=1.0, **k: None)
     seeded = []
     state.reload_rules()
     feed(state, Clock(), src=EVIL, dst=ME, proto="TCP", sp=1, dp=80, flags="FPU")
@@ -714,3 +716,53 @@ def test_ctf_load_and_exit_switch_the_data_source(state, monkeypatch):
     nw.ctf_exit(state)
     assert state.feed == "test" and state.ctf_level is None and seeded == [1]
     assert state.history.query(hours=24, ref=1_700_000_100)["total_alerts"] == 1  # το ιστορικό κρατήθηκε
+
+
+def _mqtt_connect(user=b"garden", pw=SECRET.encode(), level=4, will=False, cid=b"esp32-garden"):
+    s = lambda x: len(x).to_bytes(2, "big") + x  # noqa: E731
+    flags = (0x80 if user else 0) | (0x40 if pw else 0) | (0x04 if will else 0) | 0x02
+    var = s(b"MQTT") + bytes([level, flags]) + b"\x00\x3c" + (b"\x00" if level == 5 else b"")
+    pay = s(cid) + ((b"\x00" if level == 5 else b"") + s(b"lwt/topic") + s(b"offline") if will else b"")
+    pay += (s(user) if user else b"") + (s(pw) if pw else b"")
+    body = var + pay
+    return b"\x10" + bytes([len(body)]) + body
+
+
+@pytest.mark.parametrize("kw", [{}, {"level": 5}, {"will": True}, {"level": 5, "will": True}])
+def test_parse_mqtt_connect_sees_user_never_keeps_password(kw):
+    r = nw.parse_cleartext(50000, 1883, _mqtt_connect(**kw))
+    assert r == {"proto": "MQTT", "field": "pass", "user": "garden", "client": "esp32-garden"}
+    assert SECRET not in repr(r)
+
+
+def test_parse_mqtt_connect_without_credentials_or_garbage():
+    assert nw.parse_cleartext(50000, 1883, _mqtt_connect(user=None, pw=None)) is None
+    assert nw.parse_cleartext(50000, 1883, _mqtt_connect(pw=None))["field"] == "user_only"
+    assert nw.parse_cleartext(50000, 1883, b"\x30\x0a\x00\x04test{}") is None  # PUBLISH, όχι CONNECT
+    assert nw.parse_cleartext(50000, 1883, b"\x10\xff\xff") is None
+
+
+def test_mqtt_cleartext_alert(state):
+    c = Clock()
+    feed(state, c, src="192.168.1.20", dst="192.168.1.17", proto="TCP", sp=50000, dp=1883, flags="PA",
+         cred=nw.parse_cleartext(50000, 1883, _mqtt_connect()))
+    a = [a for a in state.alerts if a["type"] == "Κωδικός σε καθαρό κείμενο"]
+    assert a and a[0]["sev"] == "high" and "MQTT" in a[0]["detail"] and "8883" in a[0]["detail"]
+    assert SECRET not in a[0]["detail"]
+
+
+def test_tor_exit_feed_alerts(state):
+    state.intel.add("185.220.101.5/32", "Tor exit κόμβοι", kind="tor")
+    c = Clock()
+    feed(state, c, src="192.168.1.20", dst="185.220.101.5", proto="TCP", sp=50000, dp=443, flags="S")
+    feed(state, c, src="185.220.101.5", dst=ME, proto="TCP", sp=40000, dp=22, flags="S")
+    types = {a["type"]: a for a in state.alerts}
+    assert "Tor από συσκευή του δικτύου" in types and types["Tor από συσκευή του δικτύου"]["sev"] == "med"
+    assert "Κίνηση από κόμβο Tor" in types
+    assert not any("κακόβουλη IP" in a["type"] for a in state.alerts)  # Tor ≠ κακόβουλο
+
+
+def test_lan_device_on_tor_port(state):
+    c = Clock()
+    feed(state, c, src="192.168.1.20", dst="51.15.0.1", proto="TCP", sp=50000, dp=9001, flags="S")
+    assert any(a["type"] == "Tor από συσκευή του δικτύου" and a["actor"] == "192.168.1.20" for a in state.alerts)

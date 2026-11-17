@@ -809,7 +809,7 @@ sudo ufw disable
             { task: 'Δες τους κανόνες με αρίθμηση.', expect: '^sudo\\s+ufw\\s+status\\s+numbered$', ans: 'sudo ufw status numbered', out: 'Status: active\n\n     To                         Action      From\n     --                         ------      ----\n[ 1] 22/tcp                     LIMIT IN    192.168.1.0/24\n[ 2] 8883/tcp                   ALLOW IN    192.168.1.0/24' },
           ], 'Το Pi δέχεται μόνο SSH και MQTT/TLS, και μόνο από το LAN.'),
           warn('**Docker + ufw:** το Docker γράφει δικούς του κανόνες iptables και **παρακάμπτει** το ufw για ports που κάνεις publish (`-p 1883:1883`). Αν τρέχεις Mosquitto σε container, κάνε bind σε συγκεκριμένη IP (`-p 127.0.0.1:1883:1883`) ή δες τη λύση `ufw-docker`.'),
-          nw('lan', 'Η καρτέλα **LAN** του NetWatch δείχνει ποιες συσκευές μιλάνε με το Pi σου. Αν μετά το ufw βλέπεις ακόμα συνδέσεις σε θύρες που δεν άνοιξες, κάτι παρακάμπτει το firewall (π.χ. Docker).'),
+          nw('devs', 'Η καρτέλα **📟 Συσκευές** του NetWatch δείχνει ποιες συσκευές μιλάνε με το Pi σου. Αν μετά το ufw βλέπεις ακόμα συνδέσεις σε θύρες που δεν άνοιξες, κάτι παρακάμπτει το firewall (π.χ. Docker).'),
           quiz('Ποια σειρά εντολών είναι **επικίνδυνη** σε Pi που διαχειρίζεσαι μέσω SSH;',
             ['`ufw allow 22` → `ufw enable`', '`ufw default deny incoming` → `ufw enable` → `ufw allow 22`', '`ufw limit from 192.168.1.0/24 to any port 22` → `ufw enable`', '`ufw status` → `ufw enable`'], 1,
             'Αν ενεργοποιήσεις το firewall με deny **πριν** επιτρέψεις το 22, η επόμενη σύνδεση SSH θα κοπεί (και ίσως και η τρέχουσα). Πάντα: πρώτα allow SSH, μετά enable.'),
@@ -2193,6 +2193,288 @@ with socket.create_connection((HOST, PORT), timeout=5) as raw:
             'Ελέγχεις **πριν** στείλεις οτιδήποτε ευαίσθητο. Το `setCACert` δίνει τον βασικό έλεγχο, το `verify` το επιπλέον pin.'),
         ],
       },
+      {
+        id: 'iot-4-7', title: 'Δες τον κωδικό MQTT να περνάει', minutes: 20,
+        goal: 'Να «πιάσεις» με **tcpdump/Wireshark** ένα πακέτο **CONNECT** στη θύρα 1883 του δικού σου broker, να βρεις μέσα του το username και τον κωδικό **byte-byte**, και μετά να περάσεις σε **TLS στο 8883** και να δεις ότι η ίδια καταγραφή δεν δείχνει πια τίποτα χρήσιμο.',
+        blocks: [
+          text(
+            'Στο εργαστήριό σου ο **Mosquitto** τρέχει σε ένα VM του **Proxmox**, στη θύρα **1883**, με κωδικό αλλά **χωρίς TLS**. Ο κωδικός προστατεύει από όποιον *δεν* τον ξέρει. Το πρόβλημα: όποιος βλέπει την κίνηση, τον **μαθαίνει**.',
+            '',
+            'Σε αυτό το lab δεν θα το πιστέψεις επειδή το λέω εγώ. Θα το **δεις** με τα μάτια σου, στο **δικό σου** δίκτυο, και μετά θα το διορθώσεις.'
+          ),
+          anim('iot-mqtt-sniff', 'Το ίδιο CONNECT: στο 1883 ο κωδικός φαίνεται, στο 8883 φαίνονται μόνο κρυπτογραφημένα bytes.'),
+          warn('Κάνε καταγραφή κίνησης **μόνο** σε δίκτυο και συσκευές που είναι **δικά σου**. Η υποκλοπή κίνησης τρίτων είναι παράνομη.'),
+          text(
+            '### Βήμα 1: ξεκίνα την καταγραφή',
+            'Το καλύτερο σημείο είναι **ο ίδιος ο broker** (το VM), γιατί από εκεί περνά σίγουρα κάθε σύνδεση. Εναλλακτικά, στον **Proxmox host** πάνω στη γέφυρα `vmbr0`, όπου βλέπεις την κίνηση όλων των VM.'
+          ),
+          code('bash', 'Καταγραφή στη θύρα 1883 (στο VM του broker)', R`
+# Ποιο είναι το interface; (στα VM του Proxmox συνήθως ens18)
+ip -br addr
+
+# Ζωντανά, με hex + ASCII
+sudo tcpdump -i ens18 -n -X 'tcp port 1883'
+
+# Ή σε αρχείο, για να το ανοίξεις μετά στο Wireshark
+sudo tcpdump -i ens18 -n -w mqtt-1883.pcap 'tcp port 1883'
+`, L(
+            '- `tcp port 1883`: **capture filter** (σύνταξη BPF). Κρατά μόνο ό,τι πάει ή έρχεται από τη θύρα 1883.',
+            '- `-X`: δείχνει κάθε πακέτο σε **hex** και **ASCII** δίπλα-δίπλα.',
+            '- `-w αρχείο.pcap`: γράφει τα πακέτα σε αρχείο. Το ανοίγεις στο Wireshark στο laptop (`scp` από το VM).',
+            '- Στον Proxmox host: `sudo tcpdump -i vmbr0 -n -X \'tcp port 1883\'`.'
+          )),
+          text(
+            '### Βήμα 2: στείλε ένα μήνυμα με κωδικό',
+            'Από **άλλο** μηχάνημα (π.χ. το laptop ή ένα Pi), στείλε ένα δοκιμαστικό μήνυμα με έναν **δοκιμαστικό** χρήστη. Βάζουμε και `-i lab-test` ώστε το client id να είναι γνωστό.'
+          ),
+          code('bash', 'Ένα publish με username/password', R`
+mosquitto_pub -h 192.168.1.17 -p 1883 -i lab-test -u user -P pass -t test -m hi
+`, L(
+            '- `-h`: η IP του broker (το VM στον Proxmox). `-p 1883`: plaintext MQTT.',
+            '- `-i lab-test`: client id. `-u` / `-P`: username και password.',
+            '- `-t test -m hi`: topic και μήνυμα.',
+            '- Χρησιμοποίησε **δοκιμαστικό** χρήστη, όχι τον κωδικό μιας πραγματικής συσκευής: θα τον δεις να τυπώνεται στην οθόνη.'
+          )),
+          text(
+            '### Βήμα 3: διάβασε το πακέτο CONNECT',
+            'Στην έξοδο του tcpdump, μετά το TCP handshake, θα δεις κάτι σαν αυτό (μόνο το κομμάτι του MQTT):'
+          ),
+          code('text', 'Το CONNECT σε hex (MQTT 3.1.1)', R`
+10 20                         fixed header: τύπος CONNECT, remaining length = 32
+00 04 4d 51 54 54             protocol name: μήκος 4, "MQTT"
+04                            protocol level: 4 = MQTT 3.1.1
+c2                            connect flags = 1100 0010
+00 3c                         keep alive = 60 s
+00 08 6c 61 62 2d 74 65 73 74 client id: "lab-test"
+00 04 75 73 65 72             username:  "user"
+00 04 70 61 73 73             password:  "pass"   <-- εδώ!
+`, L(
+            '- **Fixed header `0x10`**: τα 4 πάνω bits είναι ο τύπος πακέτου (1 = CONNECT), τα 4 κάτω είναι flags (0 για το CONNECT). Μετά έρχεται το **remaining length** (εδώ `0x20` = 32 bytes).',
+            '- **Protocol name/level**: `MQTT` και `04` = έκδοση 3.1.1. (Το MQTT 5 έχει `05` και επιπλέον properties.)',
+            '- **Connect flags `0xC2`**: bit 7 (`0x80`) = **υπάρχει username**, bit 6 (`0x40`) = **υπάρχει password**, bit 1 (`0x02`) = clean session. Τα bits 2–5 αφορούν το Will μήνυμα.',
+            '- **Payload**: κάθε πεδίο έχει μπροστά **2 bytes μήκος** και μετά τα bytes του, με τη σειρά: client id, (Will), **username**, **password**.',
+            '- Δεν υπάρχει **καμία** κρυπτογράφηση ή hash: ο κωδικός είναι τα ίδια bytes που πληκτρολόγησες.'
+          )),
+          table(['Bit', 'Μάσκα', 'Σημασία στο connect flags'], [
+            ['7', '`0x80`', '**User Name Flag**: ακολουθεί username στο payload'],
+            ['6', '`0x40`', '**Password Flag**: ακολουθεί password στο payload'],
+            ['5', '`0x20`', 'Will Retain'],
+            ['4–3', '`0x18`', 'Will QoS (0, 1 ή 2)'],
+            ['2', '`0x04`', 'Will Flag'],
+            ['1', '`0x02`', 'Clean Session'],
+            ['0', '`0x01`', 'Reserved (πρέπει να είναι 0)'],
+          ]),
+          text(
+            '### Το ίδιο στο Wireshark',
+            'Άνοιξε το `mqtt-1883.pcap`. Το Wireshark αναγνωρίζει μόνο του το MQTT στη θύρα 1883.',
+            '- Display filter `mqtt`: μόνο τα πακέτα MQTT.',
+            '- Display filter `mqtt.msgtype == 1`: μόνο τα CONNECT.',
+            '- Άνοιξε το **MQ Telemetry Transport Protocol → Connect Command**: θα δεις *User Name* και *Password* ως πεδία, έτοιμα για αντιγραφή.',
+            '',
+            'Προσοχή στη διαφορά: το `tcp port 1883` είναι **capture filter** (τι γράφεται), ενώ το `mqtt` είναι **display filter** (τι δείχνει το Wireshark από όσα γράφτηκαν).'
+          ),
+          code('bash', 'Το ίδιο από τη γραμμή εντολών με tshark', R`
+tshark -r mqtt-1883.pcap -Y 'mqtt.msgtype == 1' -T fields -e ip.src -e mqtt.clientid -e mqtt.username -e mqtt.passwd
+`, L(
+            '- `-r`: διαβάζει το αρχείο. `-Y`: display filter.',
+            '- `-T fields -e …`: τυπώνει μόνο τα πεδία που ζητάς. Μία γραμμή ανά σύνδεση: IP, client id, user, **κωδικός**.',
+            '- Αυτό ακριβώς θα έκανε ένας επιτιθέμενος στο ίδιο δίκτυο. Σε δευτερόλεπτα.'
+          )),
+          nw('alerts', 'Το **NetWatch** κάνει αυτόματα ό,τι μόλις έκανες με το χέρι: όταν δει ένα MQTT CONNECT με τα bits `0x80`/`0x40` σε καθαρό κείμενο, βγάζει ειδοποίηση **«Κωδικός σε καθαρό κείμενο»** με πρωτόκολλο **MQTT**, την IP της συσκευής και το username (ο ίδιος ο κωδικός δεν αποθηκεύεται). Άνοιξε τις **Ειδοποιήσεις** μετά το `mosquitto_pub`.'),
+          quiz('Στο connect flags ενός CONNECT βλέπεις `0x82`. Τι ταξιδεύει στο payload;',
+            ['Username και password', 'Μόνο username (χωρίς password), με clean session', 'Μόνο password', 'Τίποτα από τα δύο'], 1,
+            '`0x82` = `0x80` (username) + `0x02` (clean session). Το bit `0x40` (password) είναι 0. Για username **και** password θα έβλεπες `0xC2`.'),
+          text(
+            '### Βήμα 4: πέρνα σε TLS στο 8883',
+            'Αν δεν έχεις ακόμα CA και πιστοποιητικά, φτιάξ’ τα όπως στο μάθημα **«Δική σου CA και TLS στο 8883»**. Το `server.crt` πρέπει να έχει στο **SAN** το όνομα ή την IP με την οποία συνδέονται οι clients (π.χ. `IP:192.168.1.17`).'
+          ),
+          code('text', '/etc/mosquitto/conf.d/20-tls.conf', R`
+per_listener_settings false
+allow_anonymous false
+password_file /etc/mosquitto/passwd
+acl_file /etc/mosquitto/acl
+
+# Plaintext ΜΟΝΟ για εργαλεία πάνω στο ίδιο VM
+listener 1883 127.0.0.1
+
+# TLS για όλο το δίκτυο
+listener 8883
+cafile   /etc/mosquitto/certs/ca.crt
+certfile /etc/mosquitto/certs/server.crt
+keyfile  /etc/mosquitto/certs/server.key
+tls_version tlsv1.2
+`, L(
+            '- `listener 8883`: νέος listener σε όλες τις διευθύνσεις.',
+            '- `cafile`: η CA σου. `certfile` / `keyfile`: το πιστοποιητικό και το ιδιωτικό κλειδί του broker (το `server.key` με owner `mosquitto` και mode 600).',
+            '- `tls_version tlsv1.2`: ελάχιστη έκδοση TLS 1.2 (το TLS 1.3 επιτρέπεται κι αυτό).',
+            '- `listener 1883 127.0.0.1`: η 1883 **δεν** ακούει πια στο δίκτυο. Πριν το κάνεις, άλλαξε τα ESP32 σε 8883, αλλιώς θα κοπούν.'
+          )),
+          code('bash', 'Επανεκκίνηση και ίδιο publish, τώρα με TLS', R`
+sudo systemctl restart mosquitto
+sudo ss -tlnp | grep mosquitto        # 127.0.0.1:1883 και 0.0.0.0:8883
+
+# Στο VM: καταγραφή στη νέα θύρα
+sudo tcpdump -i ens18 -n -X 'tcp port 8883'
+
+# Από το laptop: ίδιο μήνυμα, μέσα σε TLS
+mosquitto_pub --cafile ca.crt -h 192.168.1.17 -p 8883 -i lab-test -u user -P pass -t test -m hi
+`, L(
+            '- `ss -tlnp`: επιβεβαιώνεις ότι η 1883 ακούει **μόνο** στο localhost.',
+            '- `--cafile ca.crt`: ο client εμπιστεύεται **μόνο** τη δική σου CA και ελέγχει ότι το όνομα/IP του `-h` υπάρχει στο SAN.',
+            '- Αν δεις `certificate verify failed`, το `-h` δεν ταιριάζει με το SAN ή το `ca.crt` είναι λάθος. **Ποτέ** `--insecure` για να «περάσει».'
+          )),
+          text(
+            'Τώρα το tcpdump δείχνει μόνο **TLS records**: ένα *ClientHello* / *ServerHello* και μετά γραμμές που ξεκινούν με `17 03 03` (Application Data) και ακολουθούν τυχαία bytes. Στο Wireshark το φίλτρο `mqtt` δεν βρίσκει **τίποτα**, και το φίλτρο `tls` δείχνει μόνο κρυπτογραφημένα δεδομένα.',
+            '',
+            'Τι βλέπει ακόμα κάποιος; Τις **IP**, τις **θύρες**, το **μέγεθος** και τον **χρόνο** των πακέτων (και ίσως το όνομα του server στο SNI του ClientHello). Όχι όμως κωδικούς, topics ή μετρήσεις.'
+          ),
+          table(['', '1883 (χωρίς TLS)', '8883 (TLS)'], [
+            ['Display filter `mqtt`', 'CONNECT, PUBLISH, SUBSCRIBE…', 'τίποτα'],
+            ['Username / password', 'καθαρό κείμενο', 'κρυπτογραφημένα'],
+            ['Topics και μετρήσεις', 'καθαρό κείμενο', 'κρυπτογραφημένα'],
+            ['Ποιος μιλά με ποιον (IP/θύρα)', 'φαίνεται', 'φαίνεται'],
+            ['Ειδοποίηση NetWatch', '«Κωδικός σε καθαρό κείμενο» (MQTT)', 'καμία'],
+          ]),
+          tip('Τελικό τεστ: ξανατρέξε το `mosquitto_pub` στη **1883** από το laptop. Πρέπει να πάρεις `Connection refused`. Αν περνάει, κάποιος listener ακούει ακόμα στο δίκτυο.'),
+          quiz('Στο Wireshark γράφεις το display filter `mqtt` πάνω σε καταγραφή της θύρας 8883 και δεν βλέπεις τίποτα. Γιατί;',
+            ['Το Wireshark δεν υποστηρίζει MQTT', 'Το MQTT ταξιδεύει μέσα σε TLS: το Wireshark βλέπει μόνο κρυπτογραφημένα TLS records', 'Ο broker δεν έστειλε τίποτα', 'Το 8883 είναι UDP'], 1,
+            'Χωρίς τα κλειδιά της συνεδρίας, το Wireshark δεν μπορεί να αποκρυπτογραφήσει. Αυτός είναι ακριβώς ο σκοπός του TLS.'),
+          quiz('Ποιο είναι **capture** filter και ποιο **display** filter;',
+            ['`mqtt` = capture, `tcp port 1883` = display', '`tcp port 1883` = capture (BPF, tcpdump/Wireshark κατά την καταγραφή), `mqtt` = display (Wireshark, μετά)', 'Και τα δύο είναι display filters', 'Και τα δύο είναι capture filters'], 1,
+            'Τα capture filters (σύνταξη BPF) αποφασίζουν τι **γράφεται**. Τα display filters του Wireshark αποφασίζουν τι **δείχνεται** και καταλαβαίνουν πρωτόκολλα όπως το `mqtt`.'),
+        ],
+      },
+      {
+        id: 'iot-4-8', title: 'Φύλακας για τον broker σου', minutes: 18,
+        goal: 'Να στήσεις τον **φύλακα MQTT** του NetWatch: έναν χρήστη **μόνο για ανάγνωση**, ACL, `log_dest topic` στο Mosquitto, και να καταλάβεις τι ειδοποιήσεις βγάζει. Και να εφαρμόσεις **least privilege**: κάθε ESP32 δικός του χρήστης, γράφει μόνο στα δικά του topics.',
+        blocks: [
+          text(
+            'Το TLS κρύβει την κίνηση. Οι κωδικοί και η ACL κρατούν έξω τους αγνώστους. Μένει μια ερώτηση: **πώς θα καταλάβεις** ότι κάτι άλλαξε; Μια καινούργια συσκευή που συνδέθηκε, ένα ESP32 που ξαφνικά γράφει σε topic που δεν έγραφε ποτέ, μια εντολή στο ρελέ στις 3 τα ξημερώματα.',
+            '',
+            'Ο **φύλακας MQTT** του NetWatch συνδέεται στον broker σου σαν ένας ακόμα client, **μόνο για ανάγνωση**, και παρακολουθεί.'
+          ),
+          table(['Ειδοποίηση', 'Πότε', 'Γιατί σε νοιάζει'], [
+            ['**Άγνωστος MQTT client**', 'Συνδέεται client id που δεν έχει ξαναδεί (από το log του broker)', 'Κλεμμένος κωδικός, νέα συσκευή που δεν έβαλες εσύ'],
+            ['**Νέο MQTT topic**', 'Εμφανίζεται topic (μοτίβο) που δεν είχε χρησιμοποιηθεί ποτέ', 'Αλλαγμένο firmware ή κάποιος που δοκιμάζει την ACL'],
+            ['**Εντολή MQTT σε ασυνήθιστη ώρα**', 'Publish σε topic εντολής (`…/set`, `…/cmd`, `relay`, `switch`) μεταξύ 00:00 και 06:00', 'Κάποιος ανάβει/σβήνει πράγματα χωρίς εσένα'],
+            ['**IoT συσκευή σιώπησε**', 'Μια συσκευή δεν στέλνει για περισσότερο από 5× το συνηθισμένο της διάστημα (τουλάχιστον 5′)', 'Έπεσε, έχασε Wi‑Fi, ή κάποιος την έκοψε (deauth)'],
+          ]),
+          text(
+            'Τα πρώτα **15 λεπτά** ο φύλακας μόνο **μαθαίνει**: ποιοι clients υπάρχουν, ποια topics χρησιμοποιούνται και κάθε πόσο στέλνει κάθε συσκευή (τις ξεχωρίζει από τις δύο πρώτες στάθμες του topic, π.χ. `home/garden`). Ό,τι μάθει το θυμάται και μετά από επανεκκίνηση· με το κουμπί «↺ ξαναμάθε» ξεκινά από την αρχή. Μετά ειδοποιεί για ό,τι **ξεφεύγει** από αυτή την εικόνα.',
+            '',
+            '### Πώς βλέπει τις συνδέσεις: `$SYS/broker/log`',
+            'Ένας κανονικός client βλέπει μόνο **μηνύματα**, όχι ποιος συνδέεται. Ο Mosquitto όμως μπορεί να δημοσιεύει **το δικό του log** σε topics, με τη ρύθμιση `log_dest topic`. Οι γραμμές πάνε στο `$SYS/broker/log/<επίπεδο>` (π.χ. `N` για notice), και ανάμεσά τους οι συνδέσεις:'
+          ),
+          code('text', 'Τι διαβάζει ο φύλακας από το $SYS/broker/log/N', R`
+New client connected from 192.168.1.20:5123 as esp32-garden (p2, c1, k60, u'garden').
+Client esp32-garden disconnected.
+New client connected from 192.168.1.66:40112 as kali-test (p2, c1, k60, u'garden').
+`, L(
+            '- `from 192.168.1.20:5123`: IP και θύρα του client. `as esp32-garden`: client id.',
+            '- `p2` = MQTT 3.1.1 (`p5` = MQTT 5), `c1` = clean session, `k60` = keep alive 60 s, `u\'garden\'` = username.',
+            '- Η τρίτη γραμμή: ο χρήστης `garden` από **άλλη IP** και με **άλλο client id**. Ο κωδικός του ESP32 χρησιμοποιείται από αλλού: ακριβώς αυτό που θέλεις να μάθεις αμέσως.'
+          )),
+          text('### Βήμα 1: χρήστης `netwatch` στον Mosquitto'),
+          code('bash', 'Στο VM του broker', R`
+# ΧΩΡΙΣ -c: το αρχείο υπάρχει ήδη!
+sudo mosquitto_passwd /etc/mosquitto/passwd netwatch
+`, L(
+            '- Ζητά τον κωδικό διαδραστικά (δεν μένει στο history).',
+            '- Δώσε **μακρύ, τυχαίο** κωδικό, μόνο για το NetWatch (π.χ. `openssl rand -base64 24`).'
+          )),
+          text('### Βήμα 2: ACL μόνο για ανάγνωση'),
+          code('text', '/etc/mosquitto/acl (προσθήκη)', R`
+# --- NetWatch: διαβάζει τα πάντα, δεν γράφει ΤΙΠΟΤΑ ---
+user netwatch
+topic read #
+topic read $SYS/#
+`, L(
+            '- `topic read #`: όλα τα κανονικά topics.',
+            '- `topic read $SYS/#`: χρειάζεται **χωριστή** γραμμή. Κατά το πρότυπο MQTT, ένα wildcard στην αρχή (`#`) **δεν** ταιριάζει σε topics που ξεκινούν με `$`.',
+            '- Καμία γραμμή `write`: αν κάποιος κλέψει τον κωδικό του NetWatch, **δεν** μπορεί να στείλει εντολές.'
+          )),
+          text('### Βήμα 3: το log του broker σε topic'),
+          code('text', '/etc/mosquitto/conf.d/30-netwatch.conf', R`
+# Δημοσίευσε το log και στο $SYS/broker/log/#
+# (κρατά και το υπάρχον log_dest file του mosquitto.conf)
+log_dest topic
+
+# Προεπιλογή, το γράφουμε για σιγουριά: log για κάθε σύνδεση/αποσύνδεση
+connection_messages true
+`, L(
+            '- `log_dest topic`: κάθε γραμμή log γίνεται μήνυμα στο `$SYS/broker/log/E|W|N|I…` (error, warning, notice, information).',
+            '- Μπορείς να έχεις **πολλές** γραμμές `log_dest`: το αρχείο `/var/log/mosquitto/mosquitto.log` συνεχίζει να γράφεται.',
+            '- Το log περιέχει IPs, client ids και usernames. Γι’ αυτό το `$SYS/#` το διαβάζει **μόνο** ο `netwatch` και κανένας άλλος χρήστης.'
+          )),
+          code('bash', 'Εφαρμογή και έλεγχος', R`
+sudo systemctl restart mosquitto
+sudo journalctl -u mosquitto -n 20 --no-pager
+
+# Δες τι θα βλέπει ο φύλακας (σε άλλο τερματικό κάνε restart ένα ESP32)
+mosquitto_sub -h 192.168.1.17 -u netwatch -P 'ο-κωδικός' -v -t '$SYS/broker/log/#'
+
+# Ο netwatch ΔΕΝ πρέπει να μπορεί να γράψει. Με MQTT 5 και QoS 1 ο broker το λέει ρητά:
+mosquitto_pub -h 192.168.1.17 -u netwatch -P 'ο-κωδικός' -V mqttv5 -q 1 -t home/garden/set -m ON
+`, L(
+            '- Τα μονά εισαγωγικά στο `\'$SYS/broker/log/#\'` εμποδίζουν το shell να «φάει» το `$SYS`.',
+            '- `-v`: τυπώνει και το topic κάθε μηνύματος.',
+            '- Στο τελευταίο: σε MQTT 3.1.1 ο broker απλώς πετά το μήνυμα σιωπηλά. Με `-V mqttv5 -q 1` παίρνεις απάντηση **not authorized**. Επιβεβαίωσε ότι το ρελέ **δεν** άλλαξε.'
+          )),
+          text('### Βήμα 4: ρύθμιση στο NetWatch'),
+          code('yaml', 'config.yaml του NetWatch', R`
+mqtt_guard:
+  host: 192.168.1.17
+  port: 1883        # 8883 + ca_file όταν βάλεις TLS
+  username: netwatch
+  password: "..."
+  # ca_file: ~/netwatch/mqtt-ca.crt
+`, L(
+            '- `host`: ο broker σου (το VM στον Proxmox).',
+            '- `port`: 1883 όσο δεν έχεις TLS. Μόλις περάσεις σε TLS: `port: 8883` και ξεσχολίασε το `ca_file` με το `ca.crt` της CA σου.',
+            '- `username` / `password`: ο χρήστης μόνο-ανάγνωσης. Το `config.yaml` με `chmod 600`, γιατί έχει κωδικό.',
+            '- Θυμήσου το προηγούμενο μάθημα: όσο ο φύλακας μιλά στη 1883, ο **δικός του** κωδικός ταξιδεύει κι αυτός σε καθαρό κείμενο.'
+          )),
+          nw('mqtt', 'Άνοιξε την καρτέλα **MQTT** του NetWatch: θα δεις τους clients που ξέρει ο φύλακας, τα topics κάθε συσκευής και πότε μίλησε τελευταία. Κάνε restart ένα ESP32 και δες τη σύνδεση να εμφανίζεται.'),
+          text(
+            '### Least privilege: κάθε ESP32 δικός του χρήστης',
+            'Ο φύλακας **βλέπει**. Η ACL **εμποδίζει**. Χρειάζεσαι και τα δύο. Ο κανόνας είναι απλός: κάθε client παίρνει **τα λιγότερα δικαιώματα** που χρειάζεται για να κάνει τη δουλειά του.',
+            '- **Ένας χρήστης ανά συσκευή** (`garden`, `boiler`…), ποτέ ένας κοινός `esp32` για όλα. Αν κλαπεί ένα ESP32, σβήνεις **μόνο** αυτόν τον χρήστη.',
+            '- Κάθε συσκευή **γράφει μόνο** στα δικά της topics και **διαβάζει μόνο** τις δικές της εντολές.',
+            '- Μόνο το dashboard ή το Home Assistant γράφει σε topics εντολών.',
+            '- Ο NetWatch μόνο **διαβάζει**.'
+          ),
+          code('text', '/etc/mosquitto/acl με έναν χρήστη ανά ESP32', R`
+user garden
+topic write home/garden/state
+topic write home/garden/status
+topic read  home/garden/set
+
+user boiler
+topic write home/boiler/state
+topic write home/boiler/status
+topic read  home/boiler/set
+
+user dashboard
+topic read  home/#
+topic write home/+/set
+
+user netwatch
+topic read #
+topic read $SYS/#
+`, L(
+            '- Ο `garden` δεν μπορεί να ανάψει τον `boiler`, ακόμα κι αν κάποιος βγάλει τον κωδικό από το flash του ESP32.',
+            '- Το `home/+/set`: το `+` ταιριάζει σε **ένα** επίπεδο, άρα το dashboard στέλνει εντολές μόνο στα `home/<συσκευή>/set`.',
+            '- Με πολλές συσκευές, τα ίδια με έναν κανόνα: `pattern write home/%u/state` και `pattern read home/%u/set` (`%u` = username).'
+          )),
+          tip('Με `use_username_as_clientid true` στον listener, ο Mosquitto χρησιμοποιεί το **username ως client id**. Έτσι κανείς δεν μπορεί να συνδεθεί με το client id ενός ESP32 και να το «πετάξει» έξω (ο broker κόβει την παλιά σύνδεση όταν έρθει νέα με το ίδιο client id).'),
+          quiz('Γιατί η ACL του NetWatch χρειάζεται **και** `topic read #` **και** `topic read $SYS/#`;',
+            ['Δεν χρειάζεται: το `#` τα καλύπτει όλα', 'Γιατί τα topics που ξεκινούν με `$` δεν ταιριάζουν σε wildcard στην αρχή του φίλτρου', 'Γιατί το `$SYS` είναι μόνο για εγγραφή', 'Γιατί το `#` πιάνει μόνο ένα επίπεδο'], 1,
+            'Το πρότυπο MQTT λέει ότι φίλτρα που ξεκινούν με `#` ή `+` δεν ταιριάζουν σε topics που ξεκινούν με `$`. Γι’ αυτό το `$SYS/#` δηλώνεται ρητά.'),
+          quiz('Ο φύλακας ειδοποιεί: «Νέος client `kali-test` από 192.168.1.66 με χρήστη `garden`». Το ESP32 του κήπου είναι online από την 192.168.1.20. Τι κάνεις πρώτα;',
+            ['Τίποτα, είναι το ESP32 που άλλαξε IP', 'Αλλάζεις τον κωδικό του χρήστη `garden` (ή τον σβήνεις), ενημερώνεις το ESP32 και ψάχνεις ποια συσκευή είναι η 192.168.1.66', 'Κάνεις restart τον broker', 'Βάζεις τον `garden` σε `topic readwrite #`'], 1,
+            'Ο ίδιος χρήστης από δύο IP και με άλλο client id σημαίνει ότι ο κωδικός **διέρρευσε**. Ακύρωσέ τον και βρες τη συσκευή (καρτέλα Συσκευές). Επειδή ο `garden` γράφει μόνο στα δικά του topics, η ζημιά είναι περιορισμένη.'),
+        ],
+      },
     ],
   });
 
@@ -3051,7 +3333,7 @@ config rule
             '- Χωρίς κανόνα `iot → wan` για άλλα ports, οι συσκευές δεν «τηλεφωνούν σπίτι» σε άγνωστα clouds.',
             '- Εφαρμογή: `uci commit && service network reload && service firewall reload`.'
           )),
-          nw('lan', 'Μετά το segmentation, η καρτέλα **LAN** του NetWatch (στο laptop σου) δεν πρέπει πια να βλέπει καμία IoT συσκευή στο ίδιο broadcast domain.'),
+          nw('devs', 'Μετά το segmentation, η καρτέλα **📟 Συσκευές** του NetWatch (στο laptop σου) δεν πρέπει πια να βλέπει καμία IoT συσκευή στο ίδιο broadcast domain.'),
           tip('Δεν έχεις router με VLAN; Ένα **Raspberry Pi με δεύτερο Wi‑Fi** μπορεί να γίνει το IoT δίκτυο και ο firewall μαζί. Αυτό κάνουμε στο επόμενο μάθημα.'),
           quiz('Μια κάμερα στο IoT VLAN παραβιάζεται. Με τους παραπάνω κανόνες, τι **μπορεί** να κάνει;',
             ['Να σαρώσει το laptop στο LAN', 'Να συνδεθεί μόνο στο 192.168.1.50:8883 (και να χρειαστεί έγκυρο user/pass + ACL εκεί)', 'Να μπει στο NAS', 'Να ανοίξει θύρα στο Internet μέσω του router'], 1,
@@ -4279,6 +4561,227 @@ ssh -N -L 8080:127.0.0.1:8080 maria@pi-broker.local
             '- **WireGuard** για απομακρυσμένη πρόσβαση χωρίς ανοιχτές θύρες.',
             '- Δικοί σου κανόνες ανίχνευσης στην καρτέλα **🧩 Κανόνες** του NetWatch για την IoT κίνησή σου.'
           ),
+        ],
+      },
+    ],
+  });
+
+  // ====================================================================
+  // MODULE 10 — Απομακρυσμένη πρόσβαση με ασφάλεια
+  // ====================================================================
+  ACADEMY.scene('iot-tor-onion', {
+    w: 640, h: 300, speed: 3000,
+    intro: 'Πώς φτάνεις από το κινητό στο dashboard του Pi μέσω **Tor onion service**, χωρίς **καμία** ανοιχτή θύρα στο router σου. Κάθε βέλος είναι στην πραγματικότητα ένα **κύκλωμα Tor** με 3 κόμβους.',
+    nodes: [
+      { id: 'you', x: 70, y: 70, icon: '📱', label: 'Εσύ\nTor Browser' },
+      { id: 'hsdir', x: 300, y: 45, icon: '📒', label: 'HSDir\nκατάλογος' },
+      { id: 'nat', x: 470, y: 75, icon: '🌐', label: 'Router σπιτιού\n0 ανοιχτές θύρες' },
+      { id: 'pi', x: 585, y: 165, icon: '🍓', label: 'Pi + tor\n127.0.0.1:8123' },
+      { id: 'rp', x: 180, y: 200, icon: '🤝', label: 'Rendezvous\npoint' },
+      { id: 'ip', x: 430, y: 215, icon: '🚪', label: 'Introduction\npoint' },
+      { id: 'scan', x: 300, y: 270, icon: '🤖', label: 'Shodan / bot' },
+    ],
+    links: [['pi', 'nat'], ['nat', 'hsdir'], ['nat', 'ip'], ['you', 'hsdir'], ['you', 'rp'], ['scan', 'nat']],
+    tables: [{ id: 'st', title: 'Τι ισχύει τώρα', head: ['Βήμα', 'Κατάσταση'], rows: [] }],
+    steps: [
+      { from: 'pi', via: ['nat'], to: 'ip', pkt: 'κύκλωμα ⇢', color: BLUE, mark: { pi: 'hl' }, table: { st: [['Pi → intro points', 'εξερχόμενα κυκλώματα']] }, say: 'Το `tor` στο Pi χτίζει **εξερχόμενα** κυκλώματα προς μερικά **introduction points** και τους λέει «αν σε ρωτήσουν για μένα, φέρε μου το μήνυμα». Το NAT δεν ενοχλεί: όλα ξεκινούν **από μέσα**.' },
+      { from: 'pi', via: ['nat'], to: 'hsdir', pkt: 'descriptor ✍️', color: PURP, table: { st: [['Pi → intro points', 'εξερχόμενα κυκλώματα'], ['Descriptor', 'υπογεγραμμένος, κρυπτογραφημένος']] }, say: 'Δημοσιεύει έναν **descriptor** (ποια είναι τα intro points) στους καταλόγους HSDir. Είναι υπογεγραμμένος με το κλειδί της διεύθυνσης `.onion` και, με **client authorization**, κρυπτογραφημένος μόνο για τα δικά σου κλειδιά.' },
+      { from: 'you', to: 'hsdir', pkt: 'xyz…onion;', color: YEL, say: 'Το κινητό σου ζητά τον descriptor για τη διεύθυνση `.onion`. Μόνο αν έχεις το σωστό **ιδιωτικό κλειδί x25519** μπορείς να τον διαβάσεις.' },
+      { from: 'you', to: 'rp', pkt: 'cookie', color: YEL, say: 'Διαλέγεις έναν τυχαίο κόμβο ως **rendezvous point** και του αφήνεις ένα μυστικό **cookie**.' },
+      { from: 'you', via: ['rp'], to: 'ip', pkt: 'INTRODUCE', color: YEL, say: 'Στέλνεις στο introduction point ένα μήνυμα **κρυπτογραφημένο για το Pi**: «συνάντησέ με σε εκείνο το rendezvous, με αυτό το cookie».' },
+      { from: 'ip', via: ['nat'], to: 'pi', pkt: 'INTRODUCE', color: BLUE, say: 'Το intro point το προωθεί στο Pi από το κύκλωμα που **είχε ήδη ανοίξει το Pi**. Καμία νέα εισερχόμενη σύνδεση.' },
+      { from: 'pi', via: ['nat'], to: 'rp', pkt: 'RENDEZVOUS', color: GREEN, mark: { rp: 'ok' }, say: 'Το Pi χτίζει νέο κύκλωμα **προς** το rendezvous point και δίνει το cookie. Το rendezvous ενώνει τα δύο κυκλώματα.' },
+      { from: 'you', via: ['rp', 'nat'], to: 'pi', pkt: 'HTTP 🔒', color: GREEN, mark: { you: 'ok', pi: 'ok' }, table: { st: [['Σύνδεση', 'end-to-end κρυπτογραφημένη, 6 hops'], ['Ανοιχτές θύρες στο router', '0']] }, say: 'Έτοιμο: κρυπτογράφηση **από άκρη σε άκρη**, ~6 κόμβοι στη μέση. Κανείς τους δεν ξέρει ταυτόχρονα ποιος είσαι **και** πού είναι το Pi. Το `tor` παραδίδει την κίνηση στο `127.0.0.1:8123`.' },
+      { from: 'scan', to: 'nat', pkt: 'SYN :8123?', color: RED, drop: true, mark: { scan: 'bad', nat: 'ok' }, say: 'Το Shodan και τα botnets σαρώνουν τη δημόσια IP σου: **καμία** θύρα δεν απαντά. Δεν υπάρχει τίποτα για να βρουν ή να χτυπήσουν.' },
+    ],
+  });
+
+  M.push({
+    id: 'iot-10', order: 10, title: 'Απομακρυσμένη πρόσβαση με ασφάλεια (χωρίς ανοιχτές θύρες)',
+    desc: 'Γιατί το port forwarding είναι κακή ιδέα, Tor onion services με client authorization, σύγκριση με WireGuard/Tailscale, και τι σημαίνει όταν μια IoT συσκευή μιλά με το Tor.',
+    lessons: [
+      {
+        id: 'iot-10-1', title: 'Πρόσβαση από έξω χωρίς port forwarding: Tor onion service', minutes: 22,
+        goal: 'Να καταλάβεις γιατί το port forwarding του dashboard είναι επικίνδυνο, πώς δουλεύει ένα **Tor onion service** (introduction points, rendezvous, καμία ανοιχτή θύρα), και να στήσεις ένα για το Pi με **client authorization**, ώστε να μπαίνεις **μόνο εσύ**.',
+        blocks: [
+          text(
+            'Θέλεις να βλέπεις το dashboard του Pi ή το Proxmox όταν είσαι έξω από το σπίτι. Ο πιο γρήγορος δρόμος είναι ένας κανόνας **port forwarding** στο router: `δημόσια IP:8123 → Pi:8123`. Είναι και ο πιο **επικίνδυνος**.',
+            '',
+            '### Γιατί το port forwarding είναι κακή ιδέα',
+            '- Μηχανές όπως το **Shodan** και το **Censys** σαρώνουν **όλο** το IPv4 internet συνεχώς. Μια νέα ανοιχτή θύρα εμφανίζεται στους καταλόγους τους μέσα σε ώρες ή μέρες.',
+            '- **Botnets** (όπως το Mirai και οι απόγονοί του) δοκιμάζουν αυτόματα default κωδικούς και γνωστά exploits σε κάθε θύρα που απαντά.',
+            '- Ένα dashboard IoT ή το web UI του Proxmox **δεν** είναι φτιαγμένα για να αντέχουν το internet: ένα bug στη σελίδα login αρκεί.',
+            '- Αν κάποιος μπει, βρίσκεται **μέσα** στο LAN σου, δίπλα σε όλα τα άλλα μηχανήματα.'
+          ),
+          text(
+            '### Η ιδέα του onion service',
+            'Αντί ο κόσμος να έρχεται **προς** το Pi, το Pi **βγαίνει** προς το δίκτυο Tor και κρατά ανοιχτά κυκλώματα. Όποιος ξέρει τη διεύθυνση `.onion` (και, στη δική μας περίπτωση, έχει το **κλειδί**) συναντά το Pi σε ένα ουδέτερο σημείο μέσα στο Tor.',
+            '- **Καμία εισερχόμενη θύρα**: το router σου δεν έχει κανέναν κανόνα forwarding.',
+            '- **Το NAT δεν παίζει ρόλο**: δουλεύει ακόμα και πίσω από CGNAT του παρόχου ή από 4G router.',
+            '- Η διεύθυνση `.onion` (v3, 56 χαρακτήρες) είναι το ίδιο το **δημόσιο κλειδί** της υπηρεσίας: δεν μπορεί να την «πλαστογραφήσει» κανείς.'
+          ),
+          anim('iot-tor-onion', 'Introduction points, descriptor, rendezvous: το Pi δεν δέχεται ποτέ εισερχόμενη σύνδεση από το internet.'),
+          text(
+            '### Βήμα 1: το dashboard ακούει μόνο στο localhost',
+            'Πριν απ’ όλα: η υπηρεσία που θα δημοσιεύσεις πρέπει να ακούει **μόνο** στο `127.0.0.1`. Αλλιώς, όποιος είναι στο LAN (ή μια παραβιασμένη IoT συσκευή) μπαίνει απευθείας, χωρίς Tor και χωρίς κλειδί.'
+          ),
+          code('bash', 'Σε ποια διεύθυνση ακούει το dashboard;', R`
+sudo ss -tlnp | grep 8123
+# ΚΑΛΟ:  LISTEN 0 128 127.0.0.1:8123 ...
+# ΚΑΚΟ:  LISTEN 0 128   0.0.0.0:8123 ...   (ακούει σε όλο το δίκτυο)
+`, L(
+            '- `ss -tlnp`: TCP sockets σε κατάσταση LISTEN, με το πρόγραμμα που τα κατέχει.',
+            '- Αν βλέπεις `0.0.0.0` ή `*`, άλλαξε τη ρύθμιση bind της εφαρμογής σου σε `127.0.0.1` (π.χ. `--host 127.0.0.1` σε Flask/uvicorn).'
+          )),
+          text('### Βήμα 2: εγκατάσταση Tor και onion service'),
+          code('bash', 'Raspberry Pi OS / Debian', R`
+sudo apt update
+sudo apt install -y tor
+sudo nano /etc/tor/torrc
+`, L(
+            '- Το πακέτο `tor` των Debian τρέχει ως υπηρεσία με χρήστη `debian-tor`.',
+            '- Για νεότερες εκδόσεις υπάρχει και το επίσημο αποθετήριο `deb.torproject.org`.'
+          )),
+          code('text', '/etc/tor/torrc (προσθήκη)', R`
+HiddenServiceDir /var/lib/tor/pi_dash/
+HiddenServicePort 80 127.0.0.1:8123
+`, L(
+            '- `HiddenServiceDir`: φάκελος όπου το `tor` κρατά τα **κλειδιά** της υπηρεσίας και το αρχείο `hostname`. Το δημιουργεί μόνο του με owner `debian-tor` και permissions 700.',
+            '- `HiddenServicePort 80 127.0.0.1:8123`: όποιος ανοίξει `http://<διεύθυνση>.onion` (θύρα 80) καταλήγει στο `127.0.0.1:8123` του Pi.',
+            '- Οι νέες εκδόσεις φτιάχνουν μόνο v3 onion services (56 χαρακτήρες). Οι παλιές v2 έχουν καταργηθεί.'
+          )),
+          code('bash', 'Επανεκκίνηση και η διεύθυνσή σου', R`
+sudo -u debian-tor tor --verify-config
+sudo systemctl restart tor
+sudo cat /var/lib/tor/pi_dash/hostname
+# π.χ. abcdefghijklmnopqrstuvwxyz234567abcdefghijklmnopqrstuvwx.onion
+`, L(
+            '- `--verify-config`: ελέγχει το `torrc` πριν το εφαρμόσεις.',
+            '- `hostname`: η διεύθυνση `.onion` της υπηρεσίας σου.',
+            '- Κράτα **backup** του φακέλου `pi_dash/` (κυρίως το `hs_ed25519_secret_key`): αν τον χάσεις, χάνεις τη διεύθυνση. Αν κλαπεί, κάποιος άλλος μπορεί να την «φορέσει».'
+          )),
+          warn('Μέχρι εδώ, όποιος μάθει τη διεύθυνση `.onion` φτάνει στη σελίδα login του dashboard. Η διεύθυνση δεν είναι κωδικός. Πρόσθεσε **client authorization**.'),
+          text(
+            '### Βήμα 3: client authorization (μόνο εσύ)',
+            'Με το client authorization, ο descriptor της υπηρεσίας κρυπτογραφείται για συγκεκριμένα κλειδιά **x25519**. Χωρίς το ιδιωτικό κλειδί, ο Tor client δεν βρίσκει καν τα introduction points: η υπηρεσία φαίνεται σαν να **μην υπάρχει**.'
+          ),
+          code('bash', 'Ζεύγος κλειδιών x25519 για το κινητό σου (στο Pi)', R`
+mkdir -p ~/onion-keys && chmod 700 ~/onion-keys && cd ~/onion-keys
+openssl genpkey -algorithm x25519 -out phone.prv.pem
+grep -v ' PRIVATE KEY' phone.prv.pem | base64 -d | tail -c 32 | base32 | sed 's/=//g' > phone.prv.key
+openssl pkey -in phone.prv.pem -pubout | grep -v ' PUBLIC KEY' | base64 -d | tail -c 32 | base32 | sed 's/=//g' > phone.pub.key
+
+# Ο server παίρνει ΜΟΝΟ το δημόσιο κλειδί
+echo "descriptor:x25519:$(cat phone.pub.key)" | sudo tee /var/lib/tor/pi_dash/authorized_clients/phone.auth
+sudo chown debian-tor:debian-tor /var/lib/tor/pi_dash/authorized_clients/phone.auth
+sudo systemctl restart tor
+`, L(
+            '- `openssl genpkey -algorithm x25519`: νέο ζεύγος κλειδιών.',
+            '- `base64 -d | tail -c 32 | base32`: κρατά τα 32 bytes του κλειδιού και τα γράφει σε **base32** χωρίς `=`, όπως τα θέλει το Tor.',
+            '- `authorized_clients/<όνομα>.auth`: ένα αρχείο ανά συσκευή-πελάτη, με περιεχόμενο `descriptor:x25519:<δημόσιο κλειδί>`. Ο φάκελος υπάρχει ήδη μέσα στο `HiddenServiceDir`.',
+            '- Μόλις υπάρχει **έστω ένα** `.auth` αρχείο, η υπηρεσία δέχεται **μόνο** εξουσιοδοτημένους clients.',
+            '- Για να διώξεις μια συσκευή (π.χ. χάθηκε το κινητό): σβήνεις το `.auth` της και κάνεις restart.'
+          )),
+          code('text', 'Στον client (laptop με tor): torrc και αρχείο κλειδιού', R`
+# torrc του client
+ClientOnionAuthDir /var/lib/tor/onion_auth
+
+# /var/lib/tor/onion_auth/pi.auth_private  (μία γραμμή, permissions 600)
+<56 χαρακτήρες της .onion ΧΩΡΙΣ το .onion>:descriptor:x25519:<περιεχόμενο του phone.prv.key>
+`, L(
+            '- `ClientOnionAuthDir`: φάκελος με τα ιδιωτικά κλειδιά, ένα αρχείο `*.auth_private` ανά υπηρεσία.',
+            '- Στο **Tor Browser** (desktop/Android) δεν χρειάζεται torrc: όταν ανοίξεις τη διεύθυνση, σου ζητά το ιδιωτικό κλειδί και μπορείς να το αποθηκεύσεις.',
+            '- Το `phone.prv.key` είναι **μυστικό**. Μετέφερέ το με ασφάλεια και μετά σβήσε το από το Pi (`shred -u`).'
+          )),
+          tip('Με τον ίδιο τρόπο μπορείς να δημοσιεύσεις και το SSH του Pi: `HiddenServicePort 22 127.0.0.1:22`. Συνδέεσαι με `torsocks ssh pi@<διεύθυνση>.onion`. Τα SSH κλειδιά σου ισχύουν κανονικά από πάνω.'),
+          text(
+            '### Εναλλακτικές: WireGuard και Tailscale',
+            'Το Tor δεν είναι η μόνη λύση. Για καθημερινή χρήση, ένα **VPN** είναι συχνά πιο γρήγορο.'
+          ),
+          table(['', 'Port forwarding', 'Tor onion + client auth', 'WireGuard', 'Tailscale'], [
+            ['Ανοιχτή θύρα στο router', '✖ ναι, TCP προς την εφαρμογή', '✔ καμία', 'μία UDP (π.χ. 51820)', '✔ καμία (NAT traversal)'],
+            ['Φαίνεται σε σαρώσεις', '✖ ναι', '✔ όχι', '✔ σχεδόν όχι (δεν απαντά χωρίς σωστό κλειδί)', '✔ όχι'],
+            ['Πίσω από CGNAT / 4G', '✖ δεν δουλεύει', '✔ δουλεύει', '✖ θέλει δημόσια IP ή VPS', '✔ δουλεύει (relay αν χρειαστεί)'],
+            ['Ταχύτητα / καθυστέρηση', 'γρήγορο', 'αργό, εκατοντάδες ms', 'πολύ γρήγορο', 'πολύ γρήγορο'],
+            ['Εξάρτηση από τρίτους', '—', 'το δίκτυο Tor', 'καμία', 'λογαριασμός Tailscale (ή self-hosted Headscale)'],
+            ['Καλό για', 'τίποτα που σε νοιάζει', 'dashboard / SSH χωρίς λογαριασμούς και χωρίς δημόσια IP', 'πλήρη πρόσβαση στο LAN', 'εύκολο στήσιμο σε πολλές συσκευές'],
+          ]),
+          tip('Ό,τι κι αν διαλέξεις, κράτα και τον **κωδικό/2FA** του dashboard. Το onion service ή το VPN είναι η εξωτερική πόρτα· ο κωδικός είναι η πόρτα του δωματίου.'),
+          quiz('Γιατί ένα onion service δουλεύει ακόμα και πίσω από CGNAT, χωρίς port forwarding;',
+            ['Γιατί το Tor ανοίγει μόνο του θύρες στο router με UPnP', 'Γιατί όλες οι συνδέσεις ξεκινούν **από το Pi προς τα έξω** (κυκλώματα προς introduction και rendezvous points)', 'Γιατί το Tor χρησιμοποιεί IPv6', 'Γιατί ο πάροχος κάνει εξαίρεση για το Tor'], 1,
+            'Το Pi δεν δέχεται ποτέ εισερχόμενη σύνδεση από το internet. Χτίζει εξερχόμενα κυκλώματα, και η «συνάντηση» γίνεται στο rendezvous point μέσα στο Tor.'),
+          quiz('Έστησες onion service για το dashboard, αλλά το `ss -tlnp` δείχνει `0.0.0.0:8123`. Ποιο είναι το πρόβλημα;',
+            ['Κανένα, το Tor το προστατεύει', 'Το dashboard είναι προσβάσιμο απευθείας από όλο το LAN, χωρίς Tor και χωρίς client auth', 'Το onion service δεν θα δουλέψει', 'Το Shodan θα το βρει μέσω Tor'], 1,
+            'Το onion service προσθέτει **έναν** δρόμο. Δεν κλείνει τους άλλους. Bind στο `127.0.0.1` ώστε ο μόνος δρόμος να είναι μέσω Tor.'),
+          quiz('Τι περιέχει το αρχείο `authorized_clients/phone.auth` στον server;',
+            ['Το ιδιωτικό κλειδί του κινητού', '`descriptor:x25519:` και το **δημόσιο** κλειδί του κινητού σε base32', 'Τη διεύθυνση .onion', 'Τον κωδικό του dashboard'], 1,
+            'Ο server χρειάζεται μόνο **δημόσια** κλειδιά. Το ιδιωτικό μένει στον client (`*.auth_private` ή στο Tor Browser).'),
+        ],
+      },
+      {
+        id: 'iot-10-2', title: 'Tor στο δίκτυό σου: φίλος ή εχθρός;', minutes: 15,
+        goal: 'Να ξεχωρίζεις το **δικό σου** Tor από ύποπτη κίνηση Tor, να χρησιμοποιείς τις λίστες **exit nodes** και **relays**, και να ξέρεις γιατί μια IoT συσκευή που μιλά με το Tor είναι **κόκκινη σημαία**.',
+        blocks: [
+          text(
+            'Στο προηγούμενο μάθημα το Tor ήταν **εργαλείο σου**. Το ίδιο εργαλείο χρησιμοποιούν και οι επιτιθέμενοι, για τον ίδιο λόγο: για να μη φαίνεται πού βρίσκονται. Το ερώτημα δεν είναι «Tor ναι ή όχι», αλλά **ποια συσκευή** μιλά με το Tor και **γιατί**.',
+            '',
+            '### Δύο κατευθύνσεις, δύο λίστες',
+            '- **Εισερχόμενα από Tor**: κάποιος συνδέεται σε μια υπηρεσία σου (π.χ. ανοιχτή θύρα, honeypot) και η IP του είναι **exit node** του Tor. Ελέγχεις με τη λίστα **exit nodes**.',
+            '- **Εξερχόμενα προς Tor**: μια συσκευή **σου** συνδέεται στο δίκτυο Tor. Χτυπά πρώτα έναν **guard/relay** (όχι exit). Ελέγχεις με τη λίστα **όλων των relays**, και με τις θύρες **9001** (ORPort) και **9030** (DirPort), τις προεπιλογές των relays.'
+          ),
+          code('bash', 'Λίστες Tor (δημόσιες, από το Tor Project)', R`
+# 1) Όλα τα exit nodes, μία IP ανά γραμμή
+curl -s https://check.torproject.org/torbulkexitlist -o tor-exits.txt
+wc -l tor-exits.txt
+
+# Είναι αυτή η IP exit node;
+grep -qx '185.220.101.4' tor-exits.txt && echo "Tor exit" || echo "όχι exit"
+
+# 2) Όλα τα relays που τρέχουν τώρα (για εξερχόμενη κίνηση προς το Tor)
+curl -s 'https://onionoo.torproject.org/details?running=true&fields=or_addresses' \
+  | jq -r '.relays[].or_addresses[]' > tor-relays.txt
+head tor-relays.txt     # π.χ. 1.2.3.4:9001, [2001:db8::1]:443
+`, L(
+            '- `torbulkexitlist`: η επίσημη λίστα IP εξόδου. Ανανεώνεται συχνά: κατέβαζέ την ξανά τακτικά.',
+            '- `grep -qx`: ακριβές ταίριασμα ολόκληρης γραμμής, χωρίς έξοδο, μόνο κωδικός επιστροφής.',
+            '- **Onionoo**: η υπηρεσία του Tor Project με στοιχεία για όλα τα relays. Το `or_addresses` δίνει IP:θύρα κάθε relay.',
+            '- Θέλει `jq` (`sudo apt install jq`).'
+          )),
+          warn('Μην βασίζεσαι **μόνο** στις θύρες 9001/9030. Πολλά relays ακούν στη **443** για να μοιάζουν με HTTPS. Η θύρα είναι ένδειξη· η λίστα relays είναι απόδειξη.'),
+          text(
+            '### Γιατί είναι κόκκινη σημαία σε IoT συσκευή',
+            'Ένα ESP32 με αισθητήρα θερμοκρασίας ή μια IP κάμερα **δεν έχει κανέναν λόγο** να μιλά με το Tor. Αν το κάνει, η πιθανότερη εξήγηση είναι **malware**:',
+            '- Υπάρχουν IoT botnets (π.χ. παραλλαγές του **Mirai**) που κρύβουν τον **C2 server** τους (command and control) πίσω από onion service. Η συσκευή συνδέεται στο Tor για να πάρει εντολές.',
+            '- Έτσι ο C2 δεν «κατεβαίνει» εύκολα: δεν υπάρχει IP ή domain για να το μπλοκάρεις ή να το κατασχέσει κάποιος.',
+            '- Η συσκευή μπορεί επίσης να χρησιμοποιείται ως **proxy** ή για επιθέσεις προς άλλους.',
+            '',
+            'Αντίθετα, Tor από το **δικό σου** laptop (Tor Browser) ή από το Pi με το onion service του προηγούμενου μαθήματος είναι αναμενόμενο. Γι’ αυτό χρειάζεσαι **απογραφή**: να ξέρεις ποια συσκευή *πρέπει* να μιλά με το Tor.'
+          ),
+          table(['Τι βλέπεις', 'Εκτίμηση', 'Τι κάνεις'], [
+            ['Το laptop σου → 9001, ενώ τρέχει Tor Browser', 'αναμενόμενο', 'τίποτα'],
+            ['Το Pi με onion service → relays', 'αναμενόμενο (το έστησες εσύ)', 'το σημειώνεις στην απογραφή'],
+            ['ESP32 / κάμερα / smart plug → 9001 ή IP από τη λίστα relays', '**πολύ ύποπτο**', 'απομόνωση, reflash firmware, νέοι κωδικοί'],
+            ['Εισερχόμενη σύνδεση στο honeypot από exit node', 'σάρωση/επίθεση με απόκρυψη', 'μπλοκ, και έλεγχος τι άλλο είναι εκτεθειμένο'],
+          ]),
+          code('bash', 'Ποιος μιλά με Tor relays αυτή τη στιγμή; (στο Pi ή στον router)', R`
+# Συνδέσεις του ίδιου μηχανήματος προς 9001/9030
+sudo ss -tnp state established '( dport = :9001 or dport = :9030 )'
+
+# Κίνηση άλλων συσκευών που περνά από εδώ (π.χ. Pi ως router/sensor του VLAN IoT)
+sudo tcpdump -i any -n 'tcp[tcpflags] & tcp-syn != 0 and (dst port 9001 or dst port 9030)'
+`, L(
+            '- `ss … state established`: μόνο ενεργές συνδέσεις, με το πρόγραμμα (`-p`) που τις άνοιξε.',
+            '- Το φίλτρο tcpdump πιάνει τα **SYN** προς 9001/9030: ποια συσκευή *ξεκινά* σύνδεση προς το Tor.',
+            '- Για να δεις την κίνηση των IoT, το σημείο καταγραφής πρέπει να είναι εκεί που περνούν: router, mirror port ή ο sensor του NetWatch.'
+          )),
+          nw('alerts', 'Το **NetWatch** βγάζει **«Ύποπτη εξερχόμενη θύρα»** όταν δει σύνδεση στις θύρες **9001** (Tor relay) ή **9030** (Tor directory). Αν τρέχει Tor στο **δικό σου** Mac, η ειδοποίηση σημειώνεται ως αναμενόμενη («Είναι το δικό σου Tor») και δεν χρωματίζει τίποτα. Αν η πηγή είναι μια IoT συσκευή, ψάξ’ το αμέσως.'),
+          tip('Η καλύτερη άμυνα δεν είναι η λίστα, αλλά το **default deny**: στο VLAN των IoT επίτρεψε μόνο ό,τι χρειάζονται (broker 8883, DNS, NTP). Τότε ένα ESP32 με malware **δεν μπορεί** να φτάσει στο Tor, όποια θύρα κι αν δοκιμάσει.'),
+          quiz('Θέλεις να δεις αν ένα ESP32 σου συνδέεται **προς** το δίκτυο Tor. Ποια λίστα σε βοηθά περισσότερο;',
+            ['Η λίστα exit nodes (`torbulkexitlist`)', 'Η λίστα όλων των relays (π.χ. από το Onionoo), γιατί η πρώτη σύνδεση πάει σε guard/relay, όχι σε exit', 'Η λίστα DNS του παρόχου', 'Καμία, το Tor δεν φαίνεται'], 1,
+            'Ένας Tor client συνδέεται πρώτα σε **guard** relay. Τα exit nodes τα βλέπεις όταν κάποιος **έρχεται** σε σένα από το Tor.'),
+          quiz('Το NetWatch δείχνει ότι η έξυπνη πρίζα σου ανοίγει συνδέσεις στη θύρα 9001 διάφορων IP. Ποια είναι η σωστή αντίδραση;',
+            ['Είναι ενημέρωση firmware, το αγνοείς', 'Πιθανό malware με C2 πάνω από Tor: απομονώνεις την πρίζα (VLAN/μπλοκ), αλλάζεις κωδικούς, κάνεις reset/reflash και ελέγχεις τι άλλο επικοινώνησε', 'Ανοίγεις τη 9001 στο firewall για να δουλεύει σωστά', 'Βάζεις και τις υπόλοιπες συσκευές να χρησιμοποιούν Tor'], 1,
+            'Μια IoT συσκευή δεν έχει νόμιμο λόγο να μιλά με Tor relays. Περιορισμός πρώτα, έρευνα μετά.'),
         ],
       },
     ],
