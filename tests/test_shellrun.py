@@ -1,16 +1,12 @@
-import shutil
-
 import pytest
 
 import shellrun as sr
 
-_which = shutil.which
-
 
 @pytest.fixture(autouse=True)
-def nmap_installed(monkeypatch):
-    # τα τεστ ελέγχουν τους κανόνες, όχι αν το nmap υπάρχει σε αυτό το μηχάνημα (στο CI δεν υπάρχει)
-    monkeypatch.setattr(sr.shutil, "which", lambda c, *a, **k: "/usr/bin/nmap" if c == "nmap" else _which(c, *a, **k))
+def tools_installed(monkeypatch):
+    # τα τεστ ελέγχουν τους κανόνες, όχι ποια εργαλεία (nmap, ifconfig…) έχει αυτό το μηχάνημα — στο CI (Ubuntu) λείπουν
+    monkeypatch.setattr(sr.shutil, "which", lambda c, *a, **k: "/usr/bin/" + c)
 
 
 def blocked(c):
