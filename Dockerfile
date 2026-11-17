@@ -7,7 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends tcpdump whois i
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY netwatch.py pentest.py rules.py ctf.py wifiguard.py privacy.py index.html edu.js config.example.yaml ./
+COPY netwatch.py pentest.py rules.py ctf.py wifiguard.py privacy.py apps.py honeypot.py blocker.py index.html edu.js config.example.yaml ./
+COPY academy ./academy
 COPY samples ./samples
 COPY rules ./rules
 COPY ctf ./ctf

@@ -7,6 +7,7 @@
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script src="/edu.js"></script>
+<script src="/academy/engine.js"></script>
 <style>
 :root{--bg:#05080f;--panel:#0b111c;--panel2:#101828;--line:#1c2638;--txt:#cfe0f5;--dim:#6d7f99;
   --cyan:#3ec5ff;--green:#3ddc97;--yellow:#ffd23f;--orange:#ff9f43;--red:#ff3b5c;--purple:#b388ff;--pink:#ff6ad5}
@@ -94,7 +95,25 @@ a.mitre{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;backgro
 a.mitre:hover{border-color:#b388ff}
 .tactic{display:inline-block;vertical-align:top;width:calc(50% - 4px);margin:0 4px 8px 0;background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:8px}
 .tactic.hit{border-color:#4a2f7a;background:#1a1030}
-@media (max-width:900px){aside{display:none}.chip:nth-of-type(n+4){display:none}}
+/* Στενό παράθυρο: ο χάρτης πάνω, ο πίνακας με τις καρτέλες από κάτω (όχι κρυμμένος). Το 🗺 τον κρύβει/δείχνει. */
+.mapbtn{display:none}
+@media (max-width:900px){
+  main{flex-direction:column}
+  #viz{flex:none;height:40%;min-height:180px}
+  aside{width:auto;flex:1;min-height:0;border-left:0;border-top:1px solid var(--line)}
+  body.mapoff #viz{display:none}
+  .mapbtn{display:block}
+  .chip:nth-of-type(n+4){display:none}
+  .menu{max-height:60vh}
+  #toasts .toast:not(:first-child){display:none}.toast{padding:6px 9px;font-size:11px}.toast .sm{display:none}
+  #zc{flex-direction:row;bottom:8px;right:8px}#zl{bottom:44px;right:8px}#legend{transform:scale(.85);transform-origin:top right}
+}
+@media (max-width:600px){
+  header{gap:8px;padding:0 10px}.chip,#spark,#legend,#zl{display:none}
+  .logo{letter-spacing:1px;font-size:12px}#status{font-size:11px;padding:3px 7px}
+  nav button{padding-left:8px;padding-right:8px}
+  #zc button{width:28px;height:28px}
+}
 </style>
 </head>
 <body>
@@ -132,6 +151,7 @@ a.mitre:hover{border-color:#b388ff}
       <button data-t="home" class="on">🧭 Αρχική</button>
       <button data-t="alerts">⚠ Επιθέσεις<span class="cnt" id="ac" style="display:none">0</span></button>
       <span id="curtab" class="curtab"></span>
+      <button id="map-btn" class="mapbtn" title="Απόκρυψη/εμφάνιση χάρτη">🗺</button>
       <button id="menu-btn" class="menu-btn" title="Όλες οι ενότητες">☰ Ενότητες</button>
       <div id="menu" class="menu"></div>
     </nav>
@@ -148,6 +168,10 @@ a.mitre:hover{border-color:#b388ff}
     </div>
     <div class="tab" id="t-det"><div class="empty">Κάνε κλικ σε έναν κόμβο στον χάρτη ή σε μια γραμμή για αναλυτικά στοιχεία (OSINT).</div></div>
     <div class="tab" id="t-learn"></div>
+    <div class="tab" id="t-academy"></div>
+    <div class="tab" id="t-apps"></div>
+    <div class="tab" id="t-honey"></div>
+    <div class="tab" id="t-block"></div>
     <div class="tab" id="t-tips"></div>
     <div class="tab" id="t-hist"></div>
     <div class="tab" id="t-audit"></div>
@@ -188,6 +212,7 @@ const zoom=d3.zoom().scaleExtent([1,60]).on('zoom',e=>{ZT=e.transform;mapDirty=t
 d3.select(cv).call(zoom);
 function resize(){
   const r=cv.getBoundingClientRect();DPR=window.devicePixelRatio||1;W=r.width;H=r.height;if(W<50||H<50)return;
+  if(!S.lanUser)S.showLan=W>=390&&H>=330;  /* LAN κουτί 330×270 */  // το LAN κουτί δεν χωράει σε μικρό χάρτη (το ▣ το ξαναφέρνει)
   cv.width=W*DPR;cv.height=H*DPR;proj=d3.geoNaturalEarth1().fitExtent([[20,20],[W-20,H-20]],{type:'Sphere'});
   zoom.extent([[0,0],[W,H]]).translateExtent([[-W*.1,-H*.1],[W*1.1,H*1.1]]);
   mapImg=document.createElement('canvas');mapImg.width=W*DPR;mapImg.height=H*DPR;mapDirty=true;
@@ -211,7 +236,10 @@ function P(lon,lat){const p=proj([lon,lat]);return p?ZT.apply(p):null}
 $('zin').onclick=()=>d3.select(cv).transition().duration(400).call(zoom.scaleBy,2);
 $('zout').onclick=()=>d3.select(cv).transition().duration(400).call(zoom.scaleBy,.5);
 $('zreset').onclick=()=>d3.select(cv).transition().duration(600).call(zoom.transform,d3.zoomIdentity);
-$('zlan').onclick=()=>{S.showLan=!S.showLan};
+$('zlan').onclick=()=>{S.showLan=!S.showLan;S.lanUser=true};
+// στενό παράθυρο: κουμπί 🗺 για όλη την οθόνη στις καρτέλες (θυμάται την επιλογή)
+try{if(localStorage.getItem('nw-mapoff')==='1')document.body.classList.add('mapoff')}catch(e){}
+$('map-btn').onclick=()=>{const off=document.body.classList.toggle('mapoff');try{localStorage.setItem('nw-mapoff',off?'1':'0')}catch(e){}};
 $('zshot').onclick=()=>cv.toBlob(b=>download(b,`netwatch-map-${Date.now()}.png`),'image/png');
 function zoomTo(lonlats,maxK){
   const pts=lonlats.map(l=>proj(l)).filter(Boolean);if(!pts.length)return;
@@ -391,10 +419,10 @@ cv.addEventListener('click',e=>{const[n]=pick(e);if(n)select(n.ip);else if(S.sel
 let tab='home';
 // Ενότητες σε κάρτες: μία σειρά καρτελών + μενού «☰ Ενότητες» (και πλέγμα στην Αρχική)
 const SECTIONS=[
-  ['🛡 Προστασία',[['alerts','⚠ Επιθέσεις','τι ύποπτο έγινε, με απλά λόγια'],['wifi','☕ Wi‑Fi','είμαι ασφαλής σε αυτό το δίκτυο;'],['priv','🕵 Ανωνυμία','Tor, VPN, διαρροές'],['audit','🛡 Έλεγχος','βαθμός ασφάλειας του σπιτιού']]],
-  ['🌐 Το δίκτυό μου',[['devs','📟 Συσκευές','ποιος είναι συνδεδεμένος'],['hosts','🌍 Προορισμοί','πού μιλάει ο υπολογιστής'],['stats','📊 Στατιστικά','πρωτόκολλα, κίνηση, MITRE'],['feed','📦 Πακέτα','ζωντανά πακέτα & στρώματα OSI'],['det','🔎 Λεπτομέρειες','όλα για μία IP'],['hist','🕓 Ιστορικό','παλιές ειδοποιήσεις & συσκευές']]],
+  ['🛡 Προστασία',[['alerts','⚠ Επιθέσεις','τι ύποπτο έγινε, με απλά λόγια'],['wifi','☕ Wi‑Fi','είμαι ασφαλής σε αυτό το δίκτυο;'],['priv','🕵 Ανωνυμία','Tor, VPN, διαρροές'],['audit','🛡 Έλεγχος','βαθμός ασφάλειας του σπιτιού'],['honey','🪤 Παγίδα','ψεύτικες θύρες που πιάνουν όποιον ψάχνει'],['block','🚫 Μπλοκ','IP που έκοψες με το τείχος']]],
+  ['🌐 Το δίκτυό μου',[['devs','📟 Συσκευές','ποιος είναι συνδεδεμένος'],['hosts','🌍 Προορισμοί','πού μιλάει ο υπολογιστής'],['apps','📱 Εφαρμογές','ποια app μιλάει με ποιον · trackers'],['stats','📊 Στατιστικά','πρωτόκολλα, κίνηση, MITRE'],['feed','📦 Πακέτα','ζωντανά πακέτα & στρώματα OSI'],['det','🔎 Λεπτομέρειες','όλα για μία IP'],['hist','🕓 Ιστορικό','παλιές ειδοποιήσεις & συσκευές']]],
   ['🔴 Εργαλεία',[['pentest','🔴 Pentest','σάρωση LAN, CVE, purple-team lab'],['rules','🧩 Κανόνες','γράψε δικούς σου ανιχνευτές'],['ctf','🚩 CTF','ασκήσεις ανάλυσης κίνησης']]],
-  ['📚 Μάθηση',[['learn','📚 Μάθε','πώς δουλεύουν οι επιθέσεις'],['tips','💡 Συμβουλές','τι να κάνεις τώρα'],['quiz','🎓 Κουίζ','τεστάρισε τι έμαθες']]]];
+  ['📚 Μάθηση',[['academy','🎓 Ακαδημία','CCNA & IoT security, από το μηδέν'],['learn','📚 Μάθε','πώς δουλεύουν οι επιθέσεις'],['tips','💡 Συμβουλές','τι να κάνεις τώρα'],['quiz','❓ Κουίζ','τεστάρισε τι έμαθες']]]];
 const SECT_NAME={home:'🧭 Αρχική'};SECTIONS.forEach(([,l])=>l.forEach(([t,n])=>SECT_NAME[t]=n));
 const cardsHTML=()=>SECTIONS.map(([g,l])=>`<div class="mgroup">${g}</div><div class="mgrid">${l.map(([t,n,d])=>`<div class="mcard${t===tab?' on':''}" data-t="${t}"><b>${n}</b><span>${d}</span></div>`).join('')}</div>`).join('');
 function closeMenu(){$('menu').classList.remove('open');$('menu-btn').classList.remove('open')}
@@ -407,7 +435,8 @@ function showTab(t){tab=t;document.querySelectorAll('nav [data-t]').forEach(b=>b
   $('curtab').textContent=t==='home'||t==='alerts'?'':SECT_NAME[t]||'';
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));
   if(t==='alerts'){S.unread=0;$('ac').style.display='none'}renderTab()}
-function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,rules:renderRules,ctf:renderCtf,wifi:renderWifi,priv:renderPriv,home:renderHome})[tab]()}
+function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,rules:renderRules,ctf:renderCtf,wifi:renderWifi,priv:renderPriv,home:renderHome,academy:renderAcademy,apps:renderApps,honey:renderHoney,block:renderBlock})[tab]()}
+function renderAcademy(){const el=$('t-academy');if(el.dataset.r)return;el.dataset.r=1;window.ACADEMY?ACADEMY.render(el):el.innerHTML='<div class="empty">Δεν φορτώθηκε η Ακαδημία</div>'}
 function tabHover(){return document.querySelector('.tab.on:hover')}
 
 function eduHTML(type){const e=eduFor(type);if(!e)return'';
@@ -423,13 +452,38 @@ function alertHTML(a){const h=S.hosts.get(a.actor),g=h?.geo,open=S.openEdu.has(a
   <div style="color:#9fb4d0">${esc(a.detail)}</div>
   ${vv?`<div style="margin-top:6px;padding:6px 8px;border-radius:6px;background:${vv[0]}14;border-left:3px solid ${vv[0]};white-space:normal"><b style="color:${vv[0]}">${vv[1]}</b> — <span style="color:#cfe0f5">${esc(vv[2])}</span>${!a.benign&&e?`<div class="sm" style="margin-top:3px">👉 ${esc(e.todo[0])}</div>`:''}</div>`:''}
   ${a.mitre?`<div style="margin-top:4px"><a class="mitre" target="_blank" href="${esc(a.mitre.url)}" title="${esc(a.mitre.name)}">MITRE ATT&amp;CK ${esc(a.mitre.id)}</a> <span class="sm">${esc(a.mitre.tactic)} · ${esc(a.mitre.name)}</span></div>`:''}
-  <div class="act"><button class="b" data-sel="${esc(a.actor)}">🔎 ${a.sev==='high'&&!a.benign?'Ανάλυση επιτιθέμενου':'Ποιος είναι;'}</button><button class="b" data-edu="${a.id}">${open?'▾':'ℹ'} Πες μου περισσότερα</button>${g?`<button class="b" data-map="${esc(a.actor)}">📍 Χάρτης</button>`:''}</div>
+  <div class="act"><button class="b" data-sel="${esc(a.actor)}">🔎 ${a.sev==='high'&&!a.benign?'Ανάλυση επιτιθέμενου':'Ποιος είναι;'}</button><button class="b" data-edu="${a.id}">${open?'▾':'ℹ'} Πες μου περισσότερα</button>${g?`<button class="b" data-map="${esc(a.actor)}">📍 Χάρτης</button>`:''}${!a.benign&&a.sev!=='low'&&canBlock(a.actor)?`<button class="b" data-block="${esc(a.actor)}" data-why="${esc(a.type)}" style="border-color:#ff3b5c55">${blockedSet.has(a.actor)?'✅ Μπλοκαρισμένο':'🚫 Μπλόκαρε'}</button>`:''}</div>
   ${open?eduHTML(a.type):''}</div>`}
 function bindCommon(el){
   el.querySelectorAll('[data-sel]').forEach(d=>d.onclick=e=>{e.stopPropagation();select(d.dataset.sel)});
   el.querySelectorAll('[data-map]').forEach(d=>d.onclick=e=>{e.stopPropagation();S.sel=d.dataset.map;focusHost(d.dataset.map)});
   el.querySelectorAll('[data-edu]').forEach(d=>d.onclick=e=>{e.stopPropagation();const id=+d.dataset.edu;S.openEdu.has(id)?S.openEdu.delete(id):S.openEdu.add(id);renderTab()});
+  el.querySelectorAll('[data-block]').forEach(d=>d.onclick=e=>{e.stopPropagation();blockIp(d.dataset.block,d.dataset.why)});
 }
+// ---- 🚫 Μπλοκ: κόψε μια IP με το τείχος του υπολογιστή (pf στο Mac) ----
+let blockData=null,blockedSet=new Set();
+const canBlock=ip=>/^[0-9a-f.:]+$/i.test(ip||'')&&!S.me.has(ip)&&ip!==S.gw&&!/^(127\.|0\.|22[4-9]\.|23\d\.|255\.)/.test(ip);
+function loadBlock(){return fetch('/api/block').then(r=>r.json()).then(j=>{blockData=j;blockedSet=new Set((j.blocked||[]).map(x=>x.ip));return j})}
+function blockIp(ip,why){
+  if(blockedSet.has(ip)){showTab('block');return}
+  const live=blockData&&blockData.can_apply&&!blockData.demo;
+  if(!confirm(`Να μπλοκάρω το ${ip};\n\nΟ υπολογιστής σου δεν θα στέλνει ούτε θα δέχεται τίποτα από αυτή τη διεύθυνση.\n${live?'Θα μπει κανόνας στο τείχος προστασίας (pf). Τον βγάζεις από την καρτέλα 🚫 Μπλοκ, και φεύγει μόνος του όταν κλείσεις το NetWatch.':blockData&&blockData.demo?'(Προσομοίωση: δεν αγγίζω το πραγματικό τείχος.)':'Δεν τρέχω ως διαχειριστής: θα σου δείξω τις εντολές να τις τρέξεις εσύ.'}`))return;
+  post('/api/block',{ip,why}).then(j=>{if(j.error&&!j.blocked)return alert(j.error);blockData=j;blockedSet=new Set(j.blocked.map(x=>x.ip));showTab('block')})}
+function renderBlock(){if(!blockData){$('t-block').innerHTML='<div class="empty">φόρτωση…</div>';loadBlock().then(()=>tab==='block'&&drawBlock());return}if(!tabHover())drawBlock()}
+function drawBlock(){const d=blockData,el=$('t-block');if(d.error&&!d.blocked){el.innerHTML=`<div class="empty">${esc(d.error)}</div>`;return}
+  const mode=d.demo?'<span class="tag">προσομοίωση</span>':d.can_apply?'<span class="tag g">ενεργό τείχος (pf)</span>':'<span class="tag y">χωρίς δικαιώματα: δείχνω εντολές</span>';
+  let h=`<div class="card" style="white-space:normal"><b style="color:#fff">🚫 Μπλοκαρισμένες διευθύνσεις (${d.blocked.length})</b> ${mode}
+    <div class="sm" style="margin-top:3px">Πάτα «🚫 Μπλόκαρε» σε μια ειδοποίηση ή γράψε IP εδώ. Ο κανόνας κόβει την κίνηση <b>και προς τις δύο κατευθύνσεις</b>. Δεν μπλοκάρω ποτέ εσένα ή τον router. Οι κανόνες φεύγουν όταν κλείσεις το NetWatch ή κάνεις επανεκκίνηση.</div>
+    <div style="display:flex;gap:6px;margin-top:6px"><input id="bl-ip" placeholder="π.χ. 45.33.32.156" style="flex:1;background:#060a12;border:1px solid #1f3352;border-radius:4px;color:#fff;padding:3px 6px"><button class="b" id="bl-go">🚫 Μπλόκαρε</button></div>
+    ${d.error?`<div style="color:#ff8da0;margin-top:4px">${esc(d.error)}</div>`:''}</div>`;
+  h+=d.blocked.length?`<table><thead><tr><th>IP</th><th>γιατί</th><th>από</th><th></th></tr></thead><tbody>${d.blocked.map(x=>`<tr><td><a href="#" data-ip="${esc(x.ip)}">${esc(x.ip)}</a></td><td class="sm">${esc(x.why||'—')}</td><td class="sm">${new Date(x.t*1000).toLocaleTimeString('el-GR')}</td><td><button class="b" data-un="${esc(x.ip)}">↩ Ξεμπλόκαρε</button></td></tr>`).join('')}</tbody></table>`:'<div class="empty">Τίποτα μπλοκαρισμένο.</div>';
+  h+=`<h3>${d.platform==='darwin'?'Κανόνες pf (anchor com.apple/netwatch)':'Εντολές τείχους'}</h3><pre class="card" style="font-family:monospace;font-size:11.5px;overflow:auto">${esc(d.rules)}</pre>`;
+  if(!d.can_apply&&d.blocked.length)h+=`<div class="card" style="white-space:normal">👉 Τρέξε στο Terminal (θα ζητήσει κωδικό διαχειριστή):<pre style="font-family:monospace;font-size:11.5px;overflow:auto">${esc(d.commands.join('\n'))}</pre></div>`;
+  h+=`<div class="card sm" style="white-space:normal">💡 <b>Πότε αξίζει;</b> Όταν μια IP του Internet σε σκανάρει ή δοκιμάζει κωδικούς επίμονα. Για συσκευή <b>μέσα</b> στο δίκτυό σου, το μπλοκ προστατεύει μόνο αυτόν τον υπολογιστή· βγάλ' την από το Wi‑Fi (άλλαξε κωδικό) για να προστατέψεις όλους.</div>`;
+  el.innerHTML=h;
+  el.querySelectorAll('[data-un]').forEach(b=>b.onclick=()=>post('/api/block',{unblock:b.dataset.un}).then(j=>{blockData=j;blockedSet=new Set(j.blocked.map(x=>x.ip));drawBlock()}));
+  el.querySelectorAll('[data-ip]').forEach(x=>x.onclick=e=>{e.preventDefault();select(x.dataset.ip)});
+  $('bl-go').onclick=()=>{const v=$('bl-ip').value.trim();if(v)blockIp(v,'χειροκίνητα')}}
 function renderAlerts(){const el=$('t-alerts');if(!S.alerts.length)return;
   const counts={};S.alerts.forEach(a=>counts[a.sev]=(counts[a.sev]||0)+1);
   el.innerHTML=`<div style="margin-bottom:8px"><button class="b" onclick="exportReport()">⬇ Αναφορά συμβάντος (JSON)</button></div><div class="sm" style="margin-bottom:8px">${counts.high||0} σοβαρές · ${counts.med||0} μέτριες · ${counts.low||0} χαμηλές — πάτα «Πες μου περισσότερα» για αναλυτική εξήγηση</div>`+S.alerts.slice(0,200).map(alertHTML).join('');bindCommon(el)}
@@ -903,7 +957,7 @@ setInterval(()=>{if(tab==='audit')loadAudit()},3000);
 setInterval(()=>{if(tab==='hist')loadHist()},10000);
 setInterval(()=>{if(tabHover())return;if(tab==='hosts')renderHosts();else if(tab==='det')renderDet();else if(tab==='devs')renderDevs();else if(tab==='stats')renderStats();else if(tab==='tips')renderTips()},2000);
 function connect(){const es=new EventSource('/events');es.onmessage=e=>handle(JSON.parse(e.data));es.onerror=()=>{es.close();setTimeout(connect,2000)}}
-connect();
+connect();loadBlock().catch(()=>{});
 
 // ================= ☕ WI‑FI GUARD =================
 let wifiData=null;
@@ -942,6 +996,47 @@ function drawWifi(){const d=wifiData,r=d.result,el=$('t-wifi');const icon={ok:'�
   const tb=$('wf-trust');if(tb)tb.onclick=()=>post('/api/wifi',{ssid:w.ssid,trusted:r.public}).then(j=>{if(!j.error)wifiData=j;drawWifi()})}
 
 // ================= 🕵 ΑΝΩΝΥΜΙΑ & ΔΙΑΡΡΟΕΣ =================
+// ---- 📱 Εφαρμογές: ποια app μιλάει με ποιον, ποιοι είναι trackers ----
+let appsData=null,appsT=0,appsOpen=new Set(),appsQ='';
+const CATC={ads:'#ff9f43',analytics:'#ff3b5c',telemetry:'#ffd23f'};
+function renderApps(){if(Date.now()-appsT>5000){appsT=Date.now();fetch('/api/apps').then(r=>r.json()).then(j=>{appsData=j;if(tab==='apps'&&!tabHover())drawApps()})}
+  if(!appsData)$('t-apps').innerHTML='<div class="empty">φόρτωση…</div>';else if(!tabHover())drawApps()}
+function drawApps(){const d=appsData,el=$('t-apps');if(d.error){el.innerHTML=`<div class="empty">${esc(d.error)}</div>`;return}
+  const trkApps=d.apps.filter(a=>a.trackers.length),L=d.cat_label||{};
+  let h=`<div class="card" style="white-space:normal"><b style="color:#fff">📱 ${d.apps.length} εφαρμογές μιλάνε τώρα με ${d.total} προορισμούς</b>${d.demo?' <span class="tag">προσομοίωση</span>':''}
+    <div class="sm" style="margin-top:3px">Κάθε εφαρμογή ανοίγει συνδέσεις. Εδώ βλέπεις <b>ποια</b> μιλάει με <b>ποιον</b>. Με 🔴 σημειώνονται οι <b>trackers</b>: εταιρείες διαφημίσεων, analytics και τηλεμετρίας που μαζεύουν στοιχεία για το τι κάνεις.</div>
+    <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${Object.entries(d.cats||{}).map(([c,n])=>`<span class="tag" style="border-color:${CATC[c]};color:${CATC[c]}">${n} ${esc(L[c]||c)}</span>`).join('')||'<span class="tag g">κανένας γνωστός tracker αυτή τη στιγμή</span>'}
+    <input id="ap-q" placeholder="🔎 φίλτρο εφαρμογής/προορισμού" value="${esc(appsQ)}" style="flex:1;min-width:140px;background:#060a12;border:1px solid #1f3352;border-radius:4px;color:#fff;padding:3px 6px"></div></div>`;
+  const q=appsQ.toLowerCase(),list=d.apps.filter(a=>!q||a.app.toLowerCase().includes(q)||a.dests.some(x=>(x.name||'').toLowerCase().includes(q)||x.ip.includes(q)));
+  h+=list.map(a=>{const op=appsOpen.has(a.app);
+    return `<div class="card" style="white-space:normal"><div class="brow" data-app="${esc(a.app)}" style="cursor:pointer"><span><b style="color:#fff">${op?'▾':'▸'} ${esc(a.app)}</b> <span class="sm">${a.hosts} προορισμοί</span></span>
+    <span>${a.trackers.length?`<span class="tag r">🔴 ${a.trackers.length} tracker${a.trackers.length>1?'s':''}</span>`:'<span class="tag g">καθαρό</span>'}</span></div>
+    ${a.trackers.length?`<div class="sm" style="margin-top:3px">στέλνει σε: <b style="color:#ff8da0">${a.trackers.map(esc).join(', ')}</b></div>`:''}
+    ${op?`<table style="margin-top:6px"><thead><tr><th>Προορισμός</th><th>IP:θύρα</th><th></th></tr></thead><tbody>${a.dests.map(x=>`<tr><td>${x.tracker?'🔴 ':x.local?'🏠 ':''}${esc(x.name||'(άγνωστο όνομα)')}</td><td class="sm"><a href="#" data-ip="${esc(x.ip)}">${esc(x.ip)}</a>:${x.port}</td><td>${x.tracker?`<span class="tag" style="border-color:${CATC[x.tracker.cat]};color:${CATC[x.tracker.cat]}">${esc(x.tracker.who)} · ${esc(L[x.tracker.cat]||'')}</span>`:x.local?'<span class="tag">στο δίκτυό σου</span>':''}</td></tr>`).join('')}</tbody></table>`:''}</div>`}).join('')||'<div class="empty">Καμία σύνδεση.</div>';
+  h+=`<div class="card sm" style="white-space:normal">💡 <b>Τι μπορώ να κάνω;</b> Στον browser βάλε ad/tracker blocker (π.χ. uBlock Origin) ή DNS που μπλοκάρει trackers (NextDNS, AdGuard DNS, Pi-hole σε Raspberry Pi). Σε εφαρμογές, κλείσε από τις ρυθμίσεις τους τα «analytics/βελτίωση προϊόντος». Ένας tracker δεν είναι ιός· σημαίνει ότι κάποιος καταγράφει τι κάνεις.</div>`;
+  el.innerHTML=h;
+  el.querySelectorAll('[data-app]').forEach(r=>r.onclick=()=>{const n=r.dataset.app;appsOpen.has(n)?appsOpen.delete(n):appsOpen.add(n);drawApps()});
+  el.querySelectorAll('[data-ip]').forEach(x=>x.onclick=e=>{e.preventDefault();e.stopPropagation();select(x.dataset.ip)});
+  const qi=$('ap-q');qi.oninput=()=>{appsQ=qi.value;const p=qi.selectionStart;drawApps();const n=$('ap-q');n.focus();n.setSelectionRange(p,p)}}
+// ---- 🪤 Παγίδα (honeypot) ----
+let honeyData=null,honeyT=0,honeySel=null;
+function renderHoney(){if(Date.now()-honeyT>3000){honeyT=Date.now();fetch('/api/honeypot').then(r=>r.json()).then(j=>{honeyData=j;if(tab==='honey'&&!tabHover())drawHoney()})}
+  if(!honeyData)$('t-honey').innerHTML='<div class="empty">φόρτωση…</div>'}
+function drawHoney(){const d=honeyData,el=$('t-honey');if(d.error){el.innerHTML=`<div class="empty">${esc(d.error)}</div>`;return}
+  if(!honeySel)honeySel=new Set(d.ports.length?d.ports:d.default);
+  const on=d.running,col=on?'#3ddc97':'#6d7f99';
+  let h=`<div class="card" style="display:flex;gap:14px;align-items:center;white-space:normal"><div style="font-size:40px;filter:${on?'none':'grayscale(1)'}">🪤</div>
+    <div style="flex:1"><b style="color:#fff">Παγίδα: <span style="color:${col}">${on?'ΣΤΗΜΕΝΗ':'κλειστή'}</span></b>${d.demo?' <span class="tag">προσομοίωση</span>':''}
+    <div class="sm" style="margin-top:3px">Ανοίγω <b>ψεύτικες</b> υπηρεσίες (SSH, Telnet, σελίδα router…) στον υπολογιστή σου. Κανείς νόμιμος δεν έχει λόγο να τις αγγίξει, οπότε <b>όποιος συνδεθεί, σκανάρει ή δοκιμάζει κωδικούς</b> και σου βγάζω ειδοποίηση με το τι έστειλε. Δεν εκτελείται τίποτα: δείχνω ένα ψεύτικο μήνυμα, καταγράφω και κλείνω.</div>
+    <div style="margin-top:6px"><button class="b" id="hp-tg" style="border-color:${on?'#ff3b5c':'#3ddc97'}">${on?'⏹ Μάζεψε την παγίδα':'▶ Στήσε την παγίδα'}</button></div></div></div>`;
+  h+=`<h3>Θύρες</h3><div class="card" style="white-space:normal">${Object.entries(d.services).map(([p,[n,why]])=>{const lis=d.listening.includes(+p)||(d.demo&&d.ports.includes(+p)),err=d.errors[p];
+    return `<label style="display:flex;gap:8px;align-items:baseline;margin:3px 0"><input type="checkbox" data-hp="${p}" ${honeySel.has(+p)?'checked':''} ${on?'disabled':''}><b style="color:#fff;width:46px">${p}</b><span style="width:90px">${esc(n)}</span><span class="sm" style="flex:1">${esc(why)}</span>${lis?'<span class="tag g">ακούει</span>':''}${err?`<span class="tag r">${esc(err)}</span>`:''}</label>`}).join('')}
+    <div class="sm" style="margin-top:6px">💡 Δοκίμασέ το: από άλλο υπολογιστή/κινητό του δικτύου τρέξε <code>nc ${esc([...S.me||[]][0]||'IP-σου')} 2323</code> ή <code>nmap -p 2222,2323,8080 &lt;IP σου&gt;</code>. Δοκιμή από τον ίδιο Mac σημειώνεται 🟢 ως «δοκιμή».</div></div>`;
+  h+=`<h3>Ποιος έπεσε μέσα (${d.hits.length})</h3>`+(d.hits.length?`<table><thead><tr><th>ώρα</th><th>από</th><th>θύρα</th><th>τι έστειλε</th></tr></thead><tbody>${d.hits.map(x=>`<tr><td class="sm">${new Date(x.t*1000).toLocaleTimeString('el-GR')}</td><td><a href="#" data-ip="${esc(x.ip)}">${esc(x.ip)}</a>${x.self?' <span class="tag g">εσύ</span>':''}</td><td>${x.port} ${esc(x.service)}</td><td class="sm" style="font-family:monospace;white-space:normal">${esc(x.data)||'—'}</td></tr>`).join('')}</tbody></table>`:'<div class="empty">Κανείς ακόμα. Αυτό είναι καλό σημάδι.</div>');
+  el.innerHTML=h;
+  el.querySelectorAll('[data-hp]').forEach(c=>c.onchange=()=>{c.checked?honeySel.add(+c.dataset.hp):honeySel.delete(+c.dataset.hp)});
+  el.querySelectorAll('[data-ip]').forEach(x=>x.onclick=e=>{e.preventDefault();select(x.dataset.ip)});
+  $('hp-tg').onclick=()=>post('/api/honeypot',on?{enable:false}:{enable:true,ports:[...honeySel]}).then(j=>{honeyData=j;drawHoney()})}
 let privData=null,privBrowser=null;
 function loadPriv(){return fetch('/api/privacy').then(r=>r.json()).then(j=>{privData=j;if(tab==='priv')drawPriv();if(j.running)setTimeout(loadPriv,1500)})}
 function renderPriv(){if(!privData){$('t-priv').innerHTML='<div class="empty">φόρτωση…</div>';loadPriv();return}drawPriv()}
@@ -1010,7 +1105,7 @@ function renderHome(){homeLoad();const el=$('t-home'),G='#3ddc97',Y='#ffd23f',R=
   h+=step(4,'Πού πάει η κίνησή μου;',`σε ${[...S.hosts.values()].filter(h=>h.kind==='public').length} servers στο Internet`,'#3ec5ff','route','🛣 Διαδρομή','Παρακάτω: διάλεξε ένα site και δες βήμα-βήμα από πού περνά και ποιος βλέπει τι.');
   h+=step(5,'Φαίνομαι στο Internet;',pr?`${['❌','⚠️','🟡','✅'][pr.level]} ανωνυμία: ${esc(pr.label)}`:'πάτα «Έλεγχος διαρροών»',pr?LVL[pr.level][0]:D,'priv','🕵 Ανωνυμία','Εκεί: τι ξέρει κάθε site για σένα, Tor/VPN, διαρροές DNS / IPv6 / WebRTC.');
   h+=step(6,'Πόσο ασφαλές είναι το σπίτι μου;',au?`βαθμός <b>${au.grade}</b> (${au.score}/100)`:'υπολογίζεται…',au?(au.score>=75?G:au.score>=50?Y:R):D,'audit','🛡 Έλεγχος','Εκεί: κωδικοί χωρίς κρυπτογράφηση, επικίνδυνες υπηρεσίες στο LAN, τι να διορθώσεις.');
-  h+=step(7,'Θέλω να μάθω / να εξασκηθώ','📚 → 🎓 → 🔴 → 🚩','#b388ff','learn','📚 Μάθε','Σειρά: 📚 Μάθε (θεωρία) → 🎓 Κουίζ → 🔴 Pentest (σκάναρε το δίκτυό σου, purple-team lab) → 🧩 Κανόνες → 🚩 CTF.');
+  h+=step(7,'Θέλω να μάθω / να εξασκηθώ','🎓 → ❓ → 🔴 → 🚩','#b388ff','academy','🎓 Ακαδημία','Σειρά: 🎓 Ακαδημία (CCNA από το μηδέν & IoT security με ESP32/Raspberry Pi, με animations και labs) → ❓ Κουίζ → 🔴 Pentest (σκάναρε το δίκτυό σου, purple-team lab) → 🧩 Κανόνες → 🚩 CTF.');
   h+=`<h3 id="route-h">🛣 Πού πάει η κίνησή σου — βήμα-βήμα</h3>`+routeHTML();
   h+=`<h3>Όλες οι ενότητες</h3>`+cardsHTML();
   el.innerHTML=h;

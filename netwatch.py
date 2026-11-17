@@ -110,6 +110,7 @@ MITRE = [  # (πρόθεμα τύπου, technique id, όνομα, tactic, αν�
     ("DNS hijacking στο Wi‑Fi", "T1557", "Adversary-in-the-Middle", "Credential Access", "wifi_guard"),
     ("TLS interception στο Wi‑Fi", "T1557", "Adversary-in-the-Middle", "Credential Access", "wifi_guard"),
     ("Ανοιχτό Wi‑Fi", "T1040", "Network Sniffing", "Credential Access", "wifi_guard"),
+    ("Παγίδα", "T1046", "Network Service Discovery", "Discovery", "honeypot"),
 ]
 
 
@@ -144,6 +145,15 @@ def detector_for(typ):
         if typ.startswith(prefix):
             return det
     return None
+
+
+def quit_now(code=0):
+    """Άμεσο τέλος (και από threads), αφού τρέξουν τα atexit (π.χ. αφαίρεση κανόνων τείχους)."""
+    import atexit
+    try:
+        atexit._run_exitfuncs()
+    finally:
+        os._exit(code)
 
 
 # ---------------- ρυθμίσεις (config.yaml) ----------------
@@ -551,7 +561,8 @@ class NetState:
         self.creds, self.cred_users = {}, {}
         self.lab_ips = set()  # «επιτιθέμενοι» του purple-team lab (δεν πάνε σε ιστορικό/ειδοποιήσεις)
         self.scan_info = collections.defaultdict(dict)  # ip → {θύρα: banner/έκδοση/TLS από τον σαρωτή}
-        self.scanner = self.lab = self.wifi = self.privacy = None
+        self.scanner = self.lab = self.wifi = self.privacy = self.apps = self.honeypot = self.blocker = None
+        self._app_rdns = {}
         self.vpn_iface = None  # live: η διεπαφή του VPN όταν περνά όλη την κίνηση (utun…)
         self.leak_dns = collections.deque(maxlen=50)
         self.recent = collections.deque(maxlen=5000)  # τελευταία πακέτα για δοκιμή κανόνων
@@ -657,6 +668,25 @@ class NetState:
             if h:
                 h["rdns"] = name
                 self.dirty.add(ip)
+
+    def names_for(self, ip):
+        """Ονόματα για μια IP: DNS που είδαμε στο δίκτυο, αλλιώς reverse DNS (στο παρασκήνιο)."""
+        with self.lock:
+            h = self.hosts.get(ip)
+            names = sorted(h["names"]) + ([h["rdns"]] if h.get("rdns") else []) if h else []
+            cache = self._app_rdns
+        if names:
+            return names
+        if ip not in cache and self.rdns_enabled:
+            cache[ip] = None
+
+            def look():
+                try:
+                    cache[ip] = socket.gethostbyaddr(ip)[0]
+                except Exception:
+                    pass
+            self.rdns_pool.submit(look)
+        return [cache[ip]] if cache.get(ip) else []
 
     def ser(self, h):
         return {
@@ -971,7 +1001,7 @@ class NetState:
                        key=f"{dst}:{dp}" if benign else None, cooldown=3600 if benign else None, benign=benign)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
-    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "vpn_iface", "geo_q", "rdns_pool", "demo_geo", "home",
+    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
             "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors")
 
     def reset(self, mode, iface, me_ips, gateway, history, feed, notifier=None):
@@ -2299,7 +2329,7 @@ def make_handler(state):
                 if u.path == "/api/shutdown":  # η εφαρμογή Mac κλείνει / αλλάζει λειτουργία
                     self._json({"ok": True})
                     log("Τερματισμός από την εφαρμογή.")
-                    threading.Timer(0.2, os._exit, args=(0,)).start()
+                    threading.Timer(0.2, quit_now).start()
                     return
                 if u.path == "/api/wifi":
                     if not state.wifi:
@@ -2311,6 +2341,18 @@ def make_handler(state):
                     return self._json(state.wifi.status())
                 if u.path == "/api/trace":
                     return self._json(traceroute(state, str(body.get("ip") or "")))
+                if u.path == "/api/block":
+                    if not state.blocker:
+                        return self._json({"error": "Διαθέσιμο μόνο σε Live/Demo."}, 400)
+                    if body.get("unblock"):
+                        return self._json(state.blocker.unblock(body["unblock"]))
+                    return self._json(state.blocker.block(body.get("ip"), body.get("why", "")))
+                if u.path == "/api/honeypot":
+                    if not state.honeypot:
+                        return self._json({"error": "Διαθέσιμο μόνο σε Live/Demo."}, 400)
+                    if body.get("enable"):
+                        return self._json(state.honeypot.start(body.get("ports")))
+                    return self._json(state.honeypot.stop())
                 if u.path == "/api/privacy":
                     state.privacy.start(on_done=lambda r: state.publish({"type": "privacy", "result": r}))
                     return self._json(state.privacy.status())
@@ -2335,6 +2377,17 @@ def make_handler(state):
             if u.path == "/edu.js":
                 with open(os.path.join(HERE, "edu.js"), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
+            if u.path.startswith("/academy/") and u.path.endswith(".js"):
+                name = os.path.basename(u.path)  # μόνο αρχεία του φακέλου academy/, χωρίς ../
+                fp = os.path.join(HERE, "academy", name)
+                if re.fullmatch(r"[\w.-]+\.js", name) and os.path.isfile(fp):
+                    with open(fp, "rb") as f:
+                        return self._send(200, f.read(), "text/javascript; charset=utf-8")
+                return self._send(404, b"not found", "text/plain")
+            if u.path == "/api/academy":
+                d = os.path.join(HERE, "academy")
+                files = sorted(f for f in os.listdir(d) if f.endswith(".js") and f != "engine.js") if os.path.isdir(d) else []
+                return self._json({"files": files})
             if u.path == "/api/whois":
                 ip = parse_qs(u.query).get("ip", [""])[0]
                 return self._send(200, json.dumps({"ip": ip, "text": whois(ip)}).encode(), "application/json")
@@ -2359,6 +2412,14 @@ def make_handler(state):
                 return self._json(state.privacy.status() if state.privacy else {"error": "off"})
             if u.path == "/api/status":
                 return self._json(state.status())
+            if u.path == "/api/block":
+                return self._json(state.blocker.status() if state.blocker else {"error": "Διαθέσιμο μόνο σε Live/Demo."})
+            if u.path == "/api/honeypot":
+                return self._json(state.honeypot.status() if state.honeypot else {"error": "Διαθέσιμο μόνο σε Live/Demo."})
+            if u.path == "/api/apps":
+                if not getattr(state, "apps", None):
+                    return self._json({"error": "Διαθέσιμο μόνο σε Live/Demo (σε pcap δεν υπάρχουν εφαρμογές να δούμε)."})
+                return self._json(state.apps.view())
             if u.path == "/api/ctf":
                 import ctf
                 try:
@@ -2439,7 +2500,7 @@ def watch_parent(pid):
             os.kill(pid, 0)
         except ProcessLookupError:
             log("Η εφαρμογή έκλεισε — τέλος.")
-            os._exit(0)
+            quit_now()
         except PermissionError:
             pass
 
@@ -2530,6 +2591,24 @@ def main():
     import privacy
     state.privacy = privacy.Runner(sim=privacy.demo_check if mode == "demo" else None,
                                    vpn=lambda: privacy.vpn_full_tunnel(wifiguard.default_iface()))
+    import honeypot
+
+    def honey_hit(h):
+        me = sorted(state.me)[0] if state.me else "εσύ"
+        what = f"θύρα {h['port']} ({h['service']})" + (f" — έστειλε: «{h['data'][:80]}»" if h["data"] else "")
+        state.alert(f"Παγίδα: σύνδεση σε ψεύτικο {h['service']}", "high", h["ip"], me, what, h["t"],
+                    key=f"{h['ip']}:{h['port']}", cooldown=30,
+                    benign="Ήταν δοκιμή από τον ίδιο σου τον υπολογιστή." if h["self"] else None)
+    state.honeypot = honeypot.Honeypot(honey_hit, sim=mode == "demo") if mode != "pcap" else None
+    if state.honeypot and cfg["detectors"].get("honeypot", False):  # ΚΛΕΙΣΤΟ αν δεν το ζητήσεις
+        state.honeypot.start(cfg.get("honeypot_ports"))
+    import atexit
+    import blocker
+    state.blocker = blocker.Blocker(protect=lambda: list(state.me) + [state.gateway], sim=mode == "demo") if mode != "pcap" else None
+    if state.blocker and not state.blocker.sim:
+        atexit.register(state.blocker.clear)  # κλείνεις το NetWatch → φεύγουν και οι κανόνες
+    import apps
+    state.apps = apps.Watcher(state.names_for, demo=mode == "demo") if mode != "pcap" else None
     if mode == "live" and cfg["detectors"].get("privacy_leaks", True):
         threading.Thread(target=vpn_watch, args=(state,), daemon=True).start()
     if cfg["detectors"].get("wifi_guard", True):
@@ -2572,6 +2651,8 @@ def main():
         with open(args.port_file, "w") as f:
             f.write(str(port))
         chown_to_user(args.port_file)
+    import signal
+    signal.signal(signal.SIGTERM, lambda *_: quit_now())
     if args.parent_pid:
         threading.Thread(target=watch_parent, args=(args.parent_pid,), daemon=True).start()
     log(f"NetWatch ({state.mode}) → {url}")
