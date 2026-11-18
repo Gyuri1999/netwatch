@@ -287,12 +287,50 @@ def main():
         if live:
             state.cases.on_save = chown_to_user
             atexit.register(state.cases.save)
+        import changecheck  # 🔁 έλεγχος πριν/μετά από αλλαγή (στιγμιότυπα δικτύου + διαφορές)
+        state.changecheck = changecheck.ChangeCheck(state, sim=demo, path=os.path.join(DATA, "changecheck.json") if live else None)
+        if live:
+            state.changecheck.on_save = chown_to_user
+        import nettriage  # 🩺 «Φταίει το δίκτυο;» — διάγνωση με ένα κλικ + κείμενο για ticket
+        state.triage = nettriage.Triage(state, sim=demo)
+        import configbak  # 💾 αντίγραφα ρυθμίσεων συσκευών (Oxidized/RANCID-style) μέσω ssh με κλειδιά + διαφορές
+        state.configbak = configbak.ConfigBackup(state, cfg.get("config_backup"), sim=demo,
+                                                 path=os.path.join(DATA, "configs") if live else None)
+        if live:
+            state.configbak.on_save = chown_to_user
+        bg(state.configbak)
+        import whereis  # 🔌 «Πού είναι συνδεδεμένο;» MAC → switch → θύρα → VLAN (από τους στόχους του snmp.targets)
+        state.whereis = bg(whereis.WhereIs(state, sim=demo))
+        import expiry  # ⏳ υπενθυμίσεις λήξης: πιστοποιητικά, domains, άδειες, εγγυήσεις, firmware
+        state.expiry = expiry.Expiry(state, cfg.get("expiry"), sim=demo, path=os.path.join(DATA, "expiry.json") if live else None)
+        for err in state.expiry.errors:
+            log("⏳ expiry:", err)
+        if live:
+            state.expiry.on_save = chown_to_user
+        bg(state.expiry)
+        import segcheck  # 🧱 έλεγχος διαχωρισμού: φτάνουν οι ζώνες (VLAN) που πρέπει να είναι απομονωμένες;
+        state.segcheck = segcheck.SegCheck(state, cfg.get("segmentation"), sim=demo,
+                                           path=os.path.join(DATA, "segcheck.json") if live else None)
+        for err in state.segcheck.errors:
+            log("🧱 segmentation:", err)
+        if live:
+            state.segcheck.on_save = chown_to_user
+        bg(state.segcheck)
+        import handover  # 🔄 παράδοση βάρδιας (SOC/NOC): σύνοψη N ωρών + σημειώσεις βάρδιας
+        state.handover = handover.Handover(state, sim=demo, path=os.path.join(DATA, "handover.json") if live else None)
+        if live:
+            state.handover.on_save = chown_to_user
     else:
         state.tor = state.wg = state.vpnguard = state.encdns = state.dnsfilter = state.logimport = state.ctwatch = state.camexp = None
         state.iotfw = None
         state.timeline = None
         state.hunt = None
         state.cases = None
+        state.changecheck = state.triage = None
+        state.configbak = None
+        state.whereis = state.expiry = None
+        state.segcheck = None
+        state.handover = None
     icfg = cfg.get("ipam")
     if demo and not icfg:
         icfg = {"subnets": [{"cidr": "192.168.1.0/24", "name": "Σπίτι (LAN)", "vlan": 1, "gateway": "192.168.1.1", "dhcp": "192.168.1.100-192.168.1.199"}],

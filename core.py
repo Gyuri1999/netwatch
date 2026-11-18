@@ -109,6 +109,8 @@ MITRE = [  # (πρόθεμα τύπου, technique id, όνομα, tactic, αν�
     ("Εντολή MQTT", "T0855", "Unauthorized Command Message", "Impair Process Control", "mqtt_guard"),
     ("Νέο MQTT topic", "T1071", "Application Layer Protocol", "Command and Control", "mqtt_guard"),
     ("IoT συσκευή", "T1499", "Endpoint Denial of Service", "Impact", "mqtt_guard"),
+    ("Αλλαγή ρυθμίσεων", "T1562", "Impair Defenses", "Defense Evasion", "config_backup"),
+    ("Διαρροή διαχωρισμού", "T1021", "Remote Services", "Lateral Movement", "segmentation"),
 ]
 
 
@@ -137,7 +139,7 @@ def mitre_for(typ):
 def detector_for(typ):
     if typ.startswith("Κανόνας:"):
         return "custom_rules"
-    if typ.startswith("Διαρροή"):
+    if typ.startswith("Διαρροή") and not typ.startswith("Διαρροή διαχωρισμού"):  # 🧱 segcheck έχει δικό του ανιχνευτή
         return "privacy_leaks"
     for prefix, *_rest, det in MITRE:
         if typ.startswith(prefix):

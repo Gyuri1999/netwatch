@@ -40,12 +40,19 @@ GETS = ["/api/status", "/api/iot", "/api/mqtt", "/api/sensor", "/api/honeypot", 
         # 🟣 purple team, 🔐 TLS/SSH, 📑 αναφορά pentest (JSON· το HTML γράφεται ως pentest-report.html)
         "/api/purple", "/api/tlsaudit", "/api/pentest-report",
         # 🗂 υποθέσεις (διαλογή ειδοποιήσεων), 🎯 κυνήγι απειλών
-        "/api/cases", "/api/hunt"]
+        "/api/cases", "/api/hunt",
+        # 🔁 έλεγχος πριν/μετά από αλλαγή, 🩺 «Φταίει το δίκτυο;» (μετά από ολοκληρωμένη demo διάγνωση)
+        "/api/change", "/api/triage",
+        # 💾 αντίγραφα ρυθμίσεων συσκευών, 🔌 πού είναι συνδεδεμένο, ⏳ υπενθυμίσεις λήξης
+        "/api/configs", "/api/whereis/table", "/api/expiry",
+        # 🧱 έλεγχος διαχωρισμού (VLAN)
+        "/api/segcheck"]
 LAT_HOURS = [3, 24, 168]
 HISTORY_HOURS = [1, 24, 168, 720]
 # Βγαίνουν στο internet ή χρειάζονται παράμετρο που δεν ξέρουμε — δεν καταγράφονται.
-SKIP = {"/api/whois", "/api/cve", "/api/abuseipdb", "/api/history", "/api/packet", "/api/shell",
-        "/api/flows/device", "/api/iotfw/rules", "/api/hunt/profile", "/api/pcap/alert", "/api/ipam/export", "/api/syslog"}
+SKIP = {"/api/change/compare", "/api/whois", "/api/cve", "/api/abuseipdb", "/api/history", "/api/packet", "/api/shell",
+        "/api/flows/device", "/api/iotfw/rules", "/api/hunt/profile", "/api/pcap/alert", "/api/ipam/export", "/api/syslog",
+        "/api/configs/versions", "/api/configs/show", "/api/configs/diff", "/api/whereis"}
 MAX_DECODES = 60  # αποκωδικοποιημένα πακέτα (🔬) — ~10 KB το καθένα
 
 
@@ -152,7 +159,8 @@ def main():
         time.sleep(args.seconds * 0.25)
         for path, body in [("/api/iot", {"ips": []}), ("/api/wifi", {}), ("/api/privacy", {}),
                            ("/api/scan", {}), ("/api/exposure", {}),
-                           ("/api/purple/run", {}), ("/api/tlsaudit/run", {})]:  # καμπάνια ~35″: τελειώνει πριν το τέλος
+                           ("/api/purple/run", {}), ("/api/tlsaudit/run", {}),
+                           ("/api/triage/run", {"lang": "el", "scenario": "dns"})]:  # καμπάνια ~35″: τελειώνει πριν το τέλος
             posts[path] = c.post(path, body)
             print(f"  POST {path} → {'error' if 'error' in posts[path] else 'ok'}")
 
@@ -185,6 +193,11 @@ def main():
                 api[f"/api/iotfw/rules?dev={d['key']}&fmt={fmt}"] = c.get(f"/api/iotfw/rules?dev={quote(d['key'])}&fmt={fmt}")
         for d in (api.get("/api/flows") or {}).get("top_talkers", [])[:15]:
             api["/api/flows/device?ip=" + d["ip"]] = c.get("/api/flows/device?ip=" + quote(d["ip"]))
+        # 🔁 πριν/μετά: σύγκριση των δύο demo στιγμιότυπων (Πριν → Μετά)
+        snaps = sorted((api.get("/api/change") or {}).get("snapshots") or [], key=lambda x: x["t"])
+        if len(snaps) >= 2:
+            a_, b_ = snaps[0]["id"], snaps[-1]["id"]
+            api[f"/api/change/compare?a={a_}&b={b_}"] = c.get(f"/api/change/compare?a={a_}&b={b_}")
         # 🎯 κυνήγι απειλών: ένα αποτέλεσμα ανά υπόθεση (+ "all") και προφίλ για τις συσκευές των ευρημάτων
         prof_ips = []
         for h in (api.get("/api/hunt") or {}).get("hunts", []) + [{"id": "all"}]:
@@ -198,6 +211,23 @@ def main():
                 api["/api/hunt/profile?ip=" + ip] = c.get("/api/hunt/profile?ip=" + quote(ip))
             except urllib.error.HTTPError:
                 pass
+        # 💾 αντίγραφα ρυθμίσεων: εκδόσεις, κείμενο κάθε έκδοσης και διαφορά κάθε έκδοσης με την προηγούμενη
+        for d in (api.get("/api/configs") or {}).get("devices", []):
+            did = d["id"]
+            vs = c.get("/api/configs/versions?id=" + quote(did))
+            api["/api/configs/versions?id=" + did] = vs
+            api["/api/configs/show?id=" + did] = c.get("/api/configs/show?id=" + quote(did))
+            api["/api/configs/diff?id=" + did] = c.get("/api/configs/diff?id=" + quote(did))
+            for k, v in enumerate(vs.get("versions") or []):
+                api[f"/api/configs/show?id={did}&ts={v['ts']}"] = c.get(f"/api/configs/show?id={quote(did)}&ts={v['ts']}")
+                if k + 1 < len(vs["versions"]):
+                    prev = vs["versions"][k + 1]["ts"]
+                    api[f"/api/configs/diff?id={did}&a={prev}&b={v['ts']}"] = \
+                        c.get(f"/api/configs/diff?id={quote(did)}&a={prev}&b={v['ts']}")
+        # 🔌 «Πού είναι συνδεδεμένο;»: όλος ο πίνακας (και με uplinks) + αναζήτηση για μερικές demo συσκευές (με IP)
+        api["/api/whereis/table?all=1"] = c.get("/api/whereis/table?all=1")
+        for ip in ("192.168.1.33", "192.168.1.15", "192.168.1.30", "192.168.1.77", "192.168.1.40", "192.168.1.1", "192.168.1.3"):
+            api["/api/whereis?q=" + ip] = c.get("/api/whereis?q=" + quote(ip))
         # 🔬 Πακέτα: λίστα ροών ανά host και αποκωδικοποίηση της πρώτης ροής του καθενός.
         snap = next((m["msg"] for m in sse.msgs if m["msg"].get("type") == "snapshot"), {})
         hosts = sorted(snap.get("hosts", []), key=lambda h: -(h.get("pkts") or 0))
@@ -228,6 +258,11 @@ def main():
             api["/api/vulnlab"] = vl
         report = c.get("/report?days=7", raw=True)
         pt_report = c.get("/pentest-report?lang=el", raw=True)
+        # 📘 τεκμηρίωση δικτύου + 🔄 παράδοση βάρδιας (το shim διαλέγει ανά lang· τα αρχεία docs/network.* σε el)
+        for lg in ("el", "en"):
+            api["/api/docs?lang=" + lg] = c.get("/api/docs?lang=" + lg)
+            api["/api/handover?hours=8&lang=" + lg] = c.get("/api/handover?hours=8&lang=" + lg)
+        net_docs = {ext: c.get("/docs/network." + ext + "?lang=el", raw=True) for ext in ("md", "html", "drawio")}
 
         sse.stop_flag = True
         msgs = sse.msgs
@@ -240,6 +275,10 @@ def main():
             f.write(report)
         with open(os.path.join(args.out, "pentest-report.html"), "w", encoding="utf-8") as f:
             f.write(pt_report)
+        os.makedirs(os.path.join(args.out, "docs"), exist_ok=True)
+        for ext, body in net_docs.items():
+            with open(os.path.join(args.out, "docs", "network." + ext), "w", encoding="utf-8") as f:
+                f.write(body)
         types = {}
         for m in msgs:
             types[m["msg"].get("type")] = types.get(m["msg"].get("type"), 0) + 1

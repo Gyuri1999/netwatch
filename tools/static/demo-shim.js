@@ -72,6 +72,42 @@
     if (p === '/api/iotfw/rules') return rec('/api/iotfw/rules?dev=' + q.get('dev') + '&fmt=' + (q.get('fmt') || 'openwrt')) || { error: NA };
     if (p === '/api/flows/device') return rec('/api/flows/device?ip=' + q.get('ip')) || { error: NA };
     if (p === '/api/hunt/profile') return rec('/api/hunt/profile?ip=' + q.get('ip')) || { error: NA };
+    if (p === '/api/docs') return rec(p + '?lang=' + (q.get('lang') === 'en' ? 'en' : 'el')) || { error: NA };
+    if (p === '/api/handover') return rec(p + '?hours=8&lang=' + (q.get('lang') === 'en' ? 'en' : 'el')) || { error: NA };
+    if (p === '/api/configs/versions') return rec(p + '?id=' + q.get('id')) || { error: NA };
+    if (p === '/api/whereis/table' && q.get('all') === '1') return rec(p + '?all=1') || rec(p) || { error: NA };
+    if (p === '/api/whereis') {  // 🔌 καταγράφηκαν μερικές IP· για τις άλλες ψάχνουμε στον πίνακα
+      var wq = (q.get('q') || '').trim(), wr = rec(p + '?q=' + wq);
+      if (wr) return wr;
+      var wl = wq.toLowerCase(), wm = wl.replace(/[^0-9a-f]/g, '');
+      var rows = ((rec('/api/whereis/table') || {}).rows || []).filter(function (r) {
+        return wl && (r.ip === wq || (r.name && r.name.toLowerCase().indexOf(wl) >= 0) ||
+          (wm.length >= 4 && r.mac.replace(/:/g, '').indexOf(wm) >= 0));
+      });
+      var base = { query: wq, found: false, mac: null, ip: null, name: null, vendor: null, location: null, path: [],
+        candidates: [], refreshed: nowS(), note: null, demo: true };
+      if (rows.length !== 1) {
+        base.candidates = rows.slice(0, 10).map(function (r) { return { mac: r.mac, ip: r.ip, name: r.name }; });
+        base.note = rows.length ? rows.length + ' συσκευές ταιριάζουν — διάλεξε μία.' : 'Δεν βρέθηκε συσκευή που να ταιριάζει με «' + wq + '».';
+        return base;
+      }
+      var w = rows[0];
+      base.found = true; base.mac = w.mac; base.ip = w.ip; base.name = w.name; base.vendor = w.vendor; base.note = w.note || null;
+      base.location = { switch: w.switch, switch_host: null, port: w.port, ifindex: null, vlan: w.vlan, alias: '',
+        macs_on_port: null, uplink: w.uplink, confidence: w.confidence || 'medium' };
+      base.path = [{ switch: w.switch, port: w.port, kind: w.uplink ? 'uplink' : 'edge' }];
+      return base;
+    }
+    if (p === '/api/configs/show') return rec(p + '?id=' + q.get('id') + (q.get('ts') ? '&ts=' + q.get('ts') : '')) || { error: NA };
+    if (p === '/api/configs/diff') {  // 💾 καταγράφηκε κάθε έκδοση έναντι της προηγούμενης
+      var cb = q.get('b'), ca = q.get('a');
+      if (cb && !ca) {
+        var cv = (rec('/api/configs/versions?id=' + q.get('id')) || {}).versions || [];
+        for (var ci = 0; ci + 1 < cv.length; ci++) if (String(cv[ci].ts) === cb) ca = String(cv[ci + 1].ts);
+      }
+      return (cb ? rec(p + '?id=' + q.get('id') + '&a=' + ca + '&b=' + cb) : rec(p + '?id=' + q.get('id'))) ||
+        { error: 'Στο online demo υπάρχουν μόνο οι διαφορές κάθε έκδοσης με την προηγούμενη.' };
+    }
     if (p === '/api/syslog') {
       var sl = rec(p);
       if (!sl || !sl.results) return sl || { error: NA };
@@ -99,6 +135,8 @@
       case '/api/purple/run': case '/api/tlsaudit/run': return D.post[p] || { ok: true };
       case '/api/purple/stop': return { ok: true, stopped: false };
       case '/api/hunt/run': return rec('/api/hunt/run?id=' + body.id) || { error: NA };
+      case '/api/whereis/refresh': case '/api/expiry/refresh': return { ok: true };
+      case '/api/segcheck/run': case '/api/segcheck/report': return { ok: true, running: false };
       case '/api/scan': return { ok: true };
       case '/api/honeypot':
         honeyOn = !!body.enable;
@@ -143,6 +181,14 @@
     var href = a.getAttribute('href');
     if (/^\/?report(\?|$)/.test(href)) { e.preventDefault(); window.open('report.html', a.target || '_blank'); }
     if (/^\/?pentest-report(\?|$)/.test(href)) { e.preventDefault(); window.open('pentest-report.html', a.target || '_blank'); }
+    var nd = /^\/?docs\/network\.(md|html|drawio)(\?|$)/.exec(href);  // 📘 στατικά αρχεία τεκμηρίωσης (el)
+    if (nd) {
+      e.preventDefault();
+      if (nd[1] === 'html') { window.open('docs/network.html', a.target || '_blank'); return; }
+      var dl = document.createElement('a');
+      dl.href = 'docs/network.' + nd[1]; dl.download = 'netwatch-network.' + nd[1];
+      document.body.appendChild(dl); dl.click(); dl.remove();
+    }
   }, true);
 
   // Scripts με απόλυτο path (π.χ. '/academy/x.js' από το engine.js) → σχετικό, για το /<repo>/ του Pages.

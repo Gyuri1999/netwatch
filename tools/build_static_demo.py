@@ -74,6 +74,10 @@ def main():
     shutil.copy2(os.path.join(ROOT, "uiplus.js"), out)
     shutil.copy2(os.path.join(ROOT, "pentestui.js"), out)
     shutil.copy2(os.path.join(ROOT, "socui.js"), out)
+    shutil.copy2(os.path.join(ROOT, "worktools.js"), out)
+    shutil.copy2(os.path.join(ROOT, "opstools.js"), out)
+    shutil.copy2(os.path.join(ROOT, "cmdxlate.js"), out)
+    shutil.copy2(os.path.join(ROOT, "navplus.js"), out)
     # Ακαδημία: scripts + εικονίδια του PWA (ό,τι δεν είναι .md).
     for fp in glob.glob(os.path.join(ROOT, "academy", "*")):
         if os.path.isfile(fp) and not fp.endswith(".md"):
@@ -108,6 +112,11 @@ def main():
         rep = os.path.join(args.rec, name)
         if os.path.isfile(rep):
             shutil.copy2(rep, os.path.join(out, name))
+    for ext in ("md", "html", "drawio"):  # 📘 τεκμηρίωση δικτύου (Markdown / HTML / draw.io)
+        src = os.path.join(args.rec, "docs", "network." + ext)
+        if os.path.isfile(src):
+            os.makedirs(os.path.join(out, "docs"), exist_ok=True)
+            shutil.copy2(src, os.path.join(out, "docs", "network." + ext))
     if os.path.isfile(os.path.join(ROOT, "docs", "og.png")):
         shutil.copy2(os.path.join(ROOT, "docs", "og.png"), out)
     open(os.path.join(out, ".nojekyll"), "w").close()

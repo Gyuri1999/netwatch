@@ -70,8 +70,13 @@ def make_handler(state):
                 except ValueError as e:
                     return self._json({"error": str(e)}, 400)
             try:
-                n = min(int(self.headers.get("Content-Length") or 0), 10000)
-                body = json.loads(self.rfile.read(n) or b"{}")
+                n = int(self.headers.get("Content-Length") or 0)
+                lim = 2 * 1024 * 1024 if u.path == "/api/configs/upload" else 10000  # 💾 επικόλληση ρυθμίσεων έως 512 KB
+                if u.path == "/api/segcheck/report":  # 🧱 αποτέλεσμα ελέγχου διαχωρισμού από άλλο VLAN
+                    lim = 256 * 1024
+                if u.path == "/api/configs/upload" and n > lim:
+                    return self._json({"error": "Πολύ μεγάλο κείμενο (όριο 512 KB)."}, 413)
+                body = json.loads(self.rfile.read(min(n, lim)) or b"{}")
             except (ValueError, json.JSONDecodeError):
                 return self._json({"error": "bad json"}, 400)
             try:
@@ -221,6 +226,98 @@ def make_handler(state):
                         r = cs.delete_suppression(str(body.get("type") or "")[:200], str(body.get("actor") or "")[:200])
                     else:
                         return self._json({"error": "not found"}, 404)
+                    return self._json(r, 400 if "error" in r else 200)
+                if u.path in ("/api/configs/backup", "/api/configs/upload"):  # 💾 αντίγραφα ρυθμίσεων συσκευών
+                    cb = getattr(state, "configbak", None)
+                    if not cb:
+                        return self._json({"error": "Τα αντίγραφα ρυθμίσεων δεν είναι διαθέσιμα σε αυτή τη λειτουργία."}, 400)
+                    if not isinstance(body, dict):
+                        return self._json({"error": "bad json"}, 400)
+                    did = body.get("id")
+                    if not isinstance(did, str) or not (did == "all" and u.path.endswith("/backup") or re.fullmatch(r"[a-z0-9_.-]{1,40}", did)):
+                        return self._json({"error": "Μη έγκυρο id συσκευής."}, 400)
+                    if u.path.endswith("/backup"):
+                        r = cb.backup(did)
+                    else:
+                        for k in ("note", "name", "vendor"):
+                            if body.get(k) is not None and (not isinstance(body[k], str) or len(body[k]) > 300):
+                                return self._json({"error": f"Μη έγκυρο πεδίο «{k}»."}, 400)
+                        r = cb.upload(did, body.get("text"), note=body.get("note"), name=body.get("name"), vendor=body.get("vendor"))
+                    return self._json(r, 400 if "error" in r else 200)
+                if u.path == "/api/whereis/refresh":  # 🔌 «Πού είναι συνδεδεμένο;»
+                    wi = getattr(state, "whereis", None)
+                    if not wi:
+                        return self._json({"error": "Η αναζήτηση θύρας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."}, 400)
+                    return self._json(wi.refresh())
+                if u.path in ("/api/segcheck/run", "/api/segcheck/report"):  # 🧱 έλεγχος διαχωρισμού (VLAN)
+                    sc = getattr(state, "segcheck", None)
+                    if not sc:
+                        return self._json({"error": "Ο έλεγχος διαχωρισμού δεν είναι διαθέσιμος σε αυτή τη λειτουργία."}, 400)
+                    if u.path.endswith("/report"):  # από NetWatch/segcheck.py σε άλλο VLAN (σε agent: Bearer token)
+                        r = sc.report(body)
+                        return self._json(r, 400 if "error" in r else 200)
+                    r = sc.run()
+                    return self._json(r, 429 if r.get("retry_in") else 400 if "error" in r else 200)
+                if u.path in ("/api/expiry/add", "/api/expiry/delete", "/api/expiry/refresh"):  # ⏳ υπενθυμίσεις λήξης
+                    ex = getattr(state, "expiry", None)
+                    if not ex:
+                        return self._json({"error": "Οι υπενθυμίσεις λήξης δεν είναι διαθέσιμες σε αυτή τη λειτουργία."}, 400)
+                    if not isinstance(body, dict):
+                        return self._json({"error": "bad json"}, 400)
+                    if u.path.endswith("/refresh"):
+                        r = ex.refresh()
+                    elif u.path.endswith("/delete"):
+                        iid = body.get("id")
+                        if not isinstance(iid, str) or not re.fullmatch(r"[a-z0-9_-]{1,40}", iid):
+                            return self._json({"error": "Μη έγκυρο id."}, 400)
+                        r = ex.delete(iid)
+                    else:
+                        for k, lim in (("name", 80), ("kind", 20), ("date", 10), ("note", 200)):
+                            if body.get(k) is not None and (not isinstance(body[k], str) or len(body[k]) > lim):
+                                return self._json({"error": f"Μη έγκυρο πεδίο «{k}»."}, 400)
+                        r = ex.add(body.get("name"), body.get("kind"), body.get("date"), body.get("note"))
+                    return self._json(r, 400 if "error" in r else 200)
+                if u.path in ("/api/change/snapshot", "/api/change/delete"):  # 🔁 έλεγχος πριν/μετά από αλλαγή
+                    ch = getattr(state, "changecheck", None)
+                    if not ch:
+                        return self._json({"error": "Ο έλεγχος πριν/μετά δεν είναι διαθέσιμος σε αυτή τη λειτουργία."}, 400)
+                    if u.path.endswith("/delete"):
+                        sid = body.get("id")
+                        if isinstance(sid, bool) or not isinstance(sid, (int, str)) or not str(sid).isdigit():
+                            raise ValueError("Μη έγκυρο id στιγμιότυπου.")
+                        r = ch.delete(int(sid))
+                    else:
+                        label, targets = body.get("label"), body.get("targets")
+                        if not isinstance(label, str) or not label.strip() or len(label.strip()) > 40:
+                            raise ValueError("Η ετικέτα πρέπει να είναι κείμενο 1–40 χαρακτήρων.")
+                        if targets is not None and (not isinstance(targets, list) or len(targets) > 64
+                                                    or not all(isinstance(x, str) for x in targets)):
+                            raise ValueError("Οι στόχοι πρέπει να είναι λίστα έως 64 ιδιωτικών IP.")
+                        r = ch.snapshot(label, targets or None)
+                    return self._json(r, 400 if "error" in r else 200)
+                if u.path in ("/api/handover/note", "/api/handover/note/delete"):  # 🔄 σημειώσεις βάρδιας
+                    ho = getattr(state, "handover", None)
+                    if not ho:
+                        return self._json({"error": "Η παράδοση βάρδιας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."}, 400)
+                    if u.path.endswith("/delete"):
+                        r = ho.delete_note(body.get("t"))
+                    else:
+                        txt = body.get("text")
+                        if not isinstance(txt, str) or len(txt) > 1000:
+                            raise ValueError("Η σημείωση πρέπει να είναι κείμενο έως 1000 χαρακτήρες.")
+                        r = ho.add_note(txt)
+                    return self._json(r, 400 if "error" in r else 200)
+                if u.path == "/api/triage/run":  # 🩺 «Φταίει το δίκτυο;»
+                    tr = getattr(state, "triage", None)
+                    if not tr:
+                        return self._json({"error": "Η διάγνωση δεν είναι διαθέσιμη σε αυτή τη λειτουργία."}, 400)
+                    import nettriage
+                    lang, sc = body.get("lang") or "el", body.get("scenario")
+                    if lang not in nettriage.LANGS:
+                        raise ValueError("Γλώσσα: el ή en.")
+                    if sc is not None and sc not in nettriage.SCENARIOS:
+                        raise ValueError("Άγνωστο σενάριο.")
+                    r = tr.run(lang=lang, scenario=sc)
                     return self._json(r, 400 if "error" in r else 200)
                 if u.path == "/api/hunt/run":  # 🎯 κυνήγι απειλών: εκτέλεση υπόθεσης (ή "all")
                     hu = getattr(state, "hunt", None)
@@ -530,7 +627,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -565,9 +662,102 @@ def make_handler(state):
                 from osint import onionoo
                 ip = parse_qs(u.query).get("ip", [""])[0]
                 return self._send(200, json.dumps(onionoo(ip, demo=state.mode == "demo")).encode(), "application/json")
+            if u.path in ("/api/whereis", "/api/whereis/table"):  # 🔌 «Πού είναι συνδεδεμένο;» MAC → switch → θύρα → VLAN
+                wi = getattr(state, "whereis", None)
+                q = {k: v[0] for k, v in parse_qs(u.query).items()}
+                if u.path.endswith("/table"):
+                    return self._json(wi.table(all_rows=q.get("all") == "1") if wi else {"rows": [], "switches": [], "off": True})
+                qq = q.get("q", "")
+                if len(qq) > 64:
+                    return self._json({"error": "Πολύ μεγάλο ερώτημα (έως 64 χαρακτήρες)."}, 400)
+                return self._json(wi.lookup(qq) if wi else {"query": qq, "found": False, "location": None, "off": True})
+            if u.path == "/api/segcheck":  # 🧱 έλεγχος διαχωρισμού (VLAN)
+                sc = getattr(state, "segcheck", None)
+                return self._json(sc.view() if sc else {"config_ok": False, "configured": False, "rules": [], "zones": [],
+                                                        "matrix": {"zones": [], "cells": {}}, "off": True})
+            if u.path == "/api/expiry":  # ⏳ υπενθυμίσεις λήξης
+                ex = getattr(state, "expiry", None)
+                return self._json(ex.view() if ex else {"items": [], "counts": {}, "off": True})
+            if u.path in ("/api/change", "/api/change/compare"):  # 🔁 έλεγχος πριν/μετά από αλλαγή
+                ch = getattr(state, "changecheck", None)
+                if u.path == "/api/change":
+                    return self._json(ch.view() if ch else {"status": "idle", "snapshots": [], "last_compare": None, "off": True})
+                if not ch:
+                    return self._json({"off": True, "error": "Ο έλεγχος πριν/μετά δεν είναι διαθέσιμος σε αυτή τη λειτουργία."})
+                q = {k: v[0] for k, v in parse_qs(u.query).items()}
+                if not str(q.get("a", "")).isdigit() or not str(q.get("b", "")).isdigit():
+                    return self._json({"error": "Δώσε a και b (id στιγμιότυπων)."}, 400)
+                r = ch.compare(int(q["a"]), int(q["b"]))
+                return self._json(r, 404 if "error" in r else 200)
+            if u.path == "/api/handover":  # 🔄 παράδοση βάρδιας (SOC/NOC)
+                ho = getattr(state, "handover", None)
+                q = {k: v[0] for k, v in parse_qs(u.query).items()}
+                import handover
+                try:
+                    hours = handover.parse_hours(q.get("hours"))
+                except ValueError:
+                    return self._json({"error": "Οι ώρες πρέπει να είναι ακέραιος 1–72. / hours must be an integer 1–72."}, 400)
+                lang = q.get("lang") or "el"
+                if lang not in handover.LANGS:
+                    return self._json({"error": "Γλώσσα: el ή en."}, 400)
+                if not ho:
+                    return self._json({"off": True, "sections": [], "stats": {}, "notes": [], "text": "",
+                                       "error": "Η παράδοση βάρδιας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."})
+                return self._json(ho.summary(hours, lang))
+            if u.path in ("/api/docs", "/docs/network.md", "/docs/network.html", "/docs/network.drawio"):  # 📘 τεκμηρίωση δικτύου
+                import netdocs
+                lang = parse_qs(u.query).get("lang", ["el"])[0]
+                if lang not in netdocs.LANGS:
+                    return self._json({"error": "Γλώσσα: el ή en."}, 400)
+                doc = netdocs.build(state, lang)
+                if u.path == "/api/docs":
+                    md = netdocs.to_markdown(doc)
+                    return self._json({"generated": doc["generated"], "counts": doc["counts"], "demo": doc["demo"],
+                                       "formats": [{"id": f, "url": f"/docs/network.{f}?lang={lang}"} for f in ("md", "html", "drawio")],
+                                       "preview_md": "\n".join(md.split("\n")[:80])})
+                if u.path.endswith(".html"):
+                    return self._send(200, netdocs.to_html(doc, lang).encode(), "text/html; charset=utf-8")
+                fmt = u.path.rsplit(".", 1)[1]
+                body = (netdocs.to_markdown(doc) if fmt == "md" else netdocs.to_drawio(doc)).encode()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/markdown; charset=utf-8" if fmt == "md" else "application/xml; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Content-Disposition", f'attachment; filename="{netdocs.filename(fmt, doc["generated"])}"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                self.wfile.write(body)
+                return
+            if u.path == "/api/triage":  # 🩺 «Φταίει το δίκτυο;»
+                tr = getattr(state, "triage", None)
+                return self._json(tr.view() if tr else {"status": "idle", "steps": [], "verdict": None, "ticket": "",
+                                                        "scenarios": [], "off": True})
             if u.path == "/api/cases":  # 🗂 διαλογή ειδοποιήσεων & υποθέσεις
                 cs = getattr(state, "cases", None)
                 return self._json(cs.view() if cs else {"cases": [], "kpi": {}, "off": True})
+            if u.path in ("/api/configs", "/api/configs/versions", "/api/configs/show", "/api/configs/diff"):  # 💾 αντίγραφα ρυθμίσεων
+                cb = getattr(state, "configbak", None)
+                if not cb:
+                    return self._json({"devices": [], "off": True})
+                if u.path == "/api/configs":
+                    return self._json(cb.view())
+                q = {k: v[0] for k, v in parse_qs(u.query).items()}
+                did = q.get("id", "")
+                if not re.fullmatch(r"[a-z0-9_.-]{1,40}", did):
+                    return self._json({"error": "Μη έγκυρο id συσκευής."}, 400)
+                ts = {}
+                for k in ("ts", "a", "b"):
+                    if q.get(k):
+                        if not re.fullmatch(r"\d{1,12}", q[k]):
+                            return self._json({"error": f"Μη έγκυρο «{k}»."}, 400)
+                        ts[k] = int(q[k])
+                if u.path.endswith("/versions"):
+                    r = cb.versions(did)
+                elif u.path.endswith("/show"):
+                    r = cb.show(did, ts.get("ts"))
+                else:
+                    r = cb.diff(did, ts.get("a"), ts.get("b"))
+                return self._json(r, 404 if "error" in r else 200)
             if u.path in ("/api/hunt", "/api/hunt/profile"):  # 🎯 κυνήγι απειλών: κατάλογος υποθέσεων / προφίλ συσκευής
                 hu = getattr(state, "hunt", None)
                 if u.path == "/api/hunt":

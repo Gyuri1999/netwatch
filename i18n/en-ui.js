@@ -531,7 +531,7 @@ I18N.add({
   "Τι μπορώ να κάνω;": "What can I do?",
   "Στον browser βάλε ad/tracker blocker (π.χ. uBlock Origin) ή DNS που μπλοκάρει trackers (NextDNS, AdGuard DNS, Pi-hole σε Raspberry Pi). Σε εφαρμογές, κλείσε από τις ρυθμίσεις τους τα «analytics/βελτίωση προϊόντος». Ένας tracker δεν είναι ιός· σημαίνει ότι κάποιος καταγράφει τι κάνεις.": "In the browser, add an ad/tracker blocker (e.g. uBlock Origin) or a DNS that blocks trackers (NextDNS, AdGuard DNS, Pi-hole on a Raspberry Pi). In apps, turn off “analytics/product improvement” in their settings. A tracker isn't a virus; it means someone is logging what you do.",
   "ΣΤΗΜΕΝΗ": "ARMED",
-  "κλειστή": "off",
+  "κλειστή": "closed",
   "⏹ Μάζεψε την παγίδα": "⏹ Take down the honeypot",
   "▶ Στήσε την παγίδα": "▶ Set up the honeypot",
   "Παγίδα:": "Honeypot:",
@@ -2564,7 +2564,268 @@ I18N.add({
   "συνδέσεις": "connections",
   "λεπτό": "minute",
   "πηγή:": "source:",
-  "δεδομένα:": "data:"
+  "δεδομένα:": "data:",
+  "🔎 Φταίει το δίκτυο;": "🔎 Is it the network?",
+  "Φταίει το δίκτυο;": "Is it the network?",
+  "έλεγχος με ένα κλικ + έτοιμο κείμενο για ticket": "one-click check + ready-made ticket text",
+  "📸 Πριν / Μετά": "📸 Before / After",
+  "Πριν / Μετά": "Before / After",
+  "φωτογραφία του δικτύου πριν και μετά από μια αλλαγή": "a snapshot of the network before and after a change",
+  "📑 Αντίγραφα ρυθμίσεων": "📑 Config backups",
+  "Αντίγραφα ρυθμίσεων": "Config backups",
+  "backup των configs των switches/routers και τι άλλαξε": "backups of switch/router configs and what changed",
+  "▶ Έλεγξε τώρα": "▶ Check now",
+  "⏳ Ελέγχω…": "⏳ Checking…",
+  "Ο χρήστης λέει «δεν έχω Internet». Αντί για 20′ ερωτήσεις, ένα κλικ ελέγχει τα στρώματα με τη σειρά του μοντέλου OSI — καλώδιο/Wi‑Fi → DHCP → gateway → DNS → Internet → captive portal → MTU → ποιότητα — και σταματά στο πρώτο που χαλάει. Στο τέλος σου δίνει": "The user says «I have no Internet». Instead of 20′ of questions, one click checks the layers in OSI order — cable/Wi‑Fi → DHCP → gateway → DNS → Internet → captive portal → MTU → quality — and stops at the first one that's broken. At the end it gives you",
+  "έτοιμο κείμενο για το ticket": "ready-made ticket text",
+  "Σενάριο demo:": "Demo scenario:",
+  "Πάτα «▶ Έλεγξε τώρα».": "Press «▶ Check now».",
+  "🎫 Κείμενο για το ticket": "🎫 Ticket text",
+  "Χωρίς κωδικούς και χωρίς MAC άλλων συσκευών — έτοιμο για Jira / ServiceNow / email.": "No passwords and no MACs of other devices — ready for Jira / ServiceNow / email.",
+  "📸 Πριν / Μετά από αλλαγή": "📸 Before / After a change",
+  "Ο κανόνας κάθε μηχανικού δικτύων:": "Every network engineer's rule:",
+  "pre-check → αλλαγή → post-check": "pre-check → change → post-check",
+  ". Πριν πειράξεις VLAN, firewall ή router, τράβα «φωτογραφία» (ποιος απαντά, ποιες θύρες είναι ανοιχτές, gateway, DNS, Internet). Μετά την αλλαγή τράβα δεύτερη: βλέπεις αμέσως τι χάλασε — πριν σε πάρει τηλέφωνο ο χρήστης.": ". Before you touch a VLAN, firewall or router, take a «snapshot» (who answers, which ports are open, gateway, DNS, Internet). After the change take a second one: you immediately see what broke — before the user calls you.",
+  "📸 Πριν": "📸 Before",
+  "📸 Μετά": "📸 After",
+  "📸 Τράβα": "📸 Take",
+  "ή δικό σου όνομα, π.χ. «μετά το VLAN 30»": "or your own name, e.g. «after VLAN 30»",
+  "Φωτογραφίες": "Snapshots",
+  "— κλικ = «Α» (πριν) · shift+κλικ = «Β» (μετά)": "— click = «A» (before) · shift+click = «B» (after)",
+  "Διαγραφή": "Delete",
+  "Πριν": "Before",
+  "Μετά": "After",
+  "Καμία φωτογραφία ακόμη — πάτα «📸 Πριν».": "No snapshots yet — press «📸 Before».",
+  "🚨 Κάτι χάλασε": "🚨 Something broke",
+  "⚠ Θέλει ματιά": "⚠ Needs a look",
+  "✅ Όλα ίδια": "✅ All the same",
+  "χάθηκαν": "lost",
+  "άλλαξαν": "changed",
+  "πιο αργά": "slower",
+  "ίδια": "same",
+  "Τι άλλαξε": "What changed",
+  "Μόνο διαφορές": "Differences only",
+  "Αντιγραφή για το change ticket": "Copy for the change ticket",
+  "Τι": "What",
+  "Σημείωση": "Note",
+  "Καμία διαφορά. 🎉": "No differences. 🎉",
+  "✗ χάθηκε": "✗ lost",
+  "+ νέο": "+ new",
+  "≠ άλλαξε": "≠ changed",
+  "🐢 πιο αργό": "🐢 slower",
+  "= ίδιο": "= same",
+  "🖥 Συσκευή": "🖥 Device",
+  "🔌 Θύρα": "🔌 Port",
+  "🚪 Gateway": "🚪 Gateway",
+  "🔤 DNS": "🔤 DNS",
+  "🌍 Internet": "🌍 Internet",
+  "💻 Εδώ": "💻 Here",
+  "απαντά": "answers",
+  "δεν απαντά": "no answer",
+  "αποτυχία": "failed",
+  "Ίδια συμπεριφορά.": "Same behaviour.",
+  "Ίδιο router (ίδια IP και MAC).": "Same router (same IP and MAC).",
+  "Ίδιο με πριν.": "Same as before.",
+  "Ανοιχτή και πριν και μετά.": "Open before and after.",
+  "Λύνεται κανονικά.": "Resolves normally.",
+  "Αποτύγχανε και πριν.": "It was failing before too.",
+  "Απαντούσε πριν, τώρα δεν απαντά — έλεγξε VLAN/καλώδιο/firewall ή αν απλώς κοιμάται.": "It answered before, now it doesn't — check VLAN/cable/firewall or whether it's just asleep.",
+  "Ο router (gateway) δεν απαντά πια — όλο το δίκτυο επηρεάζεται.": "The router (gateway) no longer answers — the whole network is affected.",
+  "Δεν απαντούσε πριν, τώρα απαντά.": "It didn't answer before, now it does.",
+  "Νέα συσκευή — δεν υπήρχε στο πρώτο στιγμιότυπο.": "New device — it wasn't in the first snapshot.",
+  "Άλλαξε η διεύθυνση του router — έλεγξε DHCP/στατικές ρυθμίσεις.": "The router's address changed — check DHCP/static settings.",
+  "Δεν υπάρχει πια default gateway.": "There's no default gateway any more.",
+  "Άλλαξε η MAC του router — αν δεν άλλαξες router, πιθανό ARP spoofing!": "The router's MAC changed — if you didn't replace the router, possible ARP spoofing!",
+  "Το DNS δεν λύνει πια αυτό το όνομα — οι εφαρμογές «δεν έχουν internet».": "DNS no longer resolves this name — apps «have no internet».",
+  "Νέος έλεγχος DNS.": "New DNS check.",
+  "Το DNS λύνει ξανά.": "DNS resolves again.",
+  "Χάθηκε η πρόσβαση στο internet από αυτόν τον υπολογιστή.": "This computer lost internet access.",
+  "Νέος έλεγχος internet.": "New internet check.",
+  "Το internet δουλεύει ξανά.": "The internet works again.",
+  "Διεπαφή": "Interface",
+  "Η IP σου": "Your IP",
+  "Άλλαξε η ενεργή διεπαφή (π.χ. Wi‑Fi ↔ Ethernet).": "The active interface changed (e.g. Wi‑Fi ↔ Ethernet).",
+  "Άλλαξε η IP του υπολογιστή σου (νέο DHCP lease ή άλλο VLAN/υποδίκτυο).": "Your computer's IP changed (new DHCP lease or another VLAN/subnet).",
+  "Άλλαξαν οι DNS servers που δίνει το DHCP.": "The DNS servers handed out by DHCP changed.",
+  "Άλλαξε το MTU της διεπαφής.": "The interface MTU changed.",
+  "ο router δεν απαντά": "the router doesn't answer",
+  "άλλαξε η MAC του router": "the router's MAC changed",
+  "χάθηκε το internet": "internet lost",
+  "το DNS αποτυγχάνει": "DNS is failing",
+  "Καμία αλλαγή — όλα όπως πριν.": "No change — everything as before.",
+  "Έλεγχος HTTP 204 (Google)": "HTTP 204 check (Google)",
+  "resolver συστήματος": "system resolver",
+  "Άγνωστη συσκευή": "Unknown device",
+  "AP σαλονιού (OpenWrt)": "Living-room AP (OpenWrt)",
+  "⬇ Backup όλων": "⬇ Back up all",
+  "⬇ Backup τώρα": "⬇ Back up now",
+  "📋 Επικόλληση config": "📋 Paste config",
+  ": κάθε": ": every",
+  "ώρες κατεβάζει μέσω SSH το running-config από switches/routers και κρατά ιστορικό. Βλέπεις με χρώματα": "hours it pulls the running-config from switches/routers over SSH and keeps a history. You see in colour",
+  "τι άλλαξε, πότε": "what changed, when",
+  "— και το NetWatch σε ειδοποιεί για επικίνδυνες αλλαγές (νέος χρήστης, telnet, SNMP community, port forward). Οι κωδικοί κρύβονται πάντα στην οθόνη.": "— and NetWatch alerts you to risky changes (new user, telnet, SNMP community, port forward). Passwords are always hidden on screen.",
+  "Δεν βρέθηκε το πρόγραμμα ssh σε αυτόν τον υπολογιστή.": "The ssh program wasn't found on this computer.",
+  "Δεν υπάρχουν συσκευές. Πρόσθεσέ τες στο": "No devices. Add them in",
+  "(μόνο με κλειδί SSH — δες το config.example.yaml), ή πάτα «📋 Επικόλληση config».": "(SSH key only — see config.example.yaml), or press «📋 Paste config».",
+  "— για συσκευές χωρίς SSH: κάνε": "— for devices without SSH: run",
+  "και επικόλλησε εδώ.": "and paste it here.",
+  "+ νέα συσκευή…": "+ new device…",
+  "όνομα νέας συσκευής": "new device name",
+  "σημείωση (π.χ. «πριν το VLAN 30»)": "note (e.g. «before VLAN 30»)",
+  "💾 Αποθήκευση έκδοσης": "💾 Save version",
+  "Άκυρο": "Cancel",
+  "✓ ok": "✓ ok",
+  "✗ σφάλμα": "✗ error",
+  "ποτέ": "never",
+  "⏳ τώρα": "⏳ now",
+  "± Τι άλλαξε": "± What changed",
+  "📄 Ολόκληρο": "📄 Full config",
+  "⚠ Αλλαγές προς έλεγχο": "⚠ Changes to review",
+  "(καμία διαφορά)": "(no difference)",
+  "Ιστορικό εκδόσεων": "Version history",
+  "πρώτη": "first",
+  "επικίνδυνη αλλαγή": "risky change",
+  "σημαντική αλλαγή": "notable change",
+  "Η έκδοση αποθηκεύτηκε.": "Version saved.",
+  "Το backup ξεκίνησε.": "Backup started.",
+  "Αυτόματο αντίγραφο (SSH)": "Automatic backup (SSH)",
+  "Άλλαξε μόνο κρυφή τιμή": "Only a hidden value changed",
+  "Κανάλι 11 λόγω παρεμβολών από τον γείτονα": "Channel 11 due to the neighbour's interference",
+  "ACL MGMT μόνο για 2 υπολογιστές διαχείρισης + ACL IoT-IN": "ACL MGMT for 2 management PCs only + ACL IoT-IN",
+  "Νέο VLAN 30 για IoT, trunk 10,20,30": "New VLAN 30 for IoT, trunk 10,20,30",
+  "κωδικοί σε απλό κείμενο": "passwords in clear text",
+  "Ενεργοποιήθηκε η υπηρεσία telnet (/ip service) — κωδικοί σε απλό κείμενο": "Telnet service enabled (/ip service) — passwords in clear text",
+  "Απενεργοποιήθηκε η κρυπτογράφηση κωδικών (no service password-encryption)": "Password encryption disabled (no service password-encryption)",
+  "Ενεργοποιήθηκε ο web server διαχείρισης χωρίς HTTPS (ip http server)": "Management web server enabled without HTTPS (ip http server)",
+  "Νέο port forward (OpenWrt redirect)": "New port forward (OpenWrt redirect)",
+  "Ανοιχτό Wi‑Fi χωρίς κρυπτογράφηση (option encryption 'none')": "Open Wi‑Fi without encryption (option encryption 'none')",
+  "Προστέθηκε / άλλαξε SNMP community (MikroTik)": "SNMP community added / changed (MikroTik)",
+  "με privilege 15 (πλήρη δικαιώματα)": "with privilege 15 (full rights)",
+  "Αλλαγή ρυθμίσεων": "Configuration change",
+  "+ Νέα λήξη": "+ New expiry",
+  "+ Πρόσθεσε": "+ Add",
+  "IP, MAC ή όνομα": "IP, MAC or name",
+  "MAC στη θύρα": "MACs on port",
+  "MAC, IP ή όνομα": "MAC, IP or name",
+  "MAC, π.χ. aa:bb:cc:dd:ee:ff": "MAC, e.g. aa:bb:cc:dd:ee:ff",
+  "switch → θύρα → VLAN": "switch → port → VLAN",
+  "Όλες οι συσκευές ανά θύρα": "All devices by port",
+  "Για όταν είσαι σε πελάτη ή μπροστά στο rack με το κινητό: τα 5 πράγματα που χρειάζεσαι, με μεγάλα κουμπιά. Άνοιξε το NetWatch από το κινητό (ίδιο Wi‑Fi) και πρόσθεσέ το στην αρχική οθόνη.": "For when you're at a customer site or in front of the rack with your phone: the 5 things you need, with big buttons. Open NetWatch on your phone (same Wi‑Fi) and add it to your home screen.",
+  "Δεν βρέθηκε": "Not found",
+  "Δεν υπάρχουν switches με SNMP. Πρόσθεσέ τα στο": "No switches with SNMP. Add them in",
+  "Διαγραφή;": "Delete?",
+  "Διαδρομή:": "Path:",
+  "Είδα": "Seen",
+  "Η τεκμηρίωση που κανείς δεν προλαβαίνει να γράψει — φτιαγμένη αυτόματα από ό,τι ήδη ξέρει το NetWatch: υποδίκτυα & VLAN, router/switches, συνδέσεις LLDP, κάθε συσκευή με θύρα/VLAN, υπηρεσίες, πρόσφατες αλλαγές, ανοιχτές υποθέσεις και λήξεις. Χωρίς κωδικούς και SNMP communities. Δημιουργήθηκε:": "The documentation nobody has time to write — generated from what NetWatch already knows: subnets & VLANs, router/switches, LLDP links, every device with its port/VLAN, services, recent changes, open cases and expiries. No passwords or SNMP communities. Generated:",
+  "Καμία ακόμη.": "None yet.",
+  "Λεπτομέρειες →": "Details →",
+  "Ξαναδιάβασε τους πίνακες MAC": "Re-read the MAC tables",
+  "Προεπισκόπηση (Markdown)": "Preview (Markdown)",
+  "Σαν σε NOC/SOC: πριν φύγεις, ο επόμενος παίρνει μια σύνοψη — τι χτύπησε, ποιες υποθέσεις είναι ανοιχτές, τι άλλαξε στα configs, τι χάλασε, τι λήγει. Ένα κλικ και πάει στο Teams/Slack/email.": "Like in a NOC/SOC: before you leave, the next person gets a summary — what fired, which cases are open, what changed in the configs, what broke, what's expiring. One click and it's in Teams/Slack/email.",
+  "Τίποτα ακόμη — πρόσθεσε άδειες, εγγυήσεις και domains, ή βάλε": "Nothing yet — add licences, warranties and domains, or put",
+  "Το πιστοποιητικό που έληξε Σάββατο βράδυ, το domain που ξέχασες να ανανεώσεις, η εγγύηση του switch, η μπαταρία του UPS — όλα σε μία λίστα. Ειδοποίηση στις 30, 7 και 1 μέρα πριν.": "The certificate that expired on Saturday night, the domain you forgot to renew, the switch warranty, the UPS battery — all in one list. Alerts 30, 7 and 1 day before.",
+  "Χρειάζονται όνομα και ημερομηνία.": "Name and date are required.",
+  "άνοιξέ το και «Εκτύπωση → PDF»": "open it and “Print → PDF”",
+  "έκλεισαν": "closed",
+  "έληξαν": "expired",
+  "αλλαγές config": "config changes",
+  "ανοιχτές υποθέσεις": "open cases",
+  "απώλειες · καθυστέρηση · jitter": "loss · latency · jitter",
+  "βεβαιότητα:": "confidence:",
+  "για wiki, Git, Confluence, Obsidian": "for wiki, Git, Confluence, Obsidian",
+  "διάγραμμα τοπολογίας για diagrams.net / Visio": "topology diagram for diagrams.net / Visio",
+  "εντάξει": "OK",
+  "επικίνδυνες": "risky",
+  "και uplinks": "and uplinks",
+  "λήξεις": "expiries",
+  "λήξεις ≤30μ": "expiries ≤30d",
+  "μάλλον switch/AP πίσω της": "probably a switch/AP behind it",
+  "μέρες πριν": "days ago",
+  "μέτρια": "medium",
+  "μεσαίες": "medium",
+  "ξύπνα έναν υπολογιστή από μακριά": "wake a computer remotely",
+  "π.χ. 192.168.1.1": "e.g. 192.168.1.1",
+  "π.χ. 192.168.1.33 · aa:bb:cc:dd:ee:ff · printer": "e.g. 192.168.1.33 · aa:bb:cc:dd:ee:ff · printer",
+  "π.χ. Άδεια FortiGate": "e.g. FortiGate licence",
+  "π.χ. Ο πελάτης στο 2ο όροφο περιμένει τηλέφωνο για το Wi‑Fi": "e.g. The customer on the 2nd floor is waiting for a call about the Wi‑Fi",
+  "πίνακας MAC: πριν": "MAC table: ago",
+  "σε ≤ 30 μέρες": "in ≤ 30 days",
+  "σε ≤ 7 μέρες": "in ≤ 7 days",
+  "σοβαρές ειδοποιήσεις": "high alerts",
+  "στο config.yaml.": "in config.yaml.",
+  "υποδίκτυα": "subnets",
+  "υψηλή": "high",
+  "φίλτρο…": "filter…",
+  "χαμηλή": "low",
+  "χειροκίνητο": "manual",
+  "↗ άνοιγμα": "↗ open",
+  "↻ Ανανέωση": "↻ Refresh",
+  "≤ 30 μέρες": "≤ 30 days",
+  "≤ 7 μέρες": "≤ 7 days",
+  "⏰ Λήξεις": "⏰ Expiries",
+  "Λήξεις": "Expiries",
+  "⏳ μετράω…": "⏳ measuring…",
+  "▶ Έλεγξε": "▶ Check",
+  "⚡ Ταχύτητα Internet": "⚡ Internet speed",
+  "❓ Δεν βρέθηκε": "❓ Not found",
+  "⬇ κατέβασμα": "⬇ download",
+  "📄 Συμβόλαιο": "📄 Contract",
+  "📌 Άλλο": "📌 Other",
+  "📘 Τεκμηρίωση δικτύου": "📘 Network documentation",
+  "Τεκμηρίωση δικτύου": "Network documentation",
+  "Τεκμηρίωση": "Documentation",
+  "📝 Σημειώσεις βάρδιας": "📝 Shift notes",
+  "📤 Κείμενο για Teams / Slack / email": "📤 Text for Teams / Slack / email",
+  "🔁 Παράδοση βάρδιας": "🔁 Shift handover",
+  "Παράδοση βάρδιας": "Shift handover",
+  "🔌 Πού είναι συνδεδεμένο;": "🔌 Where is it plugged in?",
+  "Πού είναι συνδεδεμένο;": "Where is it plugged in?",
+  "🔎 Βρες": "🔎 Find",
+  "🔑 Άδεια": "🔑 Licence",
+  "🔒 Πιστοποιητικό": "🔒 Certificate",
+  "🛡 Εγγύηση": "🛡 Warranty",
+  "Λήξη πλησιάζει": "Expiry approaching",
+  "Firmware AP σαλονιού (OpenWrt)": "Living-room AP firmware (OpenWrt)",
+  "HTTPS διαχείρισης router (self-signed)": "Router management HTTPS (self-signed)",
+  "Πιστοποιητικό NAS (DSM)": "NAS certificate (DSM)",
+  "Αλλαγή μπαταρίας UPS": "UPS battery replacement",
+  "Πιστοποιητικό Proxmox": "Proxmox certificate",
+  "Εγγύηση NAS": "NAS warranty",
+  "Συμβόλαιο υποστήριξης · CON-SNT-WS-C2960": "Support contract · CON-SNT-WS-C2960",
+  "APC Back-UPS 700 · μπαταρία RBC17 (κάθε 3 χρόνια)": "APC Back-UPS 700 · RBC17 battery (every 3 years)",
+  "192.168.1.17:5001 · Let's Encrypt δεν ανανεώθηκε": "192.168.1.17:5001 · Let's Encrypt did not renew",
+  "Το νεότερο πιστοποιητικό στα logs CT · certbot renew --dry-run": "Newest certificate in the CT logs · certbot renew --dry-run",
+  "Ανανέωση στον registrar (το .gr δεν έχει RDAP)": "Renew at the registrar (.gr has no RDAP)",
+  "Τιμολόγιο στον φάκελο «Αγορές»": "Invoice in the “Purchases” folder",
+  "Το νεότερο πιστοποιητικό στα logs Certificate Transparency.": "Newest certificate in the Certificate Transparency logs.",
+  "RDAP (μητρώο του domain)": "RDAP (domain registry)",
+  "Δώσε MAC (οποιαδήποτε μορφή), IP ή μέρος ονόματος.": "Enter a MAC (any format), IP or part of a name.",
+  "Η μνήμη πρέπει να είναι YYYY-MM-DD.": "The date must be YYYY-MM-DD.",
+  "Η ημερομηνία πρέπει να είναι YYYY-MM-DD.": "The date must be YYYY-MM-DD.",
+  "Το όνομα πρέπει να είναι 1–80 χαρακτήρες.": "The name must be 1–80 characters.",
+  "Η σημείωση πρέπει να είναι έως 200 χαρακτήρες.": "The note must be at most 200 characters.",
+  "Διαγράφονται μόνο χειροκίνητα στοιχεία (αυτό δεν βρέθηκε).": "Only manual items can be deleted (this one was not found).",
+  "Ο εκτυπωτής του 2ου ορόφου θέλει έλεγχο μετά την αλλαγή VLAN": "The 2nd-floor printer needs checking after the VLAN change",
+  "Αναμένεται ενημέρωση firmware στο MikroTik απόψε 22:00": "MikroTik firmware update expected tonight at 22:00",
+  "συνδέσεις LLDP": "LLDP links",
+  "βεβαιότητα": "confidence",
+  "Δημιουργήθηκε": "Generated",
+  "Η τεκμηρίωση που κανείς δεν προλαβαίνει να γράψει — φτιαγμένη αυτόματα από ό,τι ήδη ξέρει το NetWatch: υποδίκτυα & VLAN, router/switches, συνδέσεις LLDP, κάθε συσκευή με θύρα/VLAN, υπηρεσίες, πρόσφατες αλλαγές, ανοιχτές υποθέσεις και λήξεις. Χωρίς κωδικούς και SNMP communities.": "The documentation nobody has time to write — generated from what NetWatch already knows: subnets & VLANs, router/switches, LLDP links, every device with its port/VLAN, services, recent changes, open cases and expiries. No passwords or SNMP communities.",
+  "επικοινωνία εκτός προφίλ": "traffic outside profile",
+  "Άλλο": "Other",
+  "Συμβόλαιο": "Contract",
+  "Εγγύηση": "Warranty",
+  "🧱 Διαχωρισμός VLAN": "🧱 VLAN segmentation",
+  "Διαχωρισμός VLAN": "VLAN segmentation",
+  "είναι όντως απομονωμένα guest/IoT από το LAN σου;": "are guest/IoT really isolated from your LAN?",
+  "Διαρροή διαχωρισμού VLAN": "VLAN segmentation leak",
+  "Διαρροή διαχωρισμού": "Segmentation leak",
+  "πολιτική: επιτρέπεται": "policy: allow",
+  "πολιτική: απαγορεύεται": "policy: deny",
+  "απομονωμένο": "isolated",
+  "ΔΙΑΡΡΟΗ": "LEAK",
+  "κόβεται (ενώ επιτρέπεται)": "blocked (but allowed)",
+  "δεν ελέγχθηκε": "not tested"
  },
  "patterns": [
   [
@@ -5302,6 +5563,290 @@ I18N.add({
   [
    "^Ψευδώς θετικό — καταστολή (\\d+) κανόνων \\(τύπος × δράστης\\) για (.+)\\.$",
    "False positive — suppressing $1 rules (type × actor) for $2."
+  ],
+  [
+   "^απαντά · ([\\d.]+ ms)$",
+   "answers · $1"
+  ],
+  [
+   "^(\\d+) συσκευή δεν απαντά πια$",
+   "$1 device no longer answers"
+  ],
+  [
+   "^(\\d+) συσκευές δεν απαντούν πια$",
+   "$1 devices no longer answer"
+  ],
+  [
+   "^(\\d+) θύρα έκλεισε$",
+   "$1 port closed"
+  ],
+  [
+   "^(\\d+) θύρες έκλεισαν$",
+   "$1 ports closed"
+  ],
+  [
+   "^(\\d+) συσκευή πιο αργή$",
+   "$1 device slower"
+  ],
+  [
+   "^(\\d+) συσκευές πιο αργές$",
+   "$1 devices slower"
+  ],
+  [
+   "^(\\d+) αλλαγή στη σύνδεσή σου$",
+   "$1 change to your connection"
+  ],
+  [
+   "^(\\d+) αλλαγές στη σύνδεσή σου$",
+   "$1 changes to your connection"
+  ],
+  [
+   "^(\\d+) νέα συσκευή$",
+   "$1 new device"
+  ],
+  [
+   "^(\\d+) νέες συσκευές$",
+   "$1 new devices"
+  ],
+  [
+   "^Πιο αργή: (.+) → (.+) — πιθανή διαδρομή μέσω router/άλλου VLAN ή φορτωμένο link\\.$",
+   "Slower: $1 → $2 — possibly routed via the router/another VLAN or a loaded link."
+  ],
+  [
+   "^Η θύρα (\\d+) έκλεισε — η υπηρεσία δεν είναι πια προσβάσιμη \\(firewall/ACL ή έπεσε\\)\\.$",
+   "Port $1 closed — the service is no longer reachable (firewall/ACL or it went down)."
+  ],
+  [
+   "^Νέα ανοιχτή θύρα (\\d+)\\.$",
+   "New open port $1."
+  ],
+  [
+   "^(\\S+) μέσω (.+)$",
+   "$1 via $2"
+  ],
+  [
+   "^Άγνωστη συσκευή \\((.+)\\)$",
+   "Unknown device ($1)"
+  ],
+  [
+   "^(\\d+) συσκευές · (\\d+) θύρες$",
+   "$1 devices · $2 ports"
+  ],
+  [
+   "^⏳ Τραβάω «(.+)»…$",
+   "⏳ Taking «$1»…"
+  ],
+  [
+   "^(\\d+) εκδόσεις · τελευταία αλλαγή πριν (\\S+)( ·)?$",
+   "$1 versions · last change $2 ago$3"
+  ],
+  [
+   "^⚠ (\\d+) αλλαγές προς έλεγχο$",
+   "⚠ $1 changes to review"
+  ],
+  [
+   "^τελευταίο backup: (.+)$",
+   "last backup: $1"
+  ],
+  [
+   "^Νέος τοπικός χρήστης «(.+)» με privilege 15 \\(πλήρη δικαιώματα\\)$",
+   "New local user «$1» with privilege 15 (full rights)"
+  ],
+  [
+   "^Νέος τοπικός χρήστης «(.+)» \\(ομάδα (.+)\\)$",
+   "New local user «$1» (group $2)"
+  ],
+  [
+   "^Νέος τοπικός χρήστης «(.+)»$",
+   "New local user «$1»"
+  ],
+  [
+   "^Ενεργοποιήθηκε telnet \\((.+)\\) — κωδικοί σε απλό κείμενο$",
+   "Telnet enabled ($1) — passwords in clear text"
+  ],
+  [
+   "^Προστέθηκε SNMP community προεπιλογής «(\\w+)»(.*) — μαντεύεται αμέσως$",
+   "Default SNMP community «$1» added$2 — guessed instantly"
+  ],
+  [
+   "^Προστέθηκε SNMP community(.*)$",
+   "SNMP community added$1"
+  ],
+  [
+   "^ με δικαίωμα εγγραφής \\(RW\\)$",
+   " with write access (RW)"
+  ],
+  [
+   "^Νέο static NAT / port forward: «(.+)»$",
+   "New static NAT / port forward: «$1»"
+  ],
+  [
+   "^Νέο port forward \\(dst-nat\\): (.+)$",
+   "New port forward (dst-nat): $1"
+  ],
+  [
+   "^Νέος κανόνας firewall \\((\\w+)\\) «(.+)»$",
+   "New firewall rule ($1) «$2»"
+  ],
+  [
+   "^Άλλαξε η ACL «(.+)»$",
+   "ACL «$1» changed"
+  ],
+  [
+   "^Νέα ACL «(.+)»$",
+   "New ACL «$1»"
+  ],
+  [
+   "^Εφαρμόστηκε η ACL «(.+)» στο (.+)$",
+   "ACL «$1» applied to $2"
+  ],
+  [
+   "^Αφαιρέθηκε η ACL «(.+)»$",
+   "ACL «$1» removed"
+  ],
+  [
+   "^Αφαιρέθηκε η εφαρμογή της ACL «(.+)» από (.+)$",
+   "ACL «$1» unapplied from $2"
+  ],
+  [
+   "^Νέο SSID «(.+)»$",
+   "New SSID «$1»"
+  ],
+  [
+   "^Απενεργοποιήθηκε η διεπαφή (\\S+) \\(shutdown\\)$",
+   "Interface $1 disabled (shutdown)"
+  ],
+  [
+   "^Ενεργοποιήθηκε η διεπαφή (\\S+) \\(no shutdown\\)$",
+   "Interface $1 enabled (no shutdown)"
+  ],
+  [
+   "^Προστέθηκε VLAN (\\d+)( \\(.+\\))?$",
+   "VLAN $1 added$2"
+  ],
+  [
+   "^Αφαιρέθηκε VLAN (\\d+)$",
+   "VLAN $1 removed"
+  ],
+  [
+   "^Άλλαξαν τα επιτρεπόμενα VLAN στο trunk (\\S+): (.+)$",
+   "Allowed VLANs on trunk $1 changed: $2"
+  ],
+  [
+   "^\\+(\\d+) / −(\\d+) γραμμές$",
+   "+$1 / −$2 lines"
+  ],
+  [
+   "^: κάθε ([\\d.]+) ώρες κατεβάζει μέσω SSH το running-config από switches/routers και κρατά ιστορικό\\. Βλέπεις με χρώματα$",
+   ": every $1 hours it pulls the running-config from switches/routers over SSH and keeps a history. You see in colour"
+  ],
+  [
+   "^Τελευταία ενημέρωση πριν (\\d+) μέρες — ο έλεγχος για νέα έκδοση έπρεπε να γίνει πριν (\\d+) μέρες$",
+   "Last updated $1 days ago — a check for a new version was due $2 days ago"
+  ],
+  [
+   "^CN=(\\S+) · self-signed — φτιάξε νέο: (.+)$",
+   "CN=$1 · self-signed — create a new one: $2"
+  ],
+  [
+   "^Έλεγχος διαθεσιμότητας: (\\S+)$",
+   "Uptime check: $1"
+  ],
+  [
+   "^Έλεγχος TLS: (.*)$",
+   "TLS check: $1"
+  ],
+  [
+   "^Πιστοποιητικό TLS (\\S+)$",
+   "TLS certificate $1"
+  ],
+  [
+   "^Πιστοποιητικό (\\S+) \\(CT\\)$",
+   "Certificate $1 (CT)"
+  ],
+  [
+   "^Πιστοποιητικό (\\S+)$",
+   "Certificate $1"
+  ],
+  [
+   "^Στη θύρα φαίνονται (\\d+) MAC — πιθανώς hypervisor με VM, τηλέφωνο IP με PC ή μικρό μη διαχειριζόμενο switch\\.$",
+   "$1 MACs on this port — probably a hypervisor with VMs, an IP phone with a PC, or a small unmanaged switch."
+  ],
+  [
+   "^Είναι η ίδια η συσκευή «(.+?)» \\(γείτονας LLDP/CDP στη θύρα\\)\\.$",
+   "This is the device “$1” itself (LLDP/CDP neighbour on the port)."
+  ],
+  [
+   "^πίσω από (.+?) \\(Wi‑Fi\\)$",
+   "behind $1 (Wi‑Fi)"
+  ],
+  [
+   "^πίσω από «(.+?)» \\(συσκευή χωρίς SNMP\\)$",
+   "behind “$1” (device without SNMP)"
+  ],
+  [
+   "^Η MAC φαίνεται μόνο σε uplink \\((\\d+) MAC στη θύρα\\): (.+)$",
+   "The MAC is only seen on an uplink ($1 MACs on the port): $2"
+  ],
+  [
+   "^Δεν ξέρω τη MAC της (\\S+) — κάνε ένα ping από το ίδιο LAN ώστε να μπει στον πίνακα ARP\\.$",
+   "I don't know the MAC of $1 — ping it from the same LAN so it lands in the ARP table."
+  ],
+  [
+   "^Δεν βρέθηκε συσκευή που να ταιριάζει με «(.+)»\\.$",
+   "No device matches “$1”."
+  ],
+  [
+   "^(\\d+) συσκευές ταιριάζουν — διάλεξε μία\\.$",
+   "$1 devices match — pick one."
+  ],
+  [
+   "^Δεν φαίνεται τώρα· τελευταία φορά εδώ πριν (\\d+)′\\.(.*)$",
+   "Not visible now; last seen here $1′ ago.$2"
+  ],
+  [
+   "^Η MAC δεν φαίνεται σε κανένα switch(.*)$",
+   "The MAC isn't seen on any switch (off the network, or on a switch without SNMP)."
+  ],
+  [
+   "^Έως (\\d+) χειροκίνητα στοιχεία\\.$",
+   "At most $1 manual items."
+  ],
+  [
+   "^(.+?) από (\\S+\\.\\S+(?: \\([\\d.]+\\))?)$",
+   "$1 from $2"
+  ],
+  [
+   "^New high, unassigned: #(\\d+) (.+)$",
+   "New high, unassigned: #$1 $2"
+  ],
+  [
+   "^Investigating: #(\\d+) (.+)$",
+   "Investigating: #$1 $2"
+  ],
+  [
+   "^Expires: (.+?) \\(expired\\)$",
+   "Expires: $1 (expired)"
+  ],
+  [
+   "^Expires: (.+?) (in \\d+ days)$",
+   "Expires: $1 $2"
+  ],
+  [
+   "^(.+?) \\((\\w+)\\) — (expired \\d+ days ago|in \\d+ days)$",
+   "$1 ($2) — $3"
+  ],
+  [
+   "^\\+ (\\d+) medium: (.+)$",
+   "+ $1 medium: $2"
+  ],
+  [
+   "^(.+?) ×(\\d+)$",
+   "$1 ×$2"
+  ],
+  [
+   "^Opened #(\\d+) \\[(\\w+)\\] (.+) (?:από|from) (\\S+(?: \\([\\d.]+\\))?) \\(new\\)$",
+   "Opened #$1 [$2] $3 from $4 (new)"
   ]
  ]
 });
