@@ -70,6 +70,7 @@ class NetState:
         self.home = None
         self.arp_table = {}
         self.arp_first = {}  # η πρώτη (έμπιστη) MAC που είδαμε για κάθε IP
+        self.ip_mac_seen = {}  # IP → {MAC: τελευταία φορά} (για το IPAM: συγκρούσεις IP)
         self.mac_ips = collections.defaultdict(set)
         self.dhcp_servers = {gateway} if gateway else set()
         self.dns_servers = {}
@@ -211,7 +212,7 @@ class NetState:
             "abuseipdb": bool(self.cfg.get("intel", {}).get("abuseipdb_key")),
             "history": self.history.path,
             "notify": ({"macos": bool(n.get("macos")), "telegram": bool((n.get("telegram") or {}).get("bot_token")),
-                        "ntfy": bool((n.get("ntfy") or {}).get("topic")),
+                        "ntfy": bool((n.get("ntfy") or {}).get("topic")), **__import__("ops").configured(n),
                         "min_severity": n.get("min_severity")} if self.notifier else None),
             "detectors": self.cfg["detectors"], "thresholds": self.cfg["thresholds"],
             "allowlist": {"ips": len(self.allow_ips), "macs": len(self.allow_macs), "domains": len(self.allow_domains)},
@@ -302,10 +303,17 @@ class NetState:
         if mine:
             log(f"🧪 ΔΟΚΙΜΗ ΣΟΥ {typ}: {actor} → {target} ({mine})")
             return  # ούτε ιστορικό, ούτε ειδοποιήσεις, ούτε playbooks/Home Assistant
+        mt = getattr(self, "maint", None)
+        win = mt.active(None, actor, target) if mt else None
+        if win:  # παράθυρο συντήρησης: φαίνεται και καταγράφεται, αλλά χωρίς ειδοποιήσεις/playbooks/Home Assistant
+            a["maint"] = win
         try:
             self.history.add_alert(a, self.mode)
         except Exception as e:
             log("history error:", e)
+        if win:
+            log(f"🔧 [{sev.upper()}] {typ} (συντήρηση «{win}»): {actor} → {target}")
+            return
         if self.notifier and not benign:
             self.notifier(a)
         if self.playbooks and not benign and not lab:
@@ -423,6 +431,8 @@ class NetState:
                                      "sp": sp, "dp": dp, "x": x,
                                      "f": P.get("flags") or {1: "who-has", 2: "is-at"}.get((P.get("arp") or {}).get("op"), ""),
                                      "t": round(t, 3)})
+                if P.get("icmp_type") is not None:  # 8 echo, 0 reply, 11 time exceeded (traceroute), 3 unreachable
+                    self.pending[-1]["ic"] = P["icmp_type"]
                 nm = (P.get("dns_q") or (None,))[0] or P.get("sni") or P.get("http_host")
                 if nm:  # για φίλτρα τύπου Wireshark: dns.qry.name, tls…server_name, http.host
                     self.pending[-1]["n"] = str(nm)[:120]
@@ -457,6 +467,18 @@ class NetState:
         if proto == "ARP":
             return self._arp(P, t)
         self._intel_check(src, dst, dp, t, proto, fl)
+        ed = getattr(self, "encdns", None)
+        if ed is not None:
+            try:
+                ed.observe(P, t)
+            except Exception:
+                pass
+        fw = getattr(self, "iotfw", None)
+        if fw is not None:
+            try:
+                fw.observe(P, t)
+            except Exception:
+                pass
         if P.get("cred"):
             self._cred(P, t)
         if P.get("dns_q"):
@@ -999,6 +1021,10 @@ class NetState:
                            f"{' (ανήκει στη ' + actor + ')' if others else ''}. Πιθανό Man‑in‑the‑Middle.",
                            t, key=("arp", psrc, hw))
             self.arp_table[psrc] = hw
+            seen = self.ip_mac_seen.setdefault(psrc, {})
+            seen[hw] = t
+            if len(seen) > 8:
+                del seen[min(seen, key=seen.get)]
             self.mac_ips[hw].add(psrc)
             h = self.hosts.get(psrc)
             if h is not None:
@@ -1028,8 +1054,23 @@ class NetState:
             last = al[0] if al else None
             out = {"mode": self.mode, "feed": self.feed, "iface": self.iface, "alerts": len(al),
                    "high": by.get("high", 0), "med": by.get("med", 0), "low": by.get("low", 0),
-                   "hosts": len(self.hosts), "pkts": self.total_pkts,
-                   "last": {k: last[k] for k in ("id", "t", "type", "sev", "actor", "target")} if last else None}
+                   "hosts": len(self.hosts), "pkts": self.total_pkts, "bytes": self.total_bytes,
+                   "lan": sum(1 for h in self.hosts.values() if h.get("kind") == "local"),
+                   "last": {k: last[k] for k in ("id", "t", "type", "sev", "actor", "target")} if last else None,
+                   "recent": [{k: a.get(k) for k in ("id", "t", "type", "sev", "actor", "target", "maint")} for a in al[:6]]}
+        try:
+            hs = self.health.status()["targets"] if self.health else []
+            out["homelab"] = {"up": sum(1 for x in hs if x.get("up")), "total": len(hs),
+                              "down": [x["name"] for x in hs if x.get("up") is False][:4]}
+        except Exception:
+            out["homelab"] = None
+        mt = getattr(self, "maint", None)
+        try:
+            ms = mt.status() if mt else None
+            out["maint"] = {"active": bool(ms["active"]), "name": ms["active"],
+                            "until": max([m["until"] for m in ms["mutes"]] or [0])} if ms else None
+        except Exception:
+            out["maint"] = None
         r = self.wifi.result if self.wifi else None
         out["wifi"] = {"level": r["level"], "verdict": r["verdict"], "score": r["score"],
                        "ssid": (r.get("wifi") or {}).get("ssid")} if r else None

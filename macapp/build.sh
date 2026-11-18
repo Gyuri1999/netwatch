@@ -12,7 +12,7 @@ rm -rf "$OUT" && mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources/netwatc
 
 echo "▸ μεταγλώττιση (swiftc)"
 swiftc -O -swift-version 5 -target "$(uname -m)-apple-macos12.0" \
-  -framework AppKit -framework WebKit macapp/NetWatch.swift -o "$OUT/Contents/MacOS/NetWatch"
+  -framework AppKit -framework WebKit -framework SwiftUI -framework ServiceManagement macapp/NetWatch.swift -o "$OUT/Contents/MacOS/NetWatch"
 
 echo "▸ εικονίδιο"
 swiftc -swift-version 5 macapp/make_icon.swift -o "$BUILD/make_icon"
@@ -28,7 +28,7 @@ iconutil -c icns "$ICONSET" -o "$OUT/Contents/Resources/NetWatch.icns"
 echo "▸ αρχεία NetWatch"
 cp macapp/Info.plist "$OUT/Contents/Info.plist"
 rsync -a --exclude '__pycache__' --exclude '*.md' ./*.py \
-  index.html edu.js wireshark.js i18n.js i18n academy academy.html manifest.webmanifest sw.js config.example.yaml requirements.txt rules ctf samples "$OUT/Contents/Resources/netwatch/"
+  index.html edu.js wireshark.js infra.js sectools.js privtools.js protocols.js ciscolab.js i18n.js i18n academy academy.html manifest.webmanifest sw.js config.example.yaml requirements.txt rules ctf samples "$OUT/Contents/Resources/netwatch/"
 rm -f "$OUT/Contents/Resources/netwatch/rules/local.yaml"
 
 echo "▸ υπογραφή (ad-hoc)"

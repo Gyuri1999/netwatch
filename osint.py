@@ -129,3 +129,60 @@ def whois(ip):
         return f"whois απέτυχε: {e}"
     lines = [l for l in out.splitlines() if l.strip() and not l.startswith(("%", "#"))]
     return "\n".join(lines)[:12000] or "(κενό αποτέλεσμα)"
+
+
+# ---------- 🧅 Tor relay; (Onionoo — το επίσημο API του Tor Metrics) ----------
+_ONIONOO_CACHE = {}
+ONIONOO_FIELDS = ("nickname,fingerprint,flags,running,country,country_name,as,as_name,observed_bandwidth,"
+                  "first_seen,last_seen,platform,exit_policy_summary,or_addresses,exit_addresses")
+
+
+def onionoo_parse(j):
+    out = []
+    for r in (j or {}).get("relays", [])[:5]:
+        flags = r.get("flags") or []
+        out.append({"nickname": r.get("nickname"), "fingerprint": r.get("fingerprint"), "running": r.get("running"),
+                    "flags": flags, "exit": "Exit" in flags, "guard": "Guard" in flags,
+                    "country": (r.get("country") or "").upper(), "country_name": r.get("country_name"),
+                    "as": r.get("as"), "as_name": r.get("as_name"), "bandwidth": r.get("observed_bandwidth"),
+                    "first_seen": r.get("first_seen"), "last_seen": r.get("last_seen"), "platform": r.get("platform"),
+                    "exit_ports": ((r.get("exit_policy_summary") or {}).get("accept") or [])[:12],
+                    "url": "https://metrics.torproject.org/rs.html#details/" + str(r.get("fingerprint") or "")})
+    return out
+
+
+def onionoo(ip, demo=False, now=None, fetch=None):
+    """Είναι αυτή η IP κόμβος Tor; Αν ναι: όνομα, ρόλος (guard/exit), εύρος ζώνης, από πότε τρέχει."""
+    now = now or time.time()
+    try:
+        a = ipaddress.ip_address(ip)
+    except ValueError:
+        return {"ip": ip, "error": "Μη έγκυρη IP"}
+    if not a.is_global:
+        return {"ip": ip, "relays": [], "note": "Ιδιωτική IP — δεν μπορεί να είναι κόμβος Tor."}
+    if demo:
+        rel = [] if not str(ip).startswith(("185.220.", "45.141.", "199.249.")) else [{
+            "nickname": "ForPrivacyNET", "fingerprint": "ABCD1234" * 5, "running": True,
+            "flags": ["Exit", "Fast", "Running", "Stable", "Valid"], "exit": True, "guard": False, "country": "DE",
+            "country_name": "Germany", "as": "AS208294", "as_name": "Foundation for Applied Privacy",
+            "bandwidth": 48_000_000, "first_seen": "2019-03-02 00:00:00", "last_seen": "2026-11-18 00:00:00",
+            "platform": "Tor 0.4.8.13 on Linux", "exit_ports": ["80", "443"], "url": "https://metrics.torproject.org/"}]
+        return {"ip": ip, "relays": rel, "demo": True}
+    c = _ONIONOO_CACHE.get(ip)
+    if c and now - c[0] < 6 * 3600:
+        return c[1]
+    url = "https://onionoo.torproject.org/details?search=" + str(a) + "&fields=" + ONIONOO_FIELDS
+    try:
+        if fetch:
+            j = fetch(url)
+        else:
+            req = urllib.request.Request(url, headers={"User-Agent": "NetWatch"})
+            with urllib.request.urlopen(req, timeout=10) as r:
+                j = json.loads(r.read(4_000_000))
+        res = {"ip": ip, "relays": onionoo_parse(j)}
+    except Exception as e:
+        return {"ip": ip, "error": f"Onionoo: {str(e)[:100]}"}
+    _ONIONOO_CACHE[ip] = (now, res)
+    if len(_ONIONOO_CACHE) > 500:
+        _ONIONOO_CACHE.pop(next(iter(_ONIONOO_CACHE)))
+    return res

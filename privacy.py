@@ -9,8 +9,11 @@ ip-api.com, bash.ws (DNS leak test).
 import json
 import os
 import random
+import re
 import socket
 import ssl
+import subprocess
+import sys
 import threading
 import time
 import urllib.request
@@ -124,6 +127,55 @@ def dns_leak_test(n=6, resolve=None):
              "asn": r.get("asn", ""), "org": r.get("org", "")} for r in rows if r.get("type") == "dns"]
 
 
+def akamai_resolver(resolve=None):
+    """DNS leak test ΧΩΡΙΣ τρίτο site: το whoami.akamai.net απαντά με την IP του resolver που το ρώτησε.
+    Δείχνει ποιος DNS server βγαίνει τελικά στο Internet για σένα (μόνο ο πρώτος — το bash.ws βλέπει όλους)."""
+    resolve = resolve or (lambda name: socket.gethostbyname(name))
+    ip = resolve("whoami.akamai.net")
+    return ip if re.match(r"^\d{1,3}(\.\d{1,3}){3}$", ip or "") else None
+
+
+def _run(cmd, timeout=4):
+    try:
+        return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout).stdout or ""
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
+def parse_inet6(ifconfig_text):
+    """Από το `ifconfig en0`: πόσες global IPv6 έχει η κάρτα και τι είδους (temporary / secured / σταθερή EUI-64)."""
+    out = {"global": 0, "temporary": 0, "secured": 0, "eui64": 0}
+    for line in ifconfig_text.splitlines():
+        m = re.search(r"\binet6 ([0-9a-f:]+)", line.strip(), re.I)
+        if not m or m.group(1).lower().startswith(("fe80", "::1", "fd", "fc")):
+            continue
+        out["global"] += 1
+        if "temporary" in line:
+            out["temporary"] += 1
+        elif "secured" in line:
+            out["secured"] += 1
+        elif "ff:fe" in m.group(1).lower():
+            out["eui64"] += 1
+    return out
+
+
+def ipv6_privacy(iface="en0"):
+    """Προσωρινές IPv6 (RFC 8981): χωρίς αυτές, το τέλος της IPv6 μένει ίδιο σε κάθε δίκτυο και σε «ακολουθεί»."""
+    if sys.platform == "darwin":
+        temp = _run(["sysctl", "-n", "net.inet6.ip6.use_tempaddr"]).strip()
+        d = parse_inet6(_run(["ifconfig", iface]))
+        d["tempaddr"] = temp == "1" if temp else None
+    else:
+        try:
+            temp = open("/proc/sys/net/ipv6/conf/all/use_tempaddr").read().strip()
+        except OSError:
+            temp = ""
+        d = parse_inet6(_run(["ip", "-6", "addr", "show", "dev", iface]))
+        d["tempaddr"] = temp in ("1", "2") if temp else None
+    d["iface"] = iface
+    return d
+
+
 # ---------------- αξιολόγηση ----------------
 def evaluate(d):
     """Ποιο επίπεδο ανωνυμίας έχεις και τι διαρρέει."""
@@ -178,7 +230,26 @@ def evaluate(d):
         else:
             chk("dns", "info" if not (vpn or via_tor) else "ok", "DNS", txt + ".")
     elif d.get("dns_error"):
-        chk("dns", "info", "DNS", "Το τεστ DNS δεν ολοκληρώθηκε: " + d["dns_error"])
+        chk("dns", "info", "DNS", "Το τεστ DNS (bash.ws) δεν ολοκληρώθηκε: " + d["dns_error"])
+
+    ak = d.get("dns_akamai") or {}
+    if ak.get("ip"):
+        org = ak.get("org") or ak.get("isp") or "?"
+        foreign = (vpn or via_tor) and exit_asn and asn(ak) and asn(ak) != exit_asn
+        chk("dns_akamai", "bad" if foreign else "ok" if (vpn or via_tor) else "info", "DNS χωρίς τρίτους (whoami.akamai.net)",
+            f"Ο resolver που βγαίνει στο Internet για σένα: {ak['ip']} ({org}, {ak.get('country', '?')})."
+            + (" Δεν ανήκει στο VPN — DNS leak." if foreign else ""),
+            "Βάλε το VPN να χρησιμοποιεί το δικό του DNS, ή DoH στον browser.")
+
+    p6 = d.get("v6priv") or {}
+    if p6.get("global"):
+        if p6.get("temporary"):
+            chk("v6priv", "ok", "IPv6 privacy", f"Η {p6.get('iface', 'κάρτα')} χρησιμοποιεί προσωρινές IPv6 "
+                f"({p6['temporary']}) για τις εξερχόμενες συνδέσεις — αλλάζουν συχνά, δεν σε «ακολουθούν».")
+        else:
+            chk("v6priv", "warn", "IPv6 privacy", "Δεν βρέθηκε προσωρινή IPv6: το ίδιο αναγνωριστικό συσκευής φαίνεται "
+                "σε κάθε site" + (" και περιέχει τη MAC σου (EUI-64)." if p6.get("eui64") else "."),
+                "macOS: sudo sysctl -w net.inet6.ip6.use_tempaddr=1 · Linux: net.ipv6.conf.all.use_tempaddr=2")
 
     v6 = d.get("ipv6")
     v6i = d.get("info6") or {}
@@ -230,6 +301,19 @@ def full_check(vpn=None):
         d["dns"] = dns_leak_test()
     except Exception as e:
         d["dns"], d["dns_error"] = None, str(e)[:120]
+    try:
+        aip = akamai_resolver()
+        if aip:
+            i = ip_info(aip) or {}
+            d["dns_akamai"] = {"ip": aip, "org": i.get("org") or i.get("isp"), "isp": i.get("isp"),
+                               "country": i.get("country"), "as": i.get("as", "")}
+    except Exception:
+        d["dns_akamai"] = None
+    try:
+        import wifiguard
+        d["v6priv"] = ipv6_privacy(wifiguard.default_iface() or "en0")
+    except Exception:
+        d["v6priv"] = None
     d.update(evaluate(d))
     return d
 
@@ -245,6 +329,8 @@ def demo_check(vpn=True):
          "tor_direct": {"IsTor": False, "IP": "185.65.134.77"}, "tor_browser": True,
          "tor": {"port": 9150, "is_tor": True, "ip": "185.220.101.4",
                  "exit": {"query": "185.220.101.4", "country": "Germany", "city": "Berlin", "isp": "Tor exit"}},
+         "dns_akamai": {"ip": "195.170.0.1", "org": "Ote SA", "isp": "Ote SA", "country": "Greece", "as": "AS6799 Ote SA"},
+         "v6priv": {"iface": "en0", "global": 2, "temporary": 1, "secured": 1, "eui64": 0, "tempaddr": True},
          "dns": [{"ip": "195.170.0.1", "country": "Greece", "cc": "GR", "asn": "AS6799 Ote SA", "org": "Ote SA"},
                  {"ip": "172.68.61.52", "country": "Greece", "cc": "GR", "asn": "AS13335 CloudFlare Inc",
                   "org": "CloudFlare Inc"}]}

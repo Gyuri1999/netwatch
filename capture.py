@@ -35,14 +35,24 @@ def parse_client_hello(b):
         end = min(len(b), i + 2 + int.from_bytes(b[i:i + 2], "big"))
         i += 2
         exts, curves, pfs, sni = [], [], [], None
+        has_sni, alpn, sver, sigs = False, None, [], []
         while i + 4 <= end:
             et, el = int.from_bytes(b[i:i + 2], "big"), int.from_bytes(b[i + 2:i + 4], "big")
             i += 4
             data = b[i:i + el]
             exts.append(et)
+            if et == 0:
+                has_sni = True
             if et == 0 and len(data) >= 5:
                 nl = int.from_bytes(data[3:5], "big")
                 sni = data[5:5 + nl].decode("ascii", "ignore") or None
+            elif et == 16 and len(data) >= 3 and alpn is None:
+                alpn = bytes(data[3:3 + data[2]])
+            elif et == 43 and len(data) >= 1:
+                sver = [int.from_bytes(data[k:k + 2], "big") for k in range(1, min(len(data), 1 + data[0]) - 1, 2)]
+            elif et == 13 and len(data) >= 2:
+                ll = int.from_bytes(data[0:2], "big")
+                sigs = [int.from_bytes(data[k:k + 2], "big") for k in range(2, min(len(data), 2 + ll) - 1, 2)]
             elif et == 10 and len(data) >= 2:
                 ll = int.from_bytes(data[0:2], "big")
                 curves = [int.from_bytes(data[k:k + 2], "big") for k in range(2, min(len(data), 2 + ll) - 1, 2)]
@@ -53,7 +63,43 @@ def parse_client_hello(b):
         return None
     g = lambda xs: "-".join(str(x) for x in xs if x not in GREASE)  # noqa: E731
     ja3_str = f"{ver},{g(ciphers)},{g(exts)},{g(curves)},{'-'.join(map(str, pfs))}"
-    return {"sni": sni, "ja3": hashlib.md5(ja3_str.encode()).hexdigest() if complete else None, "ja3_str": ja3_str}
+    return {"sni": sni, "ja3": hashlib.md5(ja3_str.encode()).hexdigest() if complete else None, "ja3_str": ja3_str,
+            "ja4": ja4(ver, ciphers, exts, has_sni, alpn, sver, sigs) if complete else None}
+
+
+JA4_VER = {0x0304: "13", 0x0303: "12", 0x0302: "11", 0x0301: "10", 0x0300: "s3", 0x0002: "s2",
+           0xfeff: "d1", 0xfefd: "d2", 0xfefc: "d3"}
+
+
+def ja4(ver, ciphers, exts, has_sni, alpn, sver, sigs, proto="t"):
+    """JA4 (FoxIO, https://github.com/FoxIO-LLC/ja4): «t13d1516h2_<ciphers>_<extensions>».
+
+    a: πρωτόκολλο + έκδοση TLS (η μεγαλύτερη μη‑GREASE του supported_versions, αλλιώς η legacy) + d/i (υπάρχει SNI ή όχι)
+       + πλήθος ciphers και extensions (2 ψηφία, χωρίς GREASE, max 99) + 1ος/τελευταίος χαρακτήρας του 1ου ALPN («00» αν λείπει).
+    b: sha256[:12] των ciphers ταξινομημένων (4 hex πεζά, με κόμματα)· «000000000000» αν δεν υπάρχουν.
+    c: sha256[:12] των extensions ταξινομημένων χωρίς SNI/ALPN + «_» + signature algorithms με τη σειρά τους
+       (χωρίς «_» αν δεν υπάρχουν)· «000000000000» αν δεν μένει καμία extension.
+    """
+    cs = [c for c in ciphers if c not in GREASE]
+    es = [e for e in exts if e not in GREASE]
+    vs = [v for v in (sver or []) if v not in GREASE]
+    v = JA4_VER.get(max(vs) if vs else ver, "00")
+    if alpn:
+        f, l_ = alpn[:1], alpn[-1:]
+        if f.isalnum() and l_.isalnum() and f.isascii() and l_.isascii():
+            al = (f + l_).decode()
+        else:  # μη αλφαριθμητικό: 1ος και τελευταίος χαρακτήρας της δεκαεξαδικής μορφής
+            hx = alpn.hex()
+            al = hx[0] + hx[-1]
+    else:
+        al = "00"
+    a = f"{proto}{v}{'d' if has_sni else 'i'}{min(len(cs), 99):02d}{min(len(es), 99):02d}{al}"
+    h = lambda s: hashlib.sha256(s.encode()).hexdigest()[:12]  # noqa: E731
+    b = h(",".join(sorted(f"{c:04x}" for c in cs))) if cs else "000000000000"
+    ce = sorted(f"{e:04x}" for e in es if e not in (0x0000, 0x0010))
+    sg = ",".join(f"{x:04x}" for x in sigs if x not in GREASE)
+    c = h(",".join(ce) + ("_" + sg if sg else "")) if ce else "000000000000"
+    return f"{a}_{b}_{c}"
 
 
 def parse_sni(b):
@@ -217,7 +263,7 @@ def make_parser():
                 if pl[0] == 0x16:
                     ch = parse_client_hello(pl)
                     if ch:
-                        P["sni"], P["ja3"] = ch["sni"], ch["ja3"]
+                        P["sni"], P["ja3"], P["ja4"] = ch["sni"], ch["ja3"], ch["ja4"]
                 elif pl[:4] in (b"GET ", b"POST", b"HEAD", b"PUT "):
                     m = HTTP_HOST.search(pl[:2048])
                     if m:
@@ -265,6 +311,12 @@ def live_capture(state, iface, bpf):
     def cb(pkt):
         if state.feed != "live":
             return
+        ring = getattr(state, "pcap_ring", None)
+        if ring:  # «καταγραφή γύρω από την ειδοποίηση»: τα τελευταία λεπτά σε μνήμη, για .pcap ανά ειδοποίηση
+            try:
+                ring.add(float(pkt.time), bytes(pkt))
+            except Exception:
+                pass
         try:
             P = parse(pkt)
             if P:

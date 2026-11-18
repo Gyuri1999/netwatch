@@ -224,11 +224,19 @@ class Notifier:
                 fn(title, body, a["sev"])
             except Exception as e:
                 log(f"{name} error:", e)
+        if not mac_only:
+            import ops
+            for name, fn in ops.CHANNELS.items():
+                try:
+                    fn(self.cfg.get(name), title, body, a["sev"], a)
+                except Exception as e:
+                    log(f"{name} error:", str(e)[:200])
 
     def channels(self):
         tg, nt = self.cfg.get("telegram") or {}, self.cfg.get("ntfy") or {}
         return {"macos": bool(self.cfg.get("macos")) and sys.platform == "darwin",
-                "telegram": bool(tg.get("bot_token") and tg.get("chat_id")), "ntfy": bool(nt.get("topic"))}
+                "telegram": bool(tg.get("bot_token") and tg.get("chat_id")), "ntfy": bool(nt.get("topic")),
+                **__import__("ops").configured(self.cfg)}
 
     def _telegram(self, title, body, sev):
         tg = self.cfg.get("telegram") or {}
@@ -260,7 +268,10 @@ class Notifier:
         if self.channels()["macos"]:
             self._send({"type": "δοκιμή", "sev": "low", "actor": "NetWatch", "target": "εσύ", "detail": body, "_mac_only": True})
             out["macos"] = "ok"
-        for name, fn in (("telegram", self._telegram), ("ntfy", self._ntfy)):
+        import ops
+        chans = [("telegram", self._telegram), ("ntfy", self._ntfy)] + \
+            [(n, (lambda f, n: lambda t, b, s: f(self.cfg.get(n), t, b, s, {"type": "test", "sev": s}))(f, n)) for n, f in ops.CHANNELS.items()]
+        for name, fn in chans:
             try:
                 out[name] = "ok" if fn(title, body, "med") else "δεν έχει ρυθμιστεί"
             except Exception as e:

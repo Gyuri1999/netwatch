@@ -66,6 +66,11 @@ def main():
 
     shutil.copy2(os.path.join(ROOT, "edu.js"), out)
     shutil.copy2(os.path.join(ROOT, "wireshark.js"), out)
+    shutil.copy2(os.path.join(ROOT, "infra.js"), out)
+    shutil.copy2(os.path.join(ROOT, "sectools.js"), out)
+    shutil.copy2(os.path.join(ROOT, "privtools.js"), out)
+    shutil.copy2(os.path.join(ROOT, "protocols.js"), out)
+    shutil.copy2(os.path.join(ROOT, "ciscolab.js"), out)
     # Ακαδημία: scripts + εικονίδια του PWA (ό,τι δεν είναι .md).
     for fp in glob.glob(os.path.join(ROOT, "academy", "*")):
         if os.path.isfile(fp) and not fp.endswith(".md"):

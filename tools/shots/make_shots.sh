@@ -51,6 +51,14 @@ shot tools        "$U&mode=learn&tab=pentest" --js "ptSub='tools';PTIN.subnet_in
 shot palette      "$U&mode=tech&tab=home" --js "cmdkOpen();\$('cmdk-in').value='dns';\$('cmdk-in').oninput()"
 shot stats        "$U&mode=tech&tab=stats"
 shot academy      "http://localhost:$PORT/academy.html?lang=en" --js "ACADEMY.openLesson('iot','iot-4-2')" --after 3
+shot latency      "$U&mode=tech&tab=lat" --after 3
+shot ipam         "$U&mode=tech&tab=ipam"
+shot topology     "$U&mode=tech&tab=snmp"
+shot light        "$U&mode=tech&tab=home&theme=light"
+shot tor          "$U&mode=tech&tab=tor" --after 3
+shot cameras      "$U&mode=tech&tab=cams" --after 2
+shot trackers     "$U&mode=tech&tab=home" --js "setTimeout(()=>showTab('trk'),13000)" --after 16
+shot fingerprint  "$U&mode=tech&tab=priv" --js "document.querySelector('#fp-run')&&document.querySelector('#fp-run').click();setTimeout(()=>{const e=[...document.querySelectorAll('#t-priv h3')].find(x=>x.textContent.includes('Δακτυλικό'));e&&e.scrollIntoView()},1200)" --after 3
 
 echo "▸ GIF (ζωντανός χάρτης)"
 rm -f "$TMP"/gif-*.png

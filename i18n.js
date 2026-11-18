@@ -33,7 +33,8 @@
     if (!GREEK.test(s)) return s;
     const k = norm(s);
     let out = exact.get(k);
-    if (out == null) for (const [re, to] of pats) { if (re.test(k)) { out = k.replace(re, to); break; } }
+    // pattern: και τα κομμάτια που «πιάνει» ($1, $2…) μεταφράζονται αν είναι ελληνικά (π.χ. ονόματα από το demo, λέξεις όπως «ανοιχτό»)
+    if (out == null) for (const [re, to] of pats) { const m = k.match(re); if (m) { out = k.replace(re, () => to.replace(/\$(\d)/g, (_, i) => { const g = m[+i]; return g == null ? '' : GREEK.test(g) && g !== k ? I.t(g) : g; })); break; } }
     if (out == null) {
       // «Κείμενο: τιμή» / «τιμή — κείμενο»: δοκίμασε κομμάτια χωρισμένα με σημεία στίξης
       const parts = k.split(/(\s[—–·|]\s|:\s|\s\(|\)\s?)/);

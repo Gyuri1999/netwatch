@@ -57,12 +57,109 @@ def make_handler(state):
                 return self._json({"error": "forbidden"}, 403)
             if getattr(state, "agent", None) and u.path in __import__("agent").DENY:
                 return self._json({"error": "Απενεργοποιημένο σε λειτουργία agent (θα έτρεχε στον server)."}, 403)
+            if u.path == "/api/logimport/upload":  # ακατέργαστο σώμα (eve.json / Zeek), έως 20 MB
+                li = getattr(state, "logimport", None)
+                if not li:
+                    return self._json({"error": "off"}, 400)
+                n = int(self.headers.get("Content-Length") or 0)
+                if n > 20 * 1024 * 1024:
+                    return self._json({"error": "Πολύ μεγάλο αρχείο (όριο 20 MB)."}, 413)
+                raw = self.rfile.read(n)
+                try:
+                    return self._json(li.import_text(raw, kind=parse_qs(u.query).get("kind", ["auto"])[0]))
+                except ValueError as e:
+                    return self._json({"error": str(e)}, 400)
             try:
                 n = min(int(self.headers.get("Content-Length") or 0), 10000)
                 body = json.loads(self.rfile.read(n) or b"{}")
             except (ValueError, json.JSONDecodeError):
                 return self._json({"error": "bad json"}, 400)
             try:
+                if u.path == "/api/ipam/note":
+                    ip_ = getattr(state, "ipam", None)
+                    if not ip_:
+                        return self._json({"error": "off"}, 400)
+                    try:
+                        ip_.notes.set(str(body.get("key") or ""), body.get("fields") or {})
+                    except ValueError as e:
+                        return self._json({"error": str(e)}, 400)
+                    return self._json({"ok": True})
+                if u.path in ("/api/speed/iperf", "/api/speed/internet"):
+                    sp = getattr(state, "speed", None)
+                    if not sp:
+                        return self._json({"error": "off"}, 400)
+                    try:
+                        if u.path.endswith("iperf"):
+                            r = sp.iperf(str(body.get("host") or ""), reverse=bool(body.get("reverse")), udp=bool(body.get("udp")))
+                        else:
+                            r = sp.internet()
+                    except Exception as e:
+                        return self._json({"error": str(e)[:300]}, 400)
+                    return self._json(r if isinstance(r, dict) else {"result": r})
+                if u.path == "/api/wifisurvey/scan":
+                    ws = getattr(state, "wifisurvey", None)
+                    if not ws:
+                        return self._json({"error": "off"}, 400)
+                    ws.scan()
+                    return self._json(ws.status())
+                if u.path == "/api/snmp/poll":
+                    sn = getattr(state, "snmp", None)
+                    if not sn:
+                        return self._json({"error": "off"}, 400)
+                    threading.Thread(target=sn.round, daemon=True).start()
+                    return self._json({"ok": True})
+                if u.path == "/api/tor/newnym":
+                    tr = getattr(state, "tor", None)
+                    return self._json(tr.newnym() if tr else {"error": "off"})
+                if u.path == "/api/vpnguard/arm":
+                    vg = getattr(state, "vpnguard", None)
+                    if not vg:
+                        return self._json({"error": "off"}, 400)
+                    try:
+                        return self._json(vg.arm(int(body.get("seconds") or 60)))
+                    except Exception as e:
+                        return self._json({"error": str(e)[:200]}, 400)
+                if u.path == "/api/camexp/scan":
+                    ce = getattr(state, "camexp", None)
+                    if not ce:
+                        return self._json({"error": "off"}, 400)
+                    threading.Thread(target=ce.scan, daemon=True).start()
+                    return self._json({"ok": True, "scanning": True})
+                if u.path in ("/api/iotfw/mode", "/api/iotfw/accept", "/api/iotfw/reset"):
+                    fw = getattr(state, "iotfw", None)
+                    if not fw:
+                        return self._json({"error": "off"}, 400)
+                    dev = str(body.get("dev") or "")
+                    try:
+                        if u.path.endswith("/mode"):
+                            return self._json(fw.set_mode(dev, str(body.get("mode") or "")))
+                        if u.path.endswith("/accept"):
+                            return self._json(fw.accept(dev, str(body.get("dest") or "")))
+                        return self._json(fw.reset(dev))
+                    except KeyError as e:
+                        return self._json({"error": str(e.args[0] if e.args else e)}, 404)
+                if u.path == "/api/ctwatch/check":
+                    cw = getattr(state, "ctwatch", None)
+                    if not cw:
+                        return self._json({"error": "off"}, 400)
+                    threading.Thread(target=lambda: cw.round(force=True), daemon=True).start()
+                    return self._json({"ok": True})
+                if u.path == "/api/dnsfilter/poll":
+                    df = getattr(state, "dnsfilter", None)
+                    if not df:
+                        return self._json({"error": "off"}, 400)
+                    threading.Thread(target=df.fetch, daemon=True).start()
+                    return self._json({"ok": True})
+                if u.path in ("/api/maint/mute", "/api/maint/unmute"):
+                    mt = getattr(state, "maint", None)
+                    if not mt:
+                        return self._json({"error": "δεν υπάρχει σε αυτή τη λειτουργία"}, 400)
+                    if u.path.endswith("/unmute"):
+                        mt.unmute(int(body["id"]) if str(body.get("id", "")).isdigit() else None)
+                    else:
+                        hosts = [h for h in (body.get("hosts") or []) if isinstance(h, str)]
+                        mt.mute(int(body.get("minutes") or 30), body.get("name"), hosts)
+                    return self._json(mt.status())
                 if u.path == "/api/scan":
                     target = str(body.get("target") or state.default_scan_target())
                     with state.lock:
@@ -194,9 +291,147 @@ def make_handler(state):
                 return self._json({"error": str(e)[:200]}, 502)
             return self._json({"error": "not found"}, 404)
 
+        def _infra_get(self, u):
+            """Υποδομή: NetFlow/sFlow, SNMP, syslog, IPAM, latency, ταχύτητα, Wi‑Fi survey, pcap ανά ειδοποίηση."""
+            q = {k: v[0] for k, v in parse_qs(u.query).items()}
+            off = {"enabled": False, "off": True}
+            p = u.path
+            if p == "/api/infra":  # τι είναι διαθέσιμο (για τις καρτέλες του UI)
+                return self._json({k: bool(getattr(state, k, None)) for k in
+                                   ("flows", "snmp", "syslog", "ipam", "latency", "speed", "wifisurvey", "pcap_ring", "maint",
+                                    "tor", "wg", "vpnguard", "encdns", "dnsfilter", "logimport", "ctwatch", "camexp", "iotfw")})
+            if p == "/api/flows":
+                f = getattr(state, "flows", None)
+                return self._json(f.status() if f else off)
+            if p == "/api/flows/device":
+                f = getattr(state, "flows", None)
+                return self._json(f.device(q.get("ip", "")) if f else off)
+            if p == "/api/snmp":
+                sn = getattr(state, "snmp", None)
+                return self._json(sn.status() if sn else off)
+            if p == "/api/snmp/iface":
+                sn = getattr(state, "snmp", None)
+                try:
+                    return self._json(sn.iface_history(q.get("target", ""), int(q.get("ifindex", 0))) if sn else off)
+                except ValueError:
+                    return self._json({"error": "bad ifindex"}, 400)
+            if p == "/api/syslog":
+                sy = getattr(state, "syslog", None)
+                if not sy:
+                    return self._json(off)
+                st = sy.status(recent=0)
+                try:
+                    sev = int(q["sev"]) if q.get("sev", "").isdigit() else None
+                    since = float(q["since"]) if q.get("since") else None
+                    st["results"] = sy.query(q.get("q") or None, q.get("host") or None, sev, since, min(int(q.get("limit") or 300), 2000))
+                except ValueError as e:
+                    st["results"], st["query_error"] = [], str(e)[:200]
+                return self._json(st)
+            if p in ("/api/ipam", "/api/ipam/export"):
+                ip_ = getattr(state, "ipam", None)
+                if not ip_:
+                    return self._json(off)
+                with state.lock:
+                    hosts = [{"ip": h["ip"], "mac": h.get("mac"), "names": sorted(h.get("names") or ())[:5], "vendor": h.get("vendor"),
+                              "dlabel": h.get("dlabel") or h.get("dtype"), "first": h.get("first"), "last": h.get("last")}
+                             for h in state.hosts.values() if h.get("kind") == "local" and ":" not in h["ip"]]
+                    obs = [(ip, mac, t) for ip, d in getattr(state, "ip_mac_seen", {}).items() for mac, t in d.items()]
+                    me = sorted(state.me)[0] if state.me else None
+                local_net = (me.rsplit(".", 1)[0] + ".0/24") if me and ":" not in me else None
+                if p.endswith("/export"):
+                    fmt = "json" if q.get("fmt") == "json" else "csv"
+                    body = ip_.export(hosts, fmt=fmt)
+                    body = body if isinstance(body, (bytes, bytearray)) else (body if isinstance(body, str) else json.dumps(body, ensure_ascii=False)).encode()
+                    self.send_response(200)
+                    self.send_header("Content-Type", "application/json" if fmt == "json" else "text/csv; charset=utf-8")
+                    self.send_header("Content-Disposition", f'attachment; filename="netwatch-inventory.{fmt}"')
+                    self.send_header("Content-Length", str(len(body)))
+                    self.end_headers()
+                    self.wfile.write(body)
+                    return
+                rep = ip_.report(hosts, obs, time.time(), local_net)
+                try:
+                    import ipam
+                    ipam.conflicts_to_alerts(state, rep.get("findings") or [])
+                except Exception as e:
+                    log("ipam:", e)
+                return self._json(rep)
+            if p == "/api/latency":
+                la = getattr(state, "latency", None)
+                if not la:
+                    return self._json(off)
+                st = la.status()
+                if q.get("target"):
+                    try:
+                        st["history"] = la.history(q["target"], hours=min(float(q.get("hours") or 24), 24 * 30))
+                        st["bad_hours"] = la.bad_hours(q["target"])
+                    except ValueError:
+                        return self._json({"error": "bad hours"}, 400)
+                return self._json(st)
+            if p == "/api/speed":
+                sp = getattr(state, "speed", None)
+                return self._json(sp.status() if sp else off)
+            if p == "/api/wifisurvey":
+                ws = getattr(state, "wifisurvey", None)
+                if not ws:
+                    return self._json(off)
+                st = ws.status()
+                if not st or not st.get("t"):
+                    try:
+                        ws.scan()
+                        st = ws.status()
+                    except Exception as e:
+                        st = {"error": str(e)[:200]}
+                return self._json(st)
+            if p == "/api/pcap":
+                r = getattr(state, "pcap_ring", None)
+                return self._json(r.stats() if r else off)
+            if p == "/api/pcap/alert":
+                r = getattr(state, "pcap_ring", None)
+                if not r:
+                    return self._json({"error": "ο δακτύλιος pcap είναι κλειστός (pcap_ring.enabled: false)"}, 400)
+                try:
+                    aid = int(q.get("id", ""))
+                except ValueError:
+                    return self._json({"error": "bad id"}, 400)
+                with state.lock:
+                    a = next((x for x in state.alerts if x.get("id") == aid), None)
+                if not a:
+                    return self._json({"error": "δεν βρέθηκε η ειδοποίηση"}, 404)
+                res = r.export_for_alert(a)
+                data = res["pcap"]
+                fn = re.sub(r"[^\w.-]", "_", res.get("filename") or "netwatch.pcap")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/vnd.tcpdump.pcap")
+                self.send_header("Content-Disposition", f'attachment; filename="{fn}"')
+                self.send_header("X-Packets", str(res.get("count", 0)))
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                self.wfile.write(data)
+                return
+            simple = {"/api/tor": "tor", "/api/vpn": "wg", "/api/vpnguard": "vpnguard", "/api/encdns": "encdns",
+                      "/api/dnsfilter": "dnsfilter", "/api/logimport": "logimport", "/api/ctwatch": "ctwatch",
+                      "/api/camexp": "camexp", "/api/iotfw": "iotfw"}
+            if p == "/api/iotfw/rules":
+                fw = getattr(state, "iotfw", None)
+                if not fw:
+                    return self._json(off)
+                try:
+                    return self._json(fw.rules(q.get("dev", ""), q.get("fmt", "openwrt"), lan=q.get("lan") in ("1", "true")))
+                except KeyError as e:
+                    return self._json({"error": str(e.args[0] if e.args else e)}, 404)
+                except ValueError as e:
+                    return self._json({"error": str(e)}, 400)
+            if p in simple:
+                m = getattr(state, simple[p], None)
+                return self._json(m.status() if m else off)
+            return self._json({"error": "not found"}, 404)
+
         def do_GET(self):
             u = urlparse(self.path)
-            if getattr(state, "agent", None) and not self._agent_ok():
+            if getattr(state, "agent", None) and not self._agent_ok() and \
+                    __import__("ops").token_role(self.headers, parse_qs(u.query).get("token", [""])[0],
+                                                 (state.cfg or {}).get("api_tokens")) is None:
                 import hmac
                 import agent
                 tok = parse_qs(u.query).get("token", [""])[0]
@@ -210,10 +445,20 @@ def make_handler(state):
                 if u.path == "/":
                     return self._send(401, agent.LOGIN_PAGE.encode(), "text/html; charset=utf-8")
                 return self._json({"error": "unauthorized"}, 401)
+            if u.path == "/metrics":  # Prometheus / Grafana
+                import ops
+                return self._send(200, ops.metrics(state).encode(), "text/plain; version=0.0.4; charset=utf-8")
+            if u.path == "/api/maint":
+                mt = getattr(state, "maint", None)
+                return self._json(mt.status() if mt else {"active": None, "mutes": [], "windows": [], "errors": []})
+            if u.path.startswith(("/api/flows", "/api/snmp", "/api/syslog", "/api/ipam", "/api/latency", "/api/speed",
+                                  "/api/wifisurvey", "/api/pcap", "/api/infra", "/api/tor", "/api/vpn", "/api/encdns",
+                                  "/api/dnsfilter", "/api/logimport", "/api/ctwatch", "/api/camexp", "/api/iotfw")):
+                return self._infra_get(u)
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -244,6 +489,10 @@ def make_handler(state):
             if re.fullmatch(r"/academy/icon(-\d+)?\.(png|svg)", u.path) and os.path.isfile(os.path.join(HERE, "academy", os.path.basename(u.path))):
                 with open(os.path.join(HERE, "academy", os.path.basename(u.path)), "rb") as f:
                     return self._send(200, f.read(), "image/svg+xml" if u.path.endswith(".svg") else "image/png")
+            if u.path == "/api/onionoo":
+                from osint import onionoo
+                ip = parse_qs(u.query).get("ip", [""])[0]
+                return self._send(200, json.dumps(onionoo(ip, demo=state.mode == "demo")).encode(), "application/json")
             if u.path == "/api/whois":
                 ip = parse_qs(u.query).get("ip", [""])[0]
                 return self._send(200, json.dumps({"ip": ip, "text": whois(ip)}).encode(), "application/json")

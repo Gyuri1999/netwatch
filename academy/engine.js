@@ -399,6 +399,7 @@
         s.done = true;
         if (P.streak.last !== today()) { P.streak.n = streakN() + 1; P.streak.last = today(); P.streak.best = Math.max(P.streak.best || 0, P.streak.n); }
         save();
+        if (window.confetti) setTimeout(window.confetti, 200);
       }
       W.body.innerHTML = `<h2 class="ac-title">⏱ Το 10λεπτο της ημέρας</h2>
         <div class="sm" style="margin-bottom:10px">Λίγο κάθε μέρα νικάει το «πολύ» μία φορά την εβδομάδα. 🔥 Σερί: <b>${days(streakN())}</b>${P.streak.best ? ' · ρεκόρ ' + days(P.streak.best) : ''}</div>` +
@@ -536,6 +537,7 @@
       qs.forEach((q, k) => { const good = ans[k] === q.ok; ok += good; if (q.d) { per[q.d] = per[q.d] || [0, 0]; per[q.d][1]++; per[q.d][0] += good; } });
       const score = Math.round(100 * ok / qs.length), used = Math.round((minutes * 6e4 - Math.max(0, end - Date.now())) / 6e4);
       P.exams.push({ track: t.id, t: Date.now(), n: qs.length, score, per }); save();
+      if (score >= 85 && window.confetti) window.confetti();
       const col = score >= 85 ? '#3ddc97' : score >= 70 ? '#ffd23f' : '#ff3b5c';
       const weak = Object.entries(per).sort((a, b) => a[1][0] / a[1][1] - b[1][0] / b[1][1] || WEIGHTS[b[0]] - WEIGHTS[a[0]])[0];  // ισοπαλία → ο τομέας με το μεγαλύτερο βάρος
       W.body.innerHTML = `<div style="text-align:center;margin:10px 0 16px"><div style="font-size:44px;font-weight:800;color:${col}">${score}%</div><div class="sm">${ok}/${qs.length} σωστές · ${used}′ από ${minutes}′</div>

@@ -67,6 +67,10 @@ notify:                         # live mode (or --notify)
     topic: ""                   # a LONG RANDOM name: on public ntfy.sh anyone who knows it can read your alerts
     # server: https://ntfy.sh   # or your own ntfy server (e.g. an LXC on Proxmox)
     # token: ""                 # access token if your server requires one
+  # discord: {webhook: "https://discord.com/api/webhooks/…"}
+  # slack:   {webhook: "https://hooks.slack.com/services/…"}
+  # webhook: {url: "http://192.168.1.30:8123/api/webhook/netwatch", headers: {X-Token: "…"}}   # JSON POST, http(s) only
+  # email:   {host: smtp.gmail.com, port: 587, user: "…", password: "app-password", to: ["you@example.com"]}  # STARTTLS
 
 history:
   path: data/netwatch.db        # SQLite — alerts, traffic per minute, known devices
@@ -124,3 +128,138 @@ academy_terminal: true
 #   - {name: MQTT broker, host: 192.168.1.17, port: 1883}
 #   - {name: Home Assistant, url: "http://192.168.1.30:8123/"}
 #   - {name: ESP32 garden, host: 192.168.1.20, ping: true}
+
+# ───────────── 🏗 Infrastructure (professional NMS features) ─────────────
+
+# 🔕 Maintenance windows: alerts still show on screen but are NOT sent to your phone and playbooks don't run.
+# You can also mute for 30′/1h/4h from the 🛠 Ops tab.
+# maintenance:
+#   - {name: "NAS backup", days: [mon, tue, wed, thu, fri, sat, sun], start: "02:00", end: "04:00"}
+#   - {name: "Router upgrade", start: "2026-12-01 22:00", end: "2026-12-01 23:30", hosts: ["192.168.1.1"]}
+
+# 🔑 Read-only tokens (role viewer) for a wall display / Prometheus when NetWatch runs as an agent.
+# Use LONG random strings (min 16 chars): python3 -c "import secrets; print(secrets.token_urlsafe(24))"
+# api_tokens:
+#   - {name: "Living room screen", token: "change-me-long-random", role: viewer}
+# Prometheus: scrape http://<netwatch>:8765/metrics (add ?token=… or an Authorization: Bearer header in agent mode).
+
+# 🌊 NetFlow v5/v9 / IPFIX / sFlow collector: point your router / switch / softflowd at this machine.
+# flows:
+#   enabled: true
+#   netflow_port: 2055      # NetFlow / IPFIX (UDP)
+#   sflow_port: 6343        # sFlow (UDP)
+#   allow: [192.168.1.1]    # accept flows only from these exporters
+#   window_min: 30
+
+# 📶 SNMP polling (v2c, read-only community): interfaces, traffic, errors, LLDP/CDP neighbours → topology.
+# snmp:
+#   enabled: true
+#   interval: 60
+#   targets:
+#     - {name: Router, host: 192.168.1.1, community: public}
+#     - {name: Switch, host: 192.168.1.2, community: public}
+
+# 📜 Syslog server (RFC 3164/5424, UDP+TCP). Port 514 needs root, so the default is 5514 — forward to it.
+# syslog:
+#   enabled: true
+#   port: 5514
+#   allow: [192.168.1.0/24]
+#   keep: 5000
+#   rules:                  # extra alerts: regex on the message
+#     - {name: "Backup failed", match: "backup failed", sev: med}     # "re:…" for a regex
+
+# 🗂 IPAM (like NetBox / phpIPAM): subnets, DHCP pools, reservations, conflicts.
+# ipam:
+#   subnets:
+#     - {cidr: 192.168.1.0/24, name: LAN, vlan: 1, gateway: 192.168.1.1, dhcp: "192.168.1.100-192.168.1.199"}
+#   reserved:
+#     - {ip: 192.168.1.17, name: MQTT broker}
+#   # leases_file: /var/lib/misc/dnsmasq.leases   # if NetWatch runs on the DHCP server
+#   stale_days: 7
+
+# ⏱ Latency (SmokePing-style): ping every minute, median / jitter / loss, worst hours.
+# The router and two public DNS servers are added automatically.
+# latency:
+#   interval: 60
+#   targets:
+#     - {name: Proxmox, host: 192.168.1.16}
+
+# 🚀 Speed: iperf3 to a host on your LAN (run `iperf3 -s` there) and an optional internet test (Cloudflare).
+# speed:
+#   iperf_port: 5201
+#   seconds: 5
+#   interval: 0             # minutes between automatic internet tests (0 = only when you press the button)
+
+# 📡 Wi‑Fi survey (channels, overlap, open networks nearby).
+# wifisurvey:
+#   interval: 600
+#   avoid_dfs: true
+
+# 📦 PCAP ring: the last N seconds of packets in memory; every alert gets a ⬇ .pcap button (60″ before → 30″ after).
+# pcap_ring:
+#   enabled: true
+#   seconds: 300
+#   max_mb: 64
+
+# ───────────── 🔒 Security & privacy ─────────────
+
+# 🧅 Tor: reads the control port (localhost only, read-only) to show the 3-hop circuit live.
+# Enable in torrc: ControlPort 9051 + CookieAuthentication 1  (Tor Browser already listens on 9151).
+# tor:
+#   enabled: true
+#   control_port: 9051      # omit to try 9051 then 9151
+#   # cookie_file: ~/.tor/control_auth_cookie
+
+# 🔒 VPN kill-switch & split-tunnel (macOS/Linux, read-only). On by default in live mode.
+# vpnguard:
+#   enabled: true
+#   window: 30              # seconds to watch for leaks after the VPN drops
+
+# 🔗 WireGuard / Tailscale status (needs `wg show` — root — and/or `tailscale`).
+# wireguard:
+#   enabled: true
+#   stale_min: 5            # a peer with no handshake for this long counts as lost
+#   names: {}               # {pubkey-prefix: "Phone"}
+
+# 🔐 Which devices bypass your DNS (DoH/DoT/DoQ). Pass your router / Pi-hole as local_dns.
+# encrypted_dns:
+#   enabled: true
+#   local_dns: [192.168.1.1]
+#   allow: []               # device IPs to ignore
+
+# 🔐 Pi-hole or AdGuard Home stats (read-only API).
+# dns_filter:
+#   type: pihole            # pihole | adguard
+#   url: "http://192.168.1.2"
+#   password: ""            # Pi-hole v6 app password / admin password (never logged)
+#   # user: admin           # AdGuard basic-auth user
+
+# 📥 Import Suricata (eve.json) and Zeek logs into NetWatch's alert list.
+# log_import:
+#   enabled: true
+#   files:
+#     - {path: /var/log/suricata/eve.json, type: eve, follow: true}
+#     - {path: /opt/zeek/logs/current/notice.log, type: zeek, follow: true}
+
+# 🔏 Certificate Transparency: alert on a new certificate for YOUR domains (crt.sh).
+# ct_watch:
+#   domains: ["your-site.gr"]
+#   interval_h: 6
+#   expect_issuers: ["Let's Encrypt"]
+
+# 🧱 Μικρο-τμηματοποίηση IoT: μαθαίνει με ποιους μιλά κανονικά κάθε συσκευή του LAN, βγάζει έτοιμους κανόνες
+# firewall (OpenWrt / pfSense / MikroTik / iptables) για να επιτρέπεις ΜΟΝΟ αυτά, και ειδοποιεί όταν μια συσκευή
+# σε «παρακολούθηση» μιλήσει με κάτι καινούριο. Παθητικό: δεν αλλάζει ποτέ τον router. Προφίλ: data/iotfw.json.
+# iot_firewall:
+#   enabled: true
+#   learn_hours: 24         # πόσες ώρες «μαθαίνει» κάθε νέα συσκευή
+#   alert_severity: med     # βασική σοβαρότητα παράβασης: low | med | high (ανεβαίνει για threat intel / νέα χώρα / ασυνήθιστη θύρα)
+#   max_destinations: 200   # όριο προορισμών ανά συσκευή (φραγμένη μνήμη)
+#   auto_watch: true        # μετά τη μάθηση οι IoT συσκευές (κάμερες, ESP32, πρίζες, TV…) περνούν αυτόματα σε «παρακολούθηση»
+#   ignore: []              # IP ή MAC συσκευών που αγνοούμε
+
+# 📹 Camera exposure check (DEFENSIVE — your own LAN only, private ranges, read-only, never tries passwords).
+# camera_scan:
+#   enabled: true
+#   # subnet: 192.168.1.0/24   # default: auto from your LAN
+#   interval_h: 0              # 0 = only when you press the button

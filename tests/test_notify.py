@@ -21,10 +21,12 @@ def test_ntfy_json_publish_and_test_report():
     srv = HTTPServer(("127.0.0.1", 0), H)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
     n = Notifier({"macos": False, "ntfy": {"topic": "nw-test-123", "server": f"http://127.0.0.1:{srv.server_port}", "token": "tk"}})
-    assert n.channels() == {"macos": False, "telegram": False, "ntfy": True}
+    assert n.channels() == {"macos": False, "telegram": False, "ntfy": True,
+                            "discord": False, "slack": False, "webhook": False, "email": False}
     r = n.test()
     srv.shutdown()
-    assert r == {"telegram": "δεν έχει ρυθμιστεί", "ntfy": "ok"}
+    off = "δεν έχει ρυθμιστεί"
+    assert r == {"telegram": off, "ntfy": "ok", "discord": off, "slack": off, "webhook": off, "email": off}
     auth, msg = got[0]
     assert auth == "Bearer tk" and msg["topic"] == "nw-test-123" and msg["title"] == "NetWatch — δοκιμή" and msg["priority"] == 4
 

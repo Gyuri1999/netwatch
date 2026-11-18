@@ -203,6 +203,74 @@ def main():
     state.health = health.Health(state, hcfg, auto if mode == "live" else [], sim=mode == "demo") if mode != "pcap" else None
     if state.health:
         threading.Thread(target=state.health.run_forever, daemon=True).start()
+    # ---- υποδομή (όπως στα επαγγελματικά NMS): NetFlow/sFlow, SNMP, syslog, IPAM, latency, ταχύτητα, Wi‑Fi, pcap ----
+    DATA = os.path.join(HERE, "data")
+    demo, live = mode == "demo", mode == "live"
+
+    def bg(obj):
+        if obj is not None and hasattr(obj, "run_forever"):
+            threading.Thread(target=obj.run_forever, daemon=True).start()
+        return obj
+    import flows
+    import snmp
+    import syslogd
+    import ipam
+    import latency
+    import speed
+    import wifisurvey
+    import pcapring
+    if mode != "pcap":
+        state.flows = bg(flows.Flows(state, cfg.get("flows"), sim=demo))
+        state.snmp = bg(snmp.Snmp(state, cfg.get("snmp"), sim=demo)) if demo or (cfg.get("snmp") or {}).get("enabled") else None
+        state.syslog = bg(syslogd.Syslogd(state, cfg.get("syslog"), sim=demo)) if demo or (cfg.get("syslog") or {}).get("enabled") else None
+        lcfg = cfg.get("latency") or {}
+        state.latency = bg(latency.Latency(state, lcfg, sim=demo, gateway=state.gateway,
+                                           db_path=None if demo else os.path.join(DATA, "latency.db"))) if lcfg.get("enabled", True) else None
+        state.speed = bg(speed.Speed(cfg.get("speed"), sim=demo, path=os.path.join(DATA, "speed.json")))
+        state.wifisurvey = wifisurvey.WifiSurvey(cfg.get("wifisurvey"), sim=demo)
+        state.pcap_ring = pcapring.PcapRing(cfg.get("pcap_ring"), sim=demo) if demo or (cfg.get("pcap_ring") or {}).get("enabled", True) else None
+    else:
+        state.flows = state.snmp = state.syslog = state.latency = state.speed = state.wifisurvey = state.pcap_ring = None
+    # ---- 🕵 ιδιωτικότητα & homelab (Tor, VPN/WireGuard, κρυπτογραφημένο DNS, Pi-hole/AdGuard, logs SIEM, Certificate Transparency, κάμερες) ----
+    import torctl, wgstatus, vpnguard, encdns, dnsfilter, logimport, ctwatch, iotfw
+    try:
+        import camexposure
+    except ImportError:
+        camexposure = None
+    if mode != "pcap":
+        gw = [state.gateway] if state.gateway else []
+        state.tor = bg(torctl.TorCtl(state, cfg.get("tor"), sim=demo)) if demo or (cfg.get("tor") or {}).get("enabled") else None
+        state.wg = bg(wgstatus.WgStatus(state, cfg.get("wireguard"), sim=demo)) if demo or (cfg.get("wireguard") or {}).get("enabled", True) else None
+        state.vpnguard = bg(vpnguard.VpnGuard(state, cfg.get("vpnguard"), sim=demo)) if demo or live else None
+        ecfg = dict(cfg.get("encrypted_dns") or {})
+        ecfg.setdefault("local_dns", gw)
+        state.encdns = bg(encdns.EncDns(state, ecfg, sim=demo)) if demo or ecfg.get("enabled", True) else None
+        state.dnsfilter = bg(dnsfilter.DnsFilter(state, cfg.get("dns_filter"), sim=demo)) if demo or (cfg.get("dns_filter") or {}).get("url") else None
+        state.logimport = bg(logimport.LogImport(state, cfg.get("log_import"), sim=demo)) if demo or (cfg.get("log_import") or {}).get("files") else None
+        state.ctwatch = bg(ctwatch.CtWatch(state, cfg.get("ct_watch"), sim=demo)) if demo or (cfg.get("ct_watch") or {}).get("domains") else None
+        ccfg = cfg.get("camera_scan")
+        state.camexp = (bg(camexposure.CamExposure(state, ccfg, sim=demo)) if demo or (ccfg or {}).get("enabled")
+                        else camexposure.CamExposure(state, ccfg, sim=False)) if camexposure else None
+        fcfg = cfg.get("iot_firewall") or {}  # 🧱 μικρο-τμηματοποίηση IoT (μαθαίνει προφίλ, βγάζει κανόνες firewall)
+        state.iotfw = bg(iotfw.IotFw(state, fcfg, sim=demo, path=os.path.join(DATA, "iotfw.json") if live else None)) \
+            if demo or fcfg.get("enabled", True) else None
+    else:
+        state.tor = state.wg = state.vpnguard = state.encdns = state.dnsfilter = state.logimport = state.ctwatch = state.camexp = None
+        state.iotfw = None
+    icfg = cfg.get("ipam")
+    if demo and not icfg:
+        icfg = {"subnets": [{"cidr": "192.168.1.0/24", "name": "Σπίτι (LAN)", "vlan": 1, "gateway": "192.168.1.1", "dhcp": "192.168.1.100-192.168.1.199"}],
+                "reserved": [{"ip": "192.168.1.16", "name": "Proxmox"}, {"ip": "192.168.1.17", "name": "MQTT broker"},
+                             {"ip": "192.168.1.20", "name": "ESP32 κήπου"}, {"ip": "192.168.1.30", "name": "Home Assistant"},
+                             {"ip": "192.168.1.150", "name": "Εκτυπωτής"}]}
+    state.ipam = ipam.Ipam(icfg, os.path.join(DATA, "ipam.json") if live else os.path.join(DATA, "ipam-demo.json"))
+    import ops
+    mw = cfg.get("maintenance")
+    if mode == "demo" and not mw:
+        mw = [{"name": "Νυχτερινό backup NAS", "start": "02:00", "end": "04:00"}]
+    state.maint = ops.Maintenance(mw, os.path.join(HERE, "data", "maint.json") if mode == "live" else None)
+    for err in state.maint.errors:
+        log("🔧 maintenance:", err)
     import playbooks
     pb_cfg = cfg.get("playbooks")
     if mode == "demo" and not pb_cfg:  # παράδειγμα για να φαίνεται η καρτέλα (το μπλοκ στο demo είναι εικονικό)

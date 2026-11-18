@@ -30,17 +30,25 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # /api/whois, /api/cve, /api/abuseipdb — το shim απαντά «μη διαθέσιμο στο online demo»).
 GETS = ["/api/status", "/api/iot", "/api/mqtt", "/api/sensor", "/api/honeypot", "/api/block",
         "/api/apps", "/api/wifi", "/api/privacy", "/api/audit", "/api/rules", "/api/ctf",
-        "/api/academy", "/api/hass", "/api/scan", "/api/lab", "/api/packet"]
+        "/api/academy", "/api/hass", "/api/scan", "/api/lab", "/api/packet",
+        # 🏗 Υποδομή (infra.js)
+        "/api/infra", "/api/flows", "/api/snmp", "/api/ipam", "/api/latency", "/api/speed",
+        "/api/wifisurvey", "/api/pcap", "/api/maint",
+        # 🔒 ασφάλεια & ιδιωτικότητα
+        "/api/tor", "/api/vpn", "/api/vpnguard", "/api/encdns", "/api/dnsfilter", "/api/logimport", "/api/ctwatch", "/api/camexp",
+        "/api/iotfw"]
+LAT_HOURS = [3, 24, 168]
 HISTORY_HOURS = [1, 24, 168, 720]
 # Βγαίνουν στο internet ή χρειάζονται παράμετρο που δεν ξέρουμε — δεν καταγράφονται.
-SKIP = {"/api/whois", "/api/cve", "/api/abuseipdb", "/api/history", "/api/packet", "/api/shell"}
+SKIP = {"/api/whois", "/api/cve", "/api/abuseipdb", "/api/history", "/api/packet", "/api/shell",
+        "/api/flows/device", "/api/iotfw/rules", "/api/pcap/alert", "/api/ipam/export", "/api/syslog"}
 MAX_DECODES = 60  # αποκωδικοποιημένα πακέτα (🔬) — ~10 KB το καθένα
 
 
 def discover_gets():
     """Όλα τα fetch('/api/…') του frontend, ώστε νέα endpoints να καταγράφονται χωρίς αλλαγή εδώ."""
     found = set()
-    for rel in ("index.html", "edu.js", os.path.join("academy", "engine.js")):
+    for rel in ("index.html", "edu.js", "infra.js", "sectools.js", os.path.join("academy", "engine.js")):
         try:
             src = open(os.path.join(ROOT, rel), encoding="utf-8").read()
         except OSError:
@@ -161,6 +169,17 @@ def main():
                 print(f"  (παράλειψη {p}: HTTP {e.code})")
         for h in HISTORY_HOURS:
             api[f"/api/history?hours={h}"] = c.get(f"/api/history?hours={h}")
+        # 🏗 Υποδομή: syslog (το shim φιλτράρει τοπικά), latency ανά στόχο/εύρος, ροές ανά συσκευή
+        api["/api/syslog"] = c.get("/api/syslog?limit=300")
+        for t in (api.get("/api/latency") or {}).get("targets", []):
+            for h in LAT_HOURS:
+                api[f"/api/latency?target={t['name']}&hours={h}"] = c.get(f"/api/latency?target={quote(t['name'])}&hours={h}")
+        # 🧱 IoT firewall: κανόνες ανά συσκευή και μορφή (το shim τους σερβίρει από εδώ)
+        for d in (api.get("/api/iotfw") or {}).get("devices", [])[:12]:
+            for fmt in ("openwrt", "pfsense", "mikrotik", "iptables"):
+                api[f"/api/iotfw/rules?dev={d['key']}&fmt={fmt}"] = c.get(f"/api/iotfw/rules?dev={quote(d['key'])}&fmt={fmt}")
+        for d in (api.get("/api/flows") or {}).get("top_talkers", [])[:15]:
+            api["/api/flows/device?ip=" + d["ip"]] = c.get("/api/flows/device?ip=" + quote(d["ip"]))
         # 🔬 Πακέτα: λίστα ροών ανά host και αποκωδικοποίηση της πρώτης ροής του καθενός.
         snap = next((m["msg"] for m in sse.msgs if m["msg"].get("type") == "snapshot"), {})
         hosts = sorted(snap.get("hosts", []), key=lambda h: -(h.get("pkts") or 0))

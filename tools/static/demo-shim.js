@@ -60,6 +60,27 @@
       });
       return best ? rec(best) : { error: NA };
     }
+    if (p === '/api/latency' && q.get('target')) {
+      var t = q.get('target'), lh = parseFloat(q.get('hours')) || 24, lb = null, ld = Infinity;
+      Object.keys(D.api).forEach(function (k) {
+        if (k.indexOf('/api/latency?target=' + t + '&hours=') !== 0) return;
+        var hh = +k.split('&hours=')[1];
+        if (Math.abs(hh - lh) < ld) { ld = Math.abs(hh - lh); lb = k; }
+      });
+      return lb ? rec(lb) : { error: NA };
+    }
+    if (p === '/api/iotfw/rules') return rec('/api/iotfw/rules?dev=' + q.get('dev') + '&fmt=' + (q.get('fmt') || 'openwrt')) || { error: NA };
+    if (p === '/api/flows/device') return rec('/api/flows/device?ip=' + q.get('ip')) || { error: NA };
+    if (p === '/api/syslog') {
+      var sl = rec(p);
+      if (!sl || !sl.results) return sl || { error: NA };
+      var qq = (q.get('q') || '').toLowerCase(), host = q.get('host') || '', sev = parseInt(q.get('sev'), 10);
+      sl.results = sl.results.filter(function (m) {
+        return (!qq || JSON.stringify(m).toLowerCase().indexOf(qq) >= 0) && (!host || m.host === host || m.src_ip === host) &&
+          (isNaN(sev) || m.severity <= sev);
+      });
+      return sl;
+    }
     if (p === '/api/block' && blocked) { var b = rec(p) || {}; b.blocked = blocked; return b; }
     if (p === '/api/honeypot' && honeyOn === false) return honeyOff();
     if (p === '/api/whois') return { ip: q.get('ip'), text: NA };

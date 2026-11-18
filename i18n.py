@@ -34,7 +34,7 @@ def load(folder=None):
             exact.setdefault(_norm(k), v)
         for re_s, to in d.get("patterns") or []:
             try:
-                pats.append((re.compile(re_s), re.sub(r"\$(\d)", r"\\g<\1>", to)))
+                pats.append((re.compile(re_s), to))
             except re.error:
                 pass
     return exact, pats
@@ -51,6 +51,10 @@ def tr(text, lang="en"):
     if k in exact:
         return exact[k]
     for rx, to in pats:
-        if rx.search(k):
-            return rx.sub(to, k)
+        m = rx.search(k)
+        if m:
+            def grp(g, m=m):  # ό,τι «πιάνει» το pattern μεταφράζεται κι αυτό αν είναι ελληνικό
+                v = m.group(int(g.group(1)))
+                return "" if v is None else (tr(v, lang) if v != k and GREEK.search(v) else v)
+            return k[:m.start()] + re.sub(r"\$(\d)", grp, to) + k[m.end():]
     return text

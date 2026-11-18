@@ -28,6 +28,11 @@ DEMO_REMOTE = [
     ("1.1.1.1", "one.one.one.one", "Australia", "AU", "Sydney", -33.87, 151.21, "Cloudflare, Inc.", "AS13335 Cloudflare, Inc.", 2),
     ("35.186.224.25", "spclient.wg.spotify.com", "United States", "US", "Council Bluffs", 41.26, -95.86, "Google Cloud", "AS15169 Google LLC", 6),
     ("41.63.64.10", "cdn.example.za", "South Africa", "ZA", "Johannesburg", -26.2, 28.04, "Demo Telecom", "AS0000 Demo", 1),
+    # trackers (για την καρτέλα 📡 Trackers): διαφημίσεις / analytics / τηλεμετρία
+    ("142.250.185.68", "doubleclick.net", "United States", "US", "Mountain View", 37.42, -122.08, "Google LLC", "AS15169 Google LLC", 14),
+    ("142.251.1.157", "app-measurement.com", "United States", "US", "Mountain View", 37.42, -122.08, "Google LLC", "AS15169 Google LLC", 9),
+    ("34.120.195.249", "crashlytics.com", "United States", "US", "Council Bluffs", 41.26, -95.86, "Google Cloud", "AS15169 Google LLC", 5),
+    ("35.201.97.85", "app.adjust.com", "United States", "US", "Ashburn", 39.04, -77.49, "Google Cloud", "AS15169 Google LLC", 4),
 ]
 
 
