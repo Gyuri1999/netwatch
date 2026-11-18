@@ -71,6 +71,9 @@ def main():
     shutil.copy2(os.path.join(ROOT, "privtools.js"), out)
     shutil.copy2(os.path.join(ROOT, "protocols.js"), out)
     shutil.copy2(os.path.join(ROOT, "ciscolab.js"), out)
+    shutil.copy2(os.path.join(ROOT, "uiplus.js"), out)
+    shutil.copy2(os.path.join(ROOT, "pentestui.js"), out)
+    shutil.copy2(os.path.join(ROOT, "socui.js"), out)
     # Ακαδημία: scripts + εικονίδια του PWA (ό,τι δεν είναι .md).
     for fp in glob.glob(os.path.join(ROOT, "academy", "*")):
         if os.path.isfile(fp) and not fp.endswith(".md"):
@@ -101,9 +104,10 @@ def main():
         json.dump(rec, f, ensure_ascii=False, separators=(",", ":"))
         f.write(";\n")
 
-    rep = os.path.join(args.rec, "report.html")
-    if os.path.isfile(rep):
-        shutil.copy2(rep, os.path.join(out, "report.html"))
+    for name in ("report.html", "pentest-report.html"):
+        rep = os.path.join(args.rec, name)
+        if os.path.isfile(rep):
+            shutil.copy2(rep, os.path.join(out, name))
     if os.path.isfile(os.path.join(ROOT, "docs", "og.png")):
         shutil.copy2(os.path.join(ROOT, "docs", "og.png"), out)
     open(os.path.join(out, ".nojekyll"), "w").close()

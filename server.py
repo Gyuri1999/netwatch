@@ -188,8 +188,80 @@ def make_handler(state):
                     import netkit
                     return self._json(netkit.run_tool(body, sim=state.mode == "demo", state=state))
                 if u.path == "/api/lab":
+                    if (getattr(state, "purple", None) and state.purple.status_brief() == "running"):
+                        raise ValueError("Τρέχει καμπάνια purple team — περίμενε να τελειώσει")
                     state.lab.start(str(body.get("kind")), str(body.get("variant")))
                     return self._json({"ok": True})
+                if u.path.startswith("/api/cases/"):  # 🗂 διαλογή ειδοποιήσεων & υποθέσεις
+                    cs = getattr(state, "cases", None)
+                    if not cs:
+                        return self._json({"error": "Οι υποθέσεις δεν είναι διαθέσιμες σε αυτή τη λειτουργία."}, 400)
+                    act = u.path.rsplit("/", 1)[1]
+                    note = body.get("note")
+                    if note is not None and (not isinstance(note, str) or len(note) > 2000):
+                        raise ValueError("Η σημείωση πρέπει να είναι κείμενο έως 2000 χαρακτήρες.")
+                    if act in ("update", "fp"):
+                        cid = body.get("id")
+                        if isinstance(cid, bool) or not isinstance(cid, (int, str)) or not str(cid).isdigit():
+                            raise ValueError("Μη έγκυρο id υπόθεσης.")
+                        if act == "update":
+                            st_ = body.get("status")
+                            if st_ is not None and st_ not in ("new", "investigating", "resolved", "false_positive"):
+                                raise ValueError("Μη έγκυρη κατάσταση.")
+                            r = cs.update(int(cid), status=st_, note=note)
+                        else:
+                            mins = body.get("minutes", 1440)
+                            if isinstance(mins, bool) or not isinstance(mins, (int, str)) or not str(mins).isdigit():
+                                raise ValueError("Τα λεπτά πρέπει να είναι μη αρνητικός ακέραιος.")
+                            r = cs.false_positive(int(cid), int(mins), note=note)
+                    elif act == "new":
+                        r = cs.create(str(body.get("title") or "")[:300], body.get("actors") or [],
+                                      sev=str(body.get("sev") or "med"), note=note, source="hunt")
+                    elif act == "delete-suppression":
+                        r = cs.delete_suppression(str(body.get("type") or "")[:200], str(body.get("actor") or "")[:200])
+                    else:
+                        return self._json({"error": "not found"}, 404)
+                    return self._json(r, 400 if "error" in r else 200)
+                if u.path == "/api/hunt/run":  # 🎯 κυνήγι απειλών: εκτέλεση υπόθεσης (ή "all")
+                    hu = getattr(state, "hunt", None)
+                    if not hu:
+                        return self._json({"error": "Το κυνήγι απειλών δεν είναι διαθέσιμο σε αυτή τη λειτουργία."}, 400)
+                    import hunt
+                    hid = str(body.get("id") or "")
+                    if hid != "all" and hid not in hunt.HUNTS:
+                        return self._json({"error": "Άγνωστη υπόθεση κυνηγιού."}, 400)
+                    return self._json(hu.run(hid))
+                if u.path in ("/api/purple/run", "/api/purple/stop"):  # 🟣 καμπάνια purple team (εγχυμένα πακέτα)
+                    pu = getattr(state, "purple", None)
+                    if not pu:
+                        return self._json({"error": "Δεν είναι διαθέσιμο σε αυτή τη λειτουργία."}, 400)
+                    if u.path.endswith("/stop"):
+                        return self._json(pu.stop())
+                    return self._json(pu.start(body.get("scenarios"), body.get("variants")))
+                if u.path == "/api/tlsaudit/run":  # 🔐 έλεγχος TLS/SSH (μόνο ιδιωτικές IP)
+                    ta = getattr(state, "tlsaudit", None)
+                    if not ta:
+                        return self._json({"error": "Δεν είναι διαθέσιμο σε αυτή τη λειτουργία."}, 400)
+                    res = ta.start(body.get("targets"))
+                    log(f"🔐 έλεγχος TLS/SSH: {res['total']} υπηρεσίες")
+                    return self._json(res)
+                if u.path.startswith("/api/vulnlab/"):  # 📷 NetCam Lab (μόνο 127.0.0.1)
+                    vl = getattr(state, "vulnlab", None)
+                    if not vl:
+                        return self._json({"error": "Το NetCam Lab δεν είναι διαθέσιμο σε αυτή τη λειτουργία."}, 400)
+                    act = u.path.rsplit("/", 1)[1]
+                    if act == "start":
+                        return self._json(vl.start())
+                    if act == "stop":
+                        return self._json(vl.stop())
+                    if act == "flag":
+                        return self._json(vl.submit(body.get("flag")))
+                    if act == "fix":
+                        return self._json(vl.set_fix(str(body.get("id") or ""), body.get("on", True)))
+                    if act == "verify":
+                        return self._json(vl.verify())
+                    if act == "reset":
+                        return self._json(vl.reset())
                 if u.path == "/api/ctf/load":
                     ctf_load(state, str(body.get("level")))
                     return self._json({"ok": True})
@@ -458,7 +530,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -493,6 +565,33 @@ def make_handler(state):
                 from osint import onionoo
                 ip = parse_qs(u.query).get("ip", [""])[0]
                 return self._send(200, json.dumps(onionoo(ip, demo=state.mode == "demo")).encode(), "application/json")
+            if u.path == "/api/cases":  # 🗂 διαλογή ειδοποιήσεων & υποθέσεις
+                cs = getattr(state, "cases", None)
+                return self._json(cs.view() if cs else {"cases": [], "kpi": {}, "off": True})
+            if u.path in ("/api/hunt", "/api/hunt/profile"):  # 🎯 κυνήγι απειλών: κατάλογος υποθέσεων / προφίλ συσκευής
+                hu = getattr(state, "hunt", None)
+                if u.path == "/api/hunt":
+                    return self._json(hu.catalog() if hu else {"hunts": [], "off": True})
+                if not hu:
+                    return self._json({"error": "Το κυνήγι απειλών δεν είναι διαθέσιμο σε αυτή τη λειτουργία."}, 400)
+                ip = parse_qs(u.query).get("ip", [""])[0].strip()
+                try:
+                    ipaddress.ip_address(ip)
+                except ValueError:
+                    return self._json({"error": "Μη έγκυρη IP."}, 400)
+                r = hu.profile(ip)
+                return self._json(r, 404 if "error" in r else 200)
+            if u.path in ("/api/timeline", "/api/timeline/at"):
+                tl = getattr(state, "timeline", None)
+                q = {k: v[0] for k, v in parse_qs(u.query).items()}
+                if not tl:
+                    return self._json({"enabled": False, "off": True})
+                try:
+                    if u.path == "/api/timeline":
+                        return self._json(tl.summary(max(1, min(24, float(q.get("hours", 24))))))
+                    return self._json(tl.at(float(q.get("t", time.time())), int(q.get("span", 1))))
+                except ValueError:
+                    return self._json({"error": "bad t/span"}, 400)
             if u.path == "/api/whois":
                 ip = parse_qs(u.query).get("ip", [""])[0]
                 return self._send(200, json.dumps({"ip": ip, "text": whois(ip)}).encode(), "application/json")
@@ -539,6 +638,26 @@ def make_handler(state):
                     return self._json({"error": str(e)[:200]}, 502)
             if u.path == "/api/lab":
                 return self._json(state.lab.status() if state.lab else {"status": "off"})
+            if u.path == "/api/purple":
+                pu = getattr(state, "purple", None)
+                cid = parse_qs(u.query).get("id", [""])[0]
+                return self._json(pu.status(int(cid) if cid.isdigit() else None) if pu else {"status": "off"})
+            if u.path == "/api/tlsaudit":
+                ta = getattr(state, "tlsaudit", None)
+                return self._json(ta.status() if ta else {"status": "off", "results": []})
+            if u.path in ("/pentest-report", "/api/pentest-report"):  # 📑 αναφορά pentest (HTML → PDF) / ίδια δεδομένα σε JSON
+                import pentest_report
+                lang = parse_qs(u.query).get("lang", ["el"])[0]
+                data = pentest_report.build_data(state, lang)
+                if u.path.startswith("/api/"):
+                    return self._json(data)
+                return self._send(200, pentest_report.render_html(data).encode(), "text/html; charset=utf-8")
+            if u.path == "/api/vulnlab":
+                vl = getattr(state, "vulnlab", None)
+                if vl:
+                    vl.tick()
+                return self._json(vl.status() if vl else {"running": False, "off": True,
+                                                          "error": "Το NetCam Lab δεν είναι διαθέσιμο σε αυτή τη λειτουργία."})
             if u.path == "/api/rules":
                 return self._json(state.rules_view())
             if u.path == "/api/wifi":

@@ -71,6 +71,7 @@
     }
     if (p === '/api/iotfw/rules') return rec('/api/iotfw/rules?dev=' + q.get('dev') + '&fmt=' + (q.get('fmt') || 'openwrt')) || { error: NA };
     if (p === '/api/flows/device') return rec('/api/flows/device?ip=' + q.get('ip')) || { error: NA };
+    if (p === '/api/hunt/profile') return rec('/api/hunt/profile?ip=' + q.get('ip')) || { error: NA };
     if (p === '/api/syslog') {
       var sl = rec(p);
       if (!sl || !sl.results) return sl || { error: NA };
@@ -95,6 +96,9 @@
       case '/api/iot': case '/api/mqtt': case '/api/wifi': case '/api/privacy':
         return rec(p) || { error: NA };
       case '/api/exposure': return D.post[p] || { error: NA };
+      case '/api/purple/run': case '/api/tlsaudit/run': return D.post[p] || { ok: true };
+      case '/api/purple/stop': return { ok: true, stopped: false };
+      case '/api/hunt/run': return rec('/api/hunt/run?id=' + body.id) || { error: NA };
       case '/api/scan': return { ok: true };
       case '/api/honeypot':
         honeyOn = !!body.enable;
@@ -138,6 +142,7 @@
     if (!a) return;
     var href = a.getAttribute('href');
     if (/^\/?report(\?|$)/.test(href)) { e.preventDefault(); window.open('report.html', a.target || '_blank'); }
+    if (/^\/?pentest-report(\?|$)/.test(href)) { e.preventDefault(); window.open('pentest-report.html', a.target || '_blank'); }
   }, true);
 
   // Scripts με απόλυτο path (π.χ. '/academy/x.js' από το engine.js) → σχετικό, για το /<repo>/ του Pages.

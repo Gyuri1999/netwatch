@@ -151,6 +151,28 @@ def main():
         netkit.merge_names(state, {h["ip"]: h.get("names") or [] for h in hosts})  # ονόματα → χάρτης
     state.scanner.on_result = scan_done
     state.lab = pentest.Lab(state)
+    # 🟣 purple-team καμπάνιες (ATT&CK κάλυψη) και 🔐 έλεγχος TLS/SSH (ιστορικό/αποτελέσματα στο data/ μόνο στο live)
+    import purple
+    import tlsaudit
+    pcfg, tcfg = cfg.get("purple") or {}, cfg.get("tls_audit") or {}
+    state.purple = purple.Purple(state, os.path.join(HERE, "data", "purple.json") if mode == "live" else None,
+                                 pace=float(pcfg.get("pace", 1.0)))
+    state.purple.on_save = chown_to_user
+    state.tlsaudit = tlsaudit.TlsAudit(sim=mode == "demo", scan=state.scanner.last_result,
+                                       path=os.path.join(HERE, "data", "tlsaudit.json") if mode == "live" else None,
+                                       workers=int(tcfg.get("workers", 8)), timeout=float(tcfg.get("timeout", 3)))
+    state.tlsaudit.on_save = chown_to_user
+    # 📷 NetCam Lab: ευάλωτη εικονική κάμερα ΜΟΝΟ στο 127.0.0.1, ξεκινά μόνο με POST /api/vulnlab/start
+    import atexit
+    import vulnlab
+    try:
+        state.vulnlab = vulnlab.VulnLab(state, cfg.get("vulnlab"), sim=mode == "demo",
+                                        path=os.path.join(HERE, "data", "vulnlab.json") if mode == "live" else None)
+        state.vulnlab.on_save = chown_to_user
+        atexit.register(state.vulnlab.stop, "shutdown")
+    except (ValueError, TypeError) as e:
+        log("📷 vulnlab:", e)
+        state.vulnlab = None
     import wifiguard
     state.wifi = wifiguard.Guard(state, sim=wifiguard.demo_check if mode == "demo" else None,
                                  trusted_path=os.path.join(HERE, "data", "wifi_trusted.json") if mode == "live" else None)
@@ -254,9 +276,23 @@ def main():
         fcfg = cfg.get("iot_firewall") or {}  # 🧱 μικρο-τμηματοποίηση IoT (μαθαίνει προφίλ, βγάζει κανόνες firewall)
         state.iotfw = bg(iotfw.IotFw(state, fcfg, sim=demo, path=os.path.join(DATA, "iotfw.json") if live else None)) \
             if demo or fcfg.get("enabled", True) else None
+        import timeline  # ⏱ μηχανή του χρόνου: ποιος μίλησε με ποιον, ανά λεπτό, για 24 ώρες
+        state.timeline = bg(timeline.Timeline(state, sim=demo, path=os.path.join(DATA, "timeline.json.gz") if live else None))
+        if live:
+            atexit.register(state.timeline.save)
+        import hunt  # 🎯 κυνήγι απειλών: υποθέσεις (long tail, beaconing με jitter, exfil…) + προφίλ συσκευών
+        state.hunt = hunt.Hunt(state, sim=demo)
+        import cases  # 🗂 διαλογή ειδοποιήσεων & υποθέσεις (TheHive-style)
+        state.cases = bg(cases.Cases(state, sim=demo, path=os.path.join(DATA, "cases.json") if live else None))
+        if live:
+            state.cases.on_save = chown_to_user
+            atexit.register(state.cases.save)
     else:
         state.tor = state.wg = state.vpnguard = state.encdns = state.dnsfilter = state.logimport = state.ctwatch = state.camexp = None
         state.iotfw = None
+        state.timeline = None
+        state.hunt = None
+        state.cases = None
     icfg = cfg.get("ipam")
     if demo and not icfg:
         icfg = {"subnets": [{"cidr": "192.168.1.0/24", "name": "Σπίτι (LAN)", "vlan": 1, "gateway": "192.168.1.1", "dhcp": "192.168.1.100-192.168.1.199"}],

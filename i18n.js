@@ -40,7 +40,7 @@
       const parts = k.split(/(\s[—–·|]\s|:\s|\s\(|\)\s?)/);
       if (parts.length > 1) {
         let hit = false;
-        out = parts.map(p => { if (!GREEK.test(p)) return p; const x = exact.get(norm(p)); if (x != null) { hit = true; return x; } return p; }).join('');
+        out = parts.map(p => { if (!GREEK.test(p)) return p; let x = exact.get(norm(p)); if (x == null) { const y = I.t(p); if (y !== p && !GREEK.test(y)) x = y; } if (x != null) { hit = true; return x; } return p; }).join('');
         if (!hit || GREEK.test(out)) out = hit ? out : null;
       }
     }

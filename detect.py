@@ -280,6 +280,12 @@ class NetState:
         if k in self.cooldown and t - self.cooldown[k] < cd:
             return
         self.cooldown[k] = t
+        cs = getattr(self, "cases", None)
+        if cs and benign is None:  # 🗂 σημειώθηκε «ψευδώς θετικό» σε υπόθεση → φαίνεται, αλλά ως αθώα
+            try:
+                benign = cs.suppressed(typ, actor, t) or None
+            except Exception as e:
+                log("cases:", e)
         self.alert_seq += 1
         lab = actor in self.lab_ips
         a = dict(id=self.alert_seq, t=t, type=typ, sev=sev, actor=actor,
@@ -311,6 +317,13 @@ class NetState:
             self.history.add_alert(a, self.mode)
         except Exception as e:
             log("history error:", e)
+        if cs and not benign:  # 🗂 διαλογή: η ειδοποίηση μπαίνει σε υπόθεση (και στα παράθυρα συντήρησης)
+            try:
+                cid = cs.on_alert(a)
+                if cid is not None:
+                    a["case"] = cid
+            except Exception as e:
+                log("cases:", e)
         if win:
             log(f"🔧 [{sev.upper()}] {typ} (συντήρηση «{win}»): {actor} → {target}")
             return
@@ -479,6 +492,18 @@ class NetState:
                 fw.observe(P, t)
             except Exception:
                 pass
+        tl = getattr(self, "timeline", None)
+        if tl is not None:
+            try:
+                tl.observe(P, t)
+            except Exception:
+                pass
+        hu = getattr(self, "hunt", None)
+        if hu is not None:
+            try:
+                hu.observe(P, t)
+            except Exception:
+                pass
         if P.get("cred"):
             self._cred(P, t)
         if P.get("dns_q"):
@@ -573,7 +598,7 @@ class NetState:
                        key=f"{dst}:{dp}" if benign else None, cooldown=3600 if benign else None, benign=benign)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
-    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
+    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "timeline", "hunt", "cases", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
             "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors", "own_tool", "test_ips")
 
     def reset(self, mode, iface, me_ips, gateway, history, feed, notifier=None):
