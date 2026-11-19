@@ -1,6 +1,7 @@
 """NetWatch — NetState: η κατάσταση του δικτύου και όλοι οι ανιχνευτές επιθέσεων."""
 import collections
 import copy
+import ipaddress
 import os
 import queue
 import random
@@ -83,8 +84,14 @@ class NetState:
         self.w_syn, self.w_icmp = Window(th["syn_flood"]["window"]), Window(th["icmp_flood"]["window"])
         self.w_arpflood, self.w_brute = Window(th["arp_flood"]["window"]), Window(th["brute_force"]["window"])
         self.w_dnstun, self.w_dga = Window(th["dns_tunnel"]["window"]), Window(th["dga"]["window"])
+        # επιθέσεις στο ίδιο το DNS: amplification, flood, NXDOMAIN flood / random subdomain, rebinding
+        self.w_dnsamp = Window(th["dns_amplification"]["window"])
+        self.w_dnsflood = Window(th["dns_flood"]["window"])
+        self.w_nxflood = Window(th["nxdomain_flood"]["window"])
+        self.dns_qids = collections.OrderedDict()  # (πελάτης, server, txid) → t: ερωτήματα που είδαμε
+        self.dns_public = {}  # όνομα → (δημόσια IP, t): για DNS rebinding (δημόσιο → ιδιωτικό)
         self.windows = (self.w_scan, self.w_sweep, self.w_syn, self.w_icmp, self.w_arpflood, self.w_brute,
-                        self.w_dnstun, self.w_dga)
+                        self.w_dnstun, self.w_dga, self.w_dnsamp, self.w_dnsflood, self.w_nxflood)
         self.started = time.time()
 
     # ---------- pub/sub ----------
@@ -510,6 +517,8 @@ class NetState:
             self._dns_query(src, P["dns_q"][0], t)
         if P.get("nx"):
             self._nxdomain(dst, P["nx"], t)
+        if proto == "UDP" and (dp == 53 or sp == 53) and "dns_id" in P:
+            self._dns_attacks(P, src, dst, sp, dp, t)
         if from_me and self.vpn_iface and self.mode == "live" and self.vpn_iface != self.iface:
             self._vpn_leak(P, t)
 
@@ -944,6 +953,119 @@ class NetState:
                            f"{n} μοναδικά, τυχαία subdomains του {base} σε {th['window']}s (π.χ. {sub[:32]}…) — "
                            "δεδομένα κρυμμένα μέσα σε ερωτήματα DNS (exfiltration / C2)", t,
                            key=("dnstun", src, base), cooldown=300)
+
+    # --- επιθέσεις στο DNS ---
+    DNS_QID_TTL = 15  # δευτ.: μια απάντηση χωρίς ερώτημα στο τελευταίο 15″ θεωρείται «δεν ζητήθηκε»
+    DNS_QID_MAX = 50000
+    REBIND_OK = (".plex.direct", ".nip.io", ".sslip.io", ".xip.io", ".localtest.me", ".lvh.me", ".traefik.me")
+
+    def _dns_attacks(self, P, src, dst, sp, dp, t):
+        if dp == 53 and not P.get("dns_resp"):
+            q = self.dns_qids
+            q[(src, dst, P["dns_id"])] = t
+            while q and (len(q) > self.DNS_QID_MAX or next(iter(q.values())) < t - self.DNS_QID_TTL):
+                q.popitem(last=False)
+            self._dns_flood(src, dst, t)
+        elif sp == 53 and P.get("dns_resp"):
+            asked = self.dns_qids.pop((dst, src, P["dns_id"]), None) is not None
+            self._dns_amplification(src, dst, P["len"], asked, t)
+            if P.get("nx"):
+                self._nxdomain_flood(src, P["nx"], t)
+            if P.get("dns"):
+                self._dns_rebinding(src, dst, P["dns"], t)
+
+    def _dns_amplification(self, server, client, size, asked, t):
+        """Πολλές/μεγάλες απαντήσεις DNS που ΔΕΝ ζήτησε κανείς: κάποιος έστειλε ερωτήματα με πλαστή διεύθυνση
+        αποστολέα (τη δική μας), και οι resolvers «βομβαρδίζουν» το θύμα. Ή, ανάποδα, ένας DNS server του LAN
+        απαντά μαζικά σε δημόσιες IP: είναι ανοιχτός resolver που τον χρησιμοποιούν ως «ενισχυτή»."""
+        th = self._th("dns_amplification")
+        local_server = ip_kind(server) == "local"
+        if local_server and ip_kind(client) == "public":
+            dq = self.w_dnsamp.add(("refl", server), (client, size), t)
+            victims = {c for _, (c, _) in dq}
+            total = sum(s for _, (_, s) in dq)
+            if len(victims) >= th["reflector_targets"] or total >= th["bytes"]:
+                self.alert("DNS amplification (ανοιχτός resolver)", "high", server, ", ".join(sorted(victims)[:3]),
+                           f"Ο DNS server {server} του δικτύου σου έστειλε {len(dq)} απαντήσεις ({total // 1024} KB) σε "
+                           f"{len(victims)} δημόσιες IP μέσα σε {th['window']}s — είναι ανοιχτός στο Internet και τον "
+                           "χρησιμοποιούν ως «ενισχυτή» για επιθέσεις DDoS σε άλλους", t,
+                           key=("dnsrefl", server), cooldown=600)
+            return
+        if asked or ip_kind(client) != "local":
+            return
+        dq = self.w_dnsamp.add(("victim", client), (server, size), t)
+        total = sum(s for _, (_, s) in dq)
+        servers = {sv for _, (sv, _) in dq}
+        if (len(dq) >= th["count"] or total >= th["bytes"]) and len(servers) >= th["min_servers"]:
+            self.alert("DNS amplification", "high", ", ".join(sorted(servers)[:3]), client,
+                       f"{len(dq)} απαντήσεις DNS ({total // 1024} KB) από {len(servers)} servers προς {client} μέσα σε "
+                       f"{th['window']}s, χωρίς να έχει ρωτήσει — κάποιος στέλνει ερωτήματα με πλαστή διεύθυνση "
+                       "αποστολέα ώστε οι απαντήσεις να «πλημμυρίσουν» τη σύνδεση (DDoS με ενίσχυση)", t,
+                       key=("dnsamp", client), cooldown=300)
+
+    def _dns_flood(self, client, server, t):
+        th = self._th("dns_flood")
+        dq = self.w_dnsflood.add(server, client, t)
+        if len(dq) < th["count"]:
+            return
+        top = collections.Counter(c for _, c in dq).most_common(3)
+        who = top[0][0] if top[0][1] >= len(dq) * 0.5 else f"{len({c for _, c in dq})} πηγές"
+        self.alert("DNS flood", "high", who, server,
+                   f"{len(dq)} ερωτήματα DNS προς {server} σε {th['window']}s (κυρίως από "
+                   f"{', '.join(f'{c} ×{n}' for c, n in top)}) — προσπάθεια να «γονατίσει» ο DNS server, "
+                   "ώστε να μη λειτουργεί η επίλυση ονομάτων για κανέναν", t, key=("dnsflood", server), cooldown=300)
+
+    def _nxdomain_flood(self, server, qname, t):
+        th = self._th("nxdomain_flood")
+        q = qname.lower().rstrip(".")
+        dq = self.w_nxflood.add(server, q, t)
+        if len(dq) < th["count"]:
+            return
+        names = [n for _, n in dq]
+        bases = collections.Counter(split_domain(n)[0] for n in names)
+        base, n_base = bases.most_common(1)[0]
+        uniq = len({n for n in names if split_domain(n)[0] == base})
+        if n_base >= len(names) * th["same_domain"] and uniq >= th["count"] // 2:
+            self.alert("NXDOMAIN flood (random subdomain)", "high", "DNS", base,
+                       f"{n_base} ερωτήματα για ανύπαρκτα, τυχαία subdomains του {base} μέσα σε {th['window']}s "
+                       f"(π.χ. {', '.join(sorted(set(names))[:2])}) — «water torture»: κάθε ερώτημα περνά την cache και "
+                       f"φτάνει στον DNS server του {base}, για να τον υπερφορτώσει", t,
+                       key=("nxsub", base), cooldown=300)
+        else:
+            self.alert("NXDOMAIN flood", "med", "DNS", server,
+                       f"{len(names)} απαντήσεις «δεν υπάρχει» (NXDOMAIN) από τον {server} σε {th['window']}s, για "
+                       f"{len(bases)} διαφορετικά domains — πλημμύρα ερωτημάτων για ανύπαρκτα ονόματα που "
+                       "υπερφορτώνει τον resolver (ή συσκευή που «κόλλησε»)", t, key=("nxflood", server), cooldown=300)
+
+    def _dns_rebinding(self, server, client, answers, t):
+        """Το ίδιο δημόσιο όνομα έδειχνε σε δημόσια IP και ξαφνικά δείχνει σε IP του LAN / localhost: έτσι μια
+        ιστοσελίδα κάνει τον browser να μιλήσει με τον router ή άλλες συσκευές του σπιτιού (DNS rebinding)."""
+        win = self._th("dns_rebinding")["window"]
+        for name, ip in answers:
+            n = name.lower().rstrip(".")
+            if n.endswith((".local", ".lan", ".home", ".arpa", ".localdomain", ".internal")) or \
+                    n.endswith(self.REBIND_OK) or self._allowed_name(n) or "." not in n:
+                continue
+            if ip in ("0.0.0.0", "::"):  # έτσι «μπλοκάρουν» Pi-hole/AdGuard — όχι rebinding
+                continue
+            try:
+                a = ipaddress.ip_address(ip)
+            except ValueError:
+                continue
+            if a.is_global:
+                self.dns_public[n] = (ip, t)
+                if len(self.dns_public) > 20000:
+                    self.dns_public.pop(next(iter(self.dns_public)))
+                continue
+            if not (a.is_private or a.is_loopback or a.is_link_local):
+                continue
+            prev = self.dns_public.get(n)
+            if prev and t - prev[1] <= win:
+                self.alert("DNS rebinding", "high", server, n,
+                           f"Το {n} έδειχνε στη δημόσια IP {prev[0]} και πριν από {int(t - prev[1])}s άλλαξε στην {ip} "
+                           f"του δικού σου δικτύου (απάντηση προς {client}) — μια ιστοσελίδα προσπαθεί να κάνει τον browser "
+                           "να μιλήσει με τον router ή άλλη συσκευή του σπιτιού σου", t,
+                           key=("rebind", n), cooldown=600)
 
     # --- DGA: πολλά ανύπαρκτα «τυχαία» domains ---
     def _nxdomain(self, client, qname, t):

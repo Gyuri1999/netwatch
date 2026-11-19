@@ -274,6 +274,9 @@ def make_parser():
             if DNS in pkt:
                 d = pkt[DNS]
                 try:
+                    P["dns_id"] = int(d.id)  # για να ξέρουμε αν μια απάντηση ζητήθηκε (DNS amplification)
+                    if d.qr == 1:
+                        P["dns_resp"] = True
                     qd = d.qd[0] if isinstance(d.qd, list) else d.qd
                     qn = qd.qname.decode() if isinstance(qd.qname, bytes) else str(qd.qname)
                     if d.qr == 0:

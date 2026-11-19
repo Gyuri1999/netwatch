@@ -2,6 +2,10 @@
 // health, playbooks, API errors, weekly report, CTF). Generated; see i18n/README.md for the format.
 I18N.add({
  "exact": {
+  "DNS amplification (ανοιχτός resolver)": "DNS amplification (open resolver)",
+  "DNSSEC bypass στο Wi‑Fi": "DNSSEC bypass on the Wi‑Fi",
+  "Αποσυνδέσου ή άνοιξε VPN· βάλε κρυπτογραφημένο DNS (DoH).": "Disconnect or turn on a VPN; use encrypted DNS (DoH).",
+  "Βάλε DNS που επικυρώνει DNSSEC (π.χ. 1.1.1.1, 9.9.9.9) στο router, ή κρυπτογραφημένο DNS (DoH).": "Set a DNS server that validates DNSSEC (e.g. 1.1.1.1, 9.9.9.9) on the router, or use encrypted DNS (DoH).",
   "Διαρροή DNS εκτός VPN": "DNS leak outside the VPN",
   "Διαρροή IPv6 εκτός VPN": "IPv6 leak outside the VPN",
   "Εισερχόμενη σύνδεση": "Inbound connection",
@@ -3062,6 +3066,50 @@ I18N.add({
   [
    "^- \\*\\*Χαμηλό\\*\\* — `(.+?)` — (.+?)$",
    "- **Low** — `$1` — $2"
+  ],
+  [
+   "^(-?\\d+) πηγές$",
+   "$1 sources"
+  ],
+  [
+   "^Ο DNS server (.+?) του δικτύου σου έστειλε (-?\\d+) απαντήσεις \\((-?\\d+) KB\\) σε (-?\\d+) δημόσιες IP μέσα σε ([\\d.,]+)s — είναι ανοιχτός στο Internet και τον χρησιμοποιούν ως «ενισχυτή» για επιθέσεις DDoS σε άλλους$",
+   "The DNS server $1 on your network sent $2 answers ($3 KB) to $4 public IPs within $5s — it is open to the Internet and is being used as an “amplifier” for DDoS attacks on others"
+  ],
+  [
+   "^(-?\\d+) απαντήσεις DNS \\((-?\\d+) KB\\) από (-?\\d+) servers προς (.+?) μέσα σε ([\\d.,]+)s, χωρίς να έχει ρωτήσει — κάποιος στέλνει ερωτήματα με πλαστή διεύθυνση αποστολέα ώστε οι απαντήσεις να «πλημμυρίσουν» τη σύνδεση \\(DDoS με ενίσχυση\\)$",
+   "$1 DNS answers ($2 KB) from $3 servers to $4 within $5s, without it having asked — someone is sending queries with a forged source address so that the answers “flood” the connection (amplified DDoS)"
+  ],
+  [
+   "^(-?\\d+) ερωτήματα DNS προς (.+?) σε ([\\d.,]+)s \\(κυρίως από (.+?)\\) — προσπάθεια να «γονατίσει» ο DNS server, ώστε να μη λειτουργεί η επίλυση ονομάτων για κανέναν$",
+   "$1 DNS queries to $2 in $3s (mostly from $4) — an attempt to bring the DNS server to its knees so that name resolution stops working for everyone"
+  ],
+  [
+   "^(-?\\d+) ερωτήματα για ανύπαρκτα, τυχαία subdomains του (.+?) μέσα σε ([\\d.,]+)s \\(π\\.χ\\. (.+?)\\) — «water torture»: κάθε ερώτημα περνά την cache και φτάνει στον DNS server του (.+?), για να τον υπερφορτώσει$",
+   "$1 queries for non-existent, random subdomains of $2 within $3s (e.g. $4) — “water torture”: every query bypasses the cache and reaches the DNS server of $5, to overload it"
+  ],
+  [
+   "^(-?\\d+) απαντήσεις «δεν υπάρχει» \\(NXDOMAIN\\) από τον (.+?) σε ([\\d.,]+)s, για (-?\\d+) διαφορετικά domains — πλημμύρα ερωτημάτων για ανύπαρκτα ονόματα που υπερφορτώνει τον resolver \\(ή συσκευή που «κόλλησε»\\)$",
+   "$1 “does not exist” (NXDOMAIN) answers from $2 in $3s, for $4 different domains — a flood of queries for non-existent names that overloads the resolver (or a device that got stuck)"
+  ],
+  [
+   "^Το (.+?) έδειχνε στη δημόσια IP (.+?) και πριν από (-?\\d+)s άλλαξε στην (.+?) του δικού σου δικτύου \\(απάντηση προς (.+?)\\) — μια ιστοσελίδα προσπαθεί να κάνει τον browser να μιλήσει με τον router ή άλλη συσκευή του σπιτιού σου$",
+   "$1 pointed to the public IP $2 and $3s ago changed to $4 on your own network (answer to $5) — a web page is trying to make the browser talk to your router or another device in your home"
+  ],
+  [
+   "^Ο DNS \\((.+?)\\) δηλώνει ότι ελέγχει τις υπογραφές DNSSEC, αλλά δέχτηκε και domain με σκόπιμα χαλασμένη υπογραφή — κάτι στη μέση απαντά αντί για τον πραγματικό resolver και παρακάμπτει την προστασία\\.$",
+   "The DNS server ($1) claims it checks DNSSEC signatures, but it also accepted a domain with a deliberately broken signature — something in the middle answers instead of the real resolver and bypasses the protection."
+  ],
+  [
+   "^Ο DNS του δικτύου \\((.+?)\\) δεν ελέγχει τις υπογραφές DNSSEC: μια πλαστή απάντηση \\(cache poisoning\\) δεν θα απορριφθεί\\.$",
+   "The network's DNS server ($1) does not check DNSSEC signatures: a forged answer (cache poisoning) will not be rejected."
+  ],
+  [
+   "^Ο DNS \\((.+?)\\) απορρίπτει απαντήσεις με χαλασμένη υπογραφή DNSSEC \\(η επικύρωση γίνεται ανάντη· ο router απλώς δεν περνά τη σημαία AD\\)\\.$",
+   "The DNS server ($1) rejects answers with a broken DNSSEC signature (validation happens upstream; the router just doesn't pass on the AD flag)."
+  ],
+  [
+   "^Ο DNS \\((.+?)\\) απορρίπτει απαντήσεις με χαλασμένη υπογραφή DNSSEC\\.$",
+   "The DNS server ($1) rejects answers with a broken DNSSEC signature."
   ]
  ]
 });
