@@ -572,6 +572,10 @@ def port_check(host, ports, timeout=1.5, sim=False):
     plist = parse_ports(ports, MAX_PRIVATE_PORTS if private else MAX_PUBLIC_PORTS)
     try:
         timeout = max(0.2, min(float(timeout), 5))
+        if sys.platform == "win32":
+            # Τα Windows ξαναστέλνουν SYN μετά από RST: μια ΚΛΕΙΣΤΗ θύρα απαντά «connection refused» σε ~2 δευτ.
+            # Με μικρότερο όριο θα τη βλέπαμε «filtered».
+            timeout = max(timeout, 2.5)
     except (TypeError, ValueError):
         timeout = 1.5
     if sim:

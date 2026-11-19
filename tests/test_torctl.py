@@ -128,7 +128,7 @@ class FakeTor(threading.Thread):
             cmd = line.decode().strip()
             self.commands.append(cmd)
             if cmd.startswith("PROTOCOLINFO"):
-                send(f'250-PROTOCOLINFO 1\r\n250-AUTH METHODS={self.methods} COOKIEFILE="{self.cookie_path}"\r\n'
+                send(f'250-PROTOCOLINFO 1\r\n250-AUTH METHODS={self.methods} COOKIEFILE="{self.cookie_path.replace(chr(92), chr(92) * 2)}"\r\n'
                      '250-VERSION Tor="0.4.8.13"\r\n250 OK\r\n')
             elif cmd.startswith("AUTHCHALLENGE SAFECOOKIE "):
                 cnonce = binascii.unhexlify(cmd.split()[-1])

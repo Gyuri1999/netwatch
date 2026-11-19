@@ -30,7 +30,6 @@ import argparse
 import http.server
 import logging
 import os
-import posixpath
 import re
 import socket
 import ssl
@@ -70,7 +69,7 @@ def resolve(root, url_path):
     # Και μετά το realpath (symlinks) πρέπει να είμαστε μέσα στο root.
     if os.path.commonpath([root_real, full]) != root_real:
         return None
-    if posixpath.basename(full) != name or not os.path.isfile(full):
+    if os.path.basename(full) != name or not os.path.isfile(full):  # το full είναι path του ΤΟΠΙΚΟΥ συστήματος (\\ στα Windows)
         return None
     return full
 
