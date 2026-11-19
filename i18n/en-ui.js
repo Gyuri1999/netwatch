@@ -2835,7 +2835,40 @@ I18N.add({
   "🗺 Διάγραμμα δικτύου": "🗺 Network diagram",
   "Διάγραμμα δικτύου": "Network diagram",
   "σχέδιο του δικτύου με ένα κουμπί — και πού είναι η βλάβη": "one-button drawing of your network — and where the fault is",
-  "Το διάγραμμα δικτύου δεν είναι διαθέσιμο σε αυτή τη λειτουργία.": "The network diagram is not available in this mode."
+  "Το διάγραμμα δικτύου δεν είναι διαθέσιμο σε αυτή τη λειτουργία.": "The network diagram is not available in this mode.",
+  "🖥 SSH Explorer": "🖥 SSH Explorer",
+  "αρχεία & υγεία του Raspberry Pi σου — μόνο κλειδί, μόνο ανάγνωση": "files & health of your Raspberry Pi — keys only, read-only",
+  "Ο host δεν δέχτηκε το κλειδί σου (ζητά κωδικό — εμείς δεν στέλνουμε ποτέ κωδικούς).": "The host did not accept your key (it wants a password — we never send passwords).",
+  "Βάλε το δημόσιο κλειδί σου μία φορά, στο Terminal:": "Install your public key once, in Terminal:",
+  "Δεν έχεις εγκρίνει ακόμα το κλειδί του host.": "You haven't approved the host key yet.",
+  "Πάτα «🔐 Έλεγχος κλειδιού host» και, αν το fingerprint είναι σωστό, «Εμπιστεύομαι».": "Press “🔐 Check host key” and, if the fingerprint is right, “I trust”.",
+  "⚠ Το κλειδί του host ΑΛΛΑΞΕ από την προηγούμενη φορά.": "⚠ The host key CHANGED since last time.",
+  "Αν ξαναέστησες το Pi είναι λογικό· αλλιώς μπορεί να είναι επίθεση MITM. Μην συνεχίσεις αν δεν ξέρεις γιατί.": "If you reinstalled the Pi that's expected; otherwise it may be a MITM attack. Don't continue unless you know why.",
+  "Το SSH δεν είναι ενεργό σε αυτή τη συσκευή.": "SSH is not enabled on this device.",
+  "Στο Raspberry Pi:": "On the Raspberry Pi:",
+  "Στο Raspberry Pi: sudo raspi-config → Interface Options → SSH → Enable.": "On the Raspberry Pi: sudo raspi-config → Interface Options → SSH → Enable.",
+  "Στο Raspberry Pi: sudo raspi-config → Interface Options → SSH.": "On the Raspberry Pi: sudo raspi-config → Interface Options → SSH.",
+  "Η συσκευή δεν απαντά.": "The device does not answer.",
+  "Είναι αναμμένη και στο ίδιο δίκτυο; Δοκίμασε ping ή «🔌 Πού είναι συνδεδεμένο».": "Is it on and on the same network? Try ping or “🔌 Where is it plugged in”.",
+  "Δεν βρέθηκε το όνομα.": "Name not found.",
+  "Δοκίμασε με IP (π.χ. 192.168.1.50).": "Try with an IP (e.g. 192.168.1.50).",
+  "Ο φάκελος/αρχείο δεν υπάρχει.": "The folder/file does not exist.",
+  "Ο χρήστης δεν έχει δικαίωμα ανάγνωσης εδώ.": "The user can't read here.",
+  "Δεν βρέθηκε SSH σε αυτή τη θύρα.": "No SSH found on this port.",
+  "Η συσκευή δεν απάντησε στη θύρα SSH.": "The device did not answer on the SSH port.",
+  "Κάνε πρώτα «Έλεγχος κλειδιού host» (το fingerprint πρέπει να είναι αυτό που είδες).": "Run “Check host key” first (the fingerprint must be the one you saw).",
+  "Κάνε πρώτα «Έλεγχος κλειδιού host».": "Run “Check host key” first.",
+  "🔑 Αυτό είναι ιδιωτικό κλειδί — δεν το εμφανίζουμε.": "🔑 This is a private key — we don't show it.",
+  "🔑 Αυτό είναι ιδιωτικό κλειδί — δεν το κατεβάζουμε.": "🔑 This is a private key — we don't download it.",
+  "Δεν δεχόμαστε κωδικούς — μόνο κλειδί SSH.": "We don't accept passwords — SSH keys only.",
+  "Μη έγκυρος χρήστης (π.χ. pi).": "Invalid user (e.g. pi).",
+  "Λείπει η διεύθυνση.": "Address missing.",
+  "Μη έγκυρη θύρα.": "Invalid port.",
+  "Μη έγκυρη διαδρομή": "Invalid path",
+  "Ο φάκελος δεν υπάρχει ή δεν διαβάζεται.": "The folder does not exist or can't be read.",
+  "Πολλές ταυτόχρονες συνδέσεις — δοκίμασε ξανά.": "Too many parallel connections — try again.",
+  "Άγνωστος host.": "Unknown host.",
+  "Το SSH Explorer δεν είναι διαθέσιμο σε αυτή τη λειτουργία.": "SSH Explorer is not available in this mode."
  },
  "patterns": [
   [
@@ -5861,6 +5894,14 @@ I18N.add({
   [
    "^Περίμενε (\\d+)″ πριν την επόμενη χαρτογράφηση\\.$",
    "Wait $1″ before the next mapping."
+  ],
+  [
+   "^Επιτρέπονται μόνο ιδιωτικές/τοπικές διευθύνσεις \\(όχι (.+)\\)$",
+   "Only private/local addresses are allowed (not $1)"
+  ],
+  [
+   "^Άδειο ή πολύ μεγάλο αρχείο \\(όριο (\\d+) MB\\)\\.$",
+   "Empty or too large file (limit $1 MB)."
   ]
  ]
 });

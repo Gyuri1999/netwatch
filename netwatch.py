@@ -320,6 +320,11 @@ def main():
         state.sitecheck = sitecheck.SiteCheck(sim=demo)
         import topomap  # 🗺 διάγραμμα δικτύου με ένα κουμπί + «πού είναι η βλάβη» (ping/traceroute, μόνο μνήμη)
         state.topomap = topomap.TopoMap(state, sim=demo)
+        import sshbrowse  # 🖥 SSH Explorer: αρχεία & κατάσταση Raspberry Pi/server (μόνο κλειδιά, μόνο ανάγνωση)
+        state.ssh = sshbrowse.SshBrowse(state, sim=demo, path=os.path.join(DATA, "ssh_hosts.json") if live else None,
+                                        known=os.path.join(DATA, "ssh_known_hosts") if live else None)
+        if live:
+            state.ssh.on_save = chown_to_user
         import handover  # 🔄 παράδοση βάρδιας (SOC/NOC): σύνοψη N ωρών + σημειώσεις βάρδιας
         state.handover = handover.Handover(state, sim=demo, path=os.path.join(DATA, "handover.json") if live else None)
         if live:
@@ -337,6 +342,7 @@ def main():
         state.handover = None
         state.sitecheck = None
         state.topomap = None
+        state.ssh = None
     icfg = cfg.get("ipam")
     if demo and not icfg:
         icfg = {"subnets": [{"cidr": "192.168.1.0/24", "name": "Σπίτι (LAN)", "vlan": 1, "gateway": "192.168.1.1", "dhcp": "192.168.1.100-192.168.1.199"}],

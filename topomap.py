@@ -28,7 +28,7 @@ PUBLIC_TARGET = "1.1.1.1"
 DNS_NAME = "example.com"
 MAX_HOPS = 6
 MAX_INFRA_PINGS = 16
-HOSTS_PER_PARENT = 14
+HOSTS_PER_PARENT = 60
 MIN_INTERVAL = 8
 SEEN_OK = 600            # συσκευή που φάνηκε τα τελευταία 10′ = «online»
 SLOW = {"router": 20.0, "switch": 20.0, "ap": 30.0, "modem": 30.0, "isp": 60.0, "internet": 150.0}

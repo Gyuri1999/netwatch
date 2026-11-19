@@ -6,7 +6,7 @@
   const T = (el, en) => EN() ? en : el;
   const LT = x => x && typeof x === 'object' ? (EN() ? x.en : x.el) || x.el || x.en || '' : String(x == null ? '' : x);
   const TM = { d: null, msg: null, zoom: 1, sel: null, busy: false, fault: '' };
-  const BW = 176, BH = 60, GAP = 26, ROW = 104, PW = 270, RH = 22, PAD = 30;
+  const BW = 176, BH = 60, GAP = 26, ROW = 104, PAD = 30;
   const ICON = { internet: '☁️', dns: '🔤', isp: '🏢', modem: '📟', router: '🛜', switch: '🔀', ap: '📶', host: '💻', me: '🧑‍💻', more: '➕' };
   const ST = {
     ok: ['--green', 'απαντά', 'answers'], slow: ['--yellow', 'αργό / απώλειες', 'slow / loss'], down: ['--red', 'ΔΕΝ απαντά', 'NOT answering'],
@@ -38,7 +38,7 @@
 #t-topo .tp-pop{position:absolute;z-index:3;min-width:220px;max-width:300px;background:var(--panel,#111a);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:10px;padding:10px 12px;font-size:12.5px;box-shadow:0 8px 30px rgb(0 0 0 / 35%)}
 #t-topo .tp-pop .kv{display:grid;grid-template-columns:70px 1fr;gap:3px 8px;margin:6px 0}
 #t-topo .tp-pop .kv span:nth-child(odd){color:var(--dim)}
-#t-topo .tp-pop .b{margin:4px 4px 0 0;font-size:12px;padding:3px 8px}
+#t-topo .tp-pop .b{margin:4px 4px 0 0;font-size:12px;padding:3px 8px}#t-topo .tp-pop .tp-x{position:absolute;top:6px;right:6px;margin:0;padding:1px 7px}
 @keyframes tpPulse{0%{stroke-opacity:.9;stroke-width:3}100%{stroke-opacity:0;stroke-width:16}}
 #t-topo .tp-pulse{animation:tpPulse 1.3s ease-out infinite}
 `;
@@ -62,51 +62,79 @@
       .catch(e => { TM.busy = false; TM.msg = String(e); draw(); });
   }
 
-  // ── διάταξη (δέντρο από πάνω προς τα κάτω, συσκευές ως «πάνελ θυρών» κάτω από κάθε switch) ──
-  function layout(g) {
+  // ── διάταξη: η διαδρομή σου οριζόντια πάνω (Router → Modem → Πάροχος → Internet), το LAN από κάτω,
+  //    οι συσκευές ως πλέγμα από κάρτες που γεμίζει το πλάτος της οθόνης ──
+  const CW = 214, CH = 50, CG = 10, HG = 70;
+  function devIcon(n) {
+    if (n.kind === 'me') return '🧑‍💻';
+    if (n.kind === 'more') return '➕';
+    const s = (LT(n.sub) + ' ' + LT(n.label)).toLowerCase();
+    const R = [[/iphone|android|κινητ|phone|tablet|ipad|pixel|galaxy/, '📱'], [/\btv\b|τηλεόρ|media|chromecast|roku|apple tv|sonos|speaker|ηχεί/, '📺'],
+      [/cam|κάμερ|hikvision|tapo c|reolink|dahua/, '📷'], [/print|εκτυπ|hp |epson|brother|canon/, '🖨'], [/voip|τηλέφωνο ip|grandstream|yealink/, '☎️'],
+      [/esp|raspberry|πρίζα|plug|iot|tuya|shelly|sonoff|bulb|λάμπ|thermo/, '🔌'], [/xbox|playstation|nintendo|console|κονσόλ/, '🎮'],
+      [/nas|synology|qnap|proxmox|server|διακομ/, '🗄'], [/watch|ρολόι/, '⌚'], [/mac|laptop|υπολογ|pc|desktop|windows|lenovo|dell|asus|asrock/, '💻']];
+    for (const [re, ic] of R) if (re.test(s)) return ic;
+    return '❔';
+  }
+  function layout(g, availW) {
     const N = {}; g.nodes.forEach(n => { N[n.id] = Object.assign({}, n, { kids: [], hosts: [] }); });
     g.nodes.forEach(n => {
       const p = N[n.parent]; if (!p || n.id === 'dns') return;
       (['host', 'me', 'more'].includes(n.kind) ? p.hosts : p.kids).push(N[n.id]);
     });
     const up = []; let c = N.router;
-    while (c && c.parent && N[c.parent]) { c = N[c.parent]; up.unshift(c); }   // internet … modem
-    const order = n => n.kind === 'ap' ? 1 : 0;
-    const measure = n => {
-      n.kids.sort((a, b) => order(a) - order(b));
-      n.hosts.sort((a, b) => (b.kind === 'me') - (a.kind === 'me') || String(a.port).localeCompare(String(b.port), undefined, { numeric: true }));
-      n.kids.forEach(measure);
-      const parts = n.kids.map(k => k.w).concat(n.hosts.length ? [PW] : []);
-      const sum = parts.reduce((a, b) => a + b, 0) + GAP * Math.max(0, parts.length - 1);
-      n.w = Math.max(BW, sum);
-      const ph = n.hosts.length ? 30 + n.hosts.length * RH : 0;
-      n.h = BH + (parts.length ? ROW - BH + Math.max(ph, ...n.kids.map(k => k.h), 0) : 0);
+    while (c && c.parent && N[c.parent]) { c = N[c.parent]; up.push(c); }   // modem … internet
+    const chain = [N.router].concat(up);
+    chain.forEach((n, i) => { n.x = PAD + i * (BW + HG); n.y = PAD; n.inChain = true; });
+    const chainW = PAD * 2 + chain.length * BW + (chain.length - 1) * HG + (N.dns ? 0 : 0);
+    if (N.dns && N.internet) { N.dns.x = N.internet.x; N.dns.y = PAD + BH + 46; }
+    const avail = Math.max(availW || 1200, chainW) - PAD * 2;
+    const grid = (n, maxW) => {
+      const k = n.hosts.length; if (!k) return null;
+      let cols = maxW ? Math.max(1, Math.floor((maxW + CG) / (CW + CG))) : (k <= 5 ? 1 : k <= 14 ? 2 : 3);
+      cols = Math.min(cols, k);
+      const rows = Math.ceil(k / cols);
+      return { cols, rows, w: cols * (CW + CG) + CG, h: 34 + rows * (CH + 8) + 4 };
     };
-    measure(N.router);
-    const W = Math.max(N.router.w, BW * 2 + GAP * 2) + PAD * 2;
-    const cx = PAD + (W - PAD * 2) / 2;
-    let y = PAD;
-    up.forEach(n => { n.x = cx - BW / 2; n.y = y; y += ROW; });
-    if (N.dns && N.internet) { N.dns.x = N.internet.x + BW + 70; N.dns.y = N.internet.y; }
-    const place = (n, x0, y0) => {
-      n.x = x0 + n.w / 2 - BW / 2; n.y = y0;
-      const parts = (n.hosts.length ? [{ panel: true, w: PW }] : []).concat(n.kids);
-      const sum = parts.reduce((a, p) => a + p.w, 0) + GAP * Math.max(0, parts.length - 1);
-      let x = x0 + (n.w - sum) / 2;
+    const order = n => n.kind === 'ap' ? 1 : 0;
+    const sortHosts = n => n.hosts.sort((a, b) => (b.kind === 'me') - (a.kind === 'me') || (a.kind === 'more') - (b.kind === 'more') ||
+      (a.status === 'ok' ? 0 : 1) - (b.status === 'ok' ? 0 : 1) || String(a.ip).localeCompare(String(b.ip), undefined, { numeric: true }));
+    const measure = (n, top) => {
+      n.kids.sort((a, b) => order(a) - order(b)); sortHosts(n);
+      n.kids.forEach(k => measure(k, false));
+      const kw = n.kids.reduce((a, k) => a + k.w, 0) + GAP * Math.max(0, n.kids.length - (n.hosts.length ? 0 : 1));
+      n.grid = grid(n, top ? Math.max(CW, avail - kw) : 0);
+      const parts = n.kids.map(k => k.w).concat(n.grid ? [n.grid.w] : []);
+      const sum = parts.reduce((a, b) => a + b, 0) + GAP * Math.max(0, parts.length - 1);
+      n.w = Math.max(top ? 0 : BW, sum);
+      n.h = (top ? 0 : BH) + (parts.length ? ROW - BH + Math.max(n.grid ? n.grid.h : 0, ...n.kids.map(k => k.h), 0) : 0);
+    };
+    measure(N.router, true);
+    const placeKids = (n, x0, y0) => {
+      const parts = (n.grid ? [{ panel: true, w: n.grid.w }] : []).concat(n.kids);
+      let x = x0;
       parts.forEach(p => {
-        if (p.panel) { n.panel = { x, y: y0 + ROW, w: PW, h: 30 + n.hosts.length * RH }; n.hosts.forEach((h, i) => { h.x = x; h.y = y0 + ROW + 30 + i * RH; h.inPanel = true; }); }
-        else place(p, x, y0 + ROW);
+        if (p.panel) {
+          n.panel = { x, y: y0, w: n.grid.w, h: n.grid.h };
+          n.hosts.forEach((h, i) => { h.x = x + CG + (i % n.grid.cols) * (CW + CG); h.y = y0 + 34 + Math.floor(i / n.grid.cols) * (CH + 8); h.inPanel = true; });
+        } else { p.x = x + p.w / 2 - BW / 2; p.y = y0; placeKids(p, x + (p.w - (p.innerW || p.w)) / 2, y0 + ROW); }
         x += p.w + GAP;
       });
     };
-    place(N.router, cx - N.router.w / 2, y);
-    const H = y + N.router.h + PAD + 10;
-    return { N, up, W: Math.max(W, (N.dns ? N.dns.x + BW + PAD : 0)), H };
+    // υπο-δέντρα: τα παιδιά κάθε switch κεντραρισμένα κάτω του
+    const inner = n => { n.kids.forEach(inner); const parts = n.kids.map(k => k.w).concat(n.grid ? [n.grid.w] : []); n.innerW = parts.reduce((a, b) => a + b, 0) + GAP * Math.max(0, parts.length - 1); };
+    inner(N.router);
+    const lanY = PAD + BH + (N.dns ? 46 + BH + 50 : ROW - BH + 10);
+    placeKids(N.router, PAD, lanY);
+    const W = Math.max(chainW, PAD * 2 + N.router.w);
+    const H = lanY + (N.router.h - (ROW - BH)) + PAD + 16;
+    return { N, chain, W, H, lanY };
   }
 
   function svgOf(d, opt) {
     opt = opt || {};
-    const g = d.graph, diag = d.diag || {}, L = layout(g), N = L.N;
+    const selId = opt.light ? null : TM.sel;  // στο PDF/SVG χωρίς επιλογή
+    const g = d.graph, diag = d.diag || {}, L = layout(g, opt.availW), N = L.N;
     const dark = opt.light ? false : isDark();
     const C = { txt: col('--txt'), dim: col('--dim'), line: dark ? '#2a3a52' : '#c9d4e3', bg: dark ? '#0b1322' : '#f5f8fc', panel: dark ? '#132036' : '#ffffff', cyan: col('--cyan'), red: col('--red') };
     const LP = { '--green': '#16a34a', '--yellow': '#ca8a04', '--red': '#dc2626', '--cyan': '#0891b2', '--dim': '#64748b' };
@@ -124,47 +152,57 @@
     out.push(`<defs><pattern id="tpg" width="24" height="24" patternUnits="userSpaceOnUse"><path d="M24 0H0V24" fill="none" stroke="${C.line}" stroke-opacity=".35" stroke-width=".6"/></pattern></defs><rect width="100%" height="100%" fill="url(#tpg)"/>`);
     const brokenEdge = diag.level === 'bad' ? [diag.node, diag.prev] : null;
     // ακμές
+    const hit = (e, x, y) => { if (brokenEdge && ((e.a === brokenEdge[0] && e.b === brokenEdge[1]) || (e.b === brokenEdge[0] && e.a === brokenEdge[1])))
+      out.push(`<g><circle cx="${x}" cy="${y}" r="13" fill="${C.red}"/><text x="${x}" y="${y + 5}" text-anchor="middle" font-size="15">⚡</text></g>`); };
     g.edges.forEach(e => {
       const a = N[e.a], b = N[e.b]; if (!a || !b || b.inPanel) return;
       if (e.side) { // internet ↔ DNS
-        out.push(`<line x1="${a.x + BW}" y1="${a.y + BH / 2}" x2="${b.x}" y2="${b.y + BH / 2}" stroke="${C.dim}" stroke-dasharray="4 4" stroke-width="1.5"/>`);
+        out.push(`<line x1="${a.x + BW / 2}" y1="${a.y + BH}" x2="${b.x + BW / 2}" y2="${b.y}" stroke="${C.dim}" stroke-dasharray="4 4" stroke-width="1.5"/>`);
         return;
       }
       const onp = path.has(a.id) && path.has(b.id);
       const s = e.status === 'down' ? C.red : e.status === 'slow' ? vc('--yellow') : onp ? C.cyan : C.dim;
-      const x1 = a.x + BW / 2, y1 = a.y + BH, x2 = b.x + BW / 2, y2 = b.y, my = y1 + (y2 - y1) / 2;
       const dash = e.guess || e.status === 'unreach' ? ' stroke-dasharray="5 5"' : '';
+      if (a.inChain && b.inChain) { // οριζόντια: η διαδρομή προς το Internet
+        const [l, r] = a.x < b.x ? [a, b] : [b, a], y = l.y + BH / 2, x1 = l.x + BW, x2 = r.x;
+        out.push(`<line x1="${x1}" y1="${y}" x2="${x2}" y2="${y}" stroke="${s}" stroke-width="${onp ? 3 : 1.8}"${dash}/>`);
+        out.push(`<path d="M${x2 - 8} ${y - 5}L${x2} ${y}L${x2 - 8} ${y + 5}" fill="none" stroke="${s}" stroke-width="2"/>`);
+        hit(e, (x1 + x2) / 2, y);
+        return;
+      }
+      const x1 = a.x + BW / 2, y1 = a.y + BH, x2 = b.x + BW / 2, y2 = b.y, my = y2 - 26;
       out.push(`<path d="M${x1} ${y1}V${my}H${x2}V${y2}" fill="none" stroke="${s}" stroke-width="${onp ? 3 : 1.8}"${dash} stroke-linejoin="round"/>`);
       if (e.label) out.push(`<text x="${x2 + 6}" y="${y2 - 8}" font-size="11" fill="${C.dim}" ${mono}>${E(trunc(e.label, 14))}</text>`);
-      if (brokenEdge && ((e.a === brokenEdge[0] && e.b === brokenEdge[1]) || (e.b === brokenEdge[0] && e.a === brokenEdge[1]))) {
-        const fx = x2, fy = my;
-        out.push(`<g><circle cx="${fx}" cy="${fy}" r="13" fill="${C.red}"/><text x="${fx}" y="${fy + 5}" text-anchor="middle" font-size="15">⚡</text></g>`);
-      }
+      hit(e, x2, my);
     });
-    // πάνελ συσκευών (σαν «patch panel»)
+    // πλέγμα συσκευών κάτω από κάθε router/switch/AP
     Object.values(N).forEach(n => {
       if (!n.panel) return;
-      const p = n.panel, x1 = n.x + BW / 2, y1 = n.y + BH, x2 = p.x + p.w / 2, my = y1 + (p.y - y1) / 2;
+      const p = n.panel, x1 = n.x + BW / 2, y1 = n.y + BH, x2 = Math.min(Math.max(x1, p.x + 30), p.x + p.w - 30), my = p.y - 26;
       const onp = n.hosts.some(h => path.has(h.id));
       out.push(`<path d="M${x1} ${y1}V${my}H${x2}V${p.y}" fill="none" stroke="${onp ? C.cyan : C.dim}" stroke-width="${onp ? 3 : 1.8}" stroke-linejoin="round"/>`);
-      out.push(`<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="10" fill="${C.panel}" fill-opacity=".92" stroke="${C.line}"/>`);
-      out.push(`<text x="${p.x + 10}" y="${p.y + 19}" font-size="11.5" font-weight="700" fill="${C.dim}">${E(T('ΣΥΣΚΕΥΕΣ', 'DEVICES'))} · ${n.hosts.length}</text>`);
+      out.push(`<rect x="${p.x}" y="${p.y}" width="${p.w}" height="${p.h}" rx="12" fill="${C.panel}" fill-opacity=".55" stroke="${C.line}"/>`);
+      const on = n.hosts.filter(h => h.status === 'ok' || h.kind === 'me').length;
+      out.push(`<text x="${p.x + 12}" y="${p.y + 22}" font-size="12" font-weight="700" fill="${C.dim}">${E(T('ΣΥΣΚΕΥΕΣ', 'DEVICES'))} · ${n.hosts.length}  <tspan fill="${sc('ok')}">● ${on} ${E(T('ενεργές', 'active'))}</tspan>  ·  ${E(T('στο', 'on'))} ${E(trunc(LT(n.label), 26))}</text>`);
       n.hosts.forEach(h => {
-        const y = h.y, me = h.kind === 'me', sel = TM.sel === h.id;
+        const x = h.x, y = h.y, me = h.kind === 'me', sel = selId === h.id, more = h.kind === 'more';
+        const name = LT(h.label), named = name && name !== h.ip;
         out.push(`<g class="nd" data-id="${E(h.id)}">`);
-        out.push(`<rect x="${p.x + 4}" y="${y}" width="${p.w - 8}" height="${RH - 2}" rx="5" fill="${me ? C.cyan : sel ? C.line : 'transparent'}" fill-opacity="${me ? .16 : .5}"/>`);
-        out.push(`<text x="${p.x + 10}" y="${y + 14}" font-size="10.5" fill="${C.dim}" ${mono}>${E(trunc(h.port || '·', 7))}</text>`);
-        out.push(`<circle cx="${p.x + 68}" cy="${y + 10}" r="4" fill="${sc(h.status)}"/>`);
-        const vl = h.vlan != null ? ` · v${h.vlan}` : '';
-        out.push(`<text x="${p.x + 78}" y="${y + 14}" font-size="11.5" fill="${C.txt}" font-weight="${me ? 700 : 400}">${E(trunc((me ? '🧑‍💻 ' : '') + LT(h.label), 17))}</text>`);
-        out.push(`<text x="${p.x + p.w - 10}" y="${y + 14}" font-size="10" text-anchor="end" fill="${C.dim}" ${mono}>${E((h.ip || '').replace(/^\d+\.\d+\./, '…') + vl)}</text>`);
+        out.push(`<rect class="box" x="${x}" y="${y}" width="${CW}" height="${CH}" rx="9" fill="${C.panel}" stroke="${me ? C.cyan : sel ? C.txt : C.line}" stroke-width="${me || sel ? 2 : 1}"/>`);
+        out.push(`<circle cx="${x + 12}" cy="${y + 14}" r="4" fill="${sc(h.status)}"/>`);
+        out.push(`<text x="${x + 22}" y="${y + 20}" font-size="15">${devIcon(h)}</text>`);
+        out.push(`<text x="${x + 44}" y="${y + 20}" font-size="12" font-weight="${me || named ? 700 : 500}" fill="${C.txt}">${E(trunc(more ? T(`${name} ακόμα`, `${name} more`) : me && !named ? T('Εσύ', 'You') : name, 22))}</text>`);
+        const tag = [h.port, h.vlan != null ? 'v' + h.vlan : ''].filter(Boolean).join(' · ');
+        const l2 = more ? '' : named || me ? h.ip : (LT(h.sub) || T('άγνωστη συσκευή', 'unknown device'));
+        out.push(`<text x="${x + 44}" y="${y + 37}" font-size="10.5" fill="${C.dim}" ${named || me ? mono : ''}>${E(trunc(l2, tag ? 15 : 26))}</text>`);
+        if (tag) out.push(`<text x="${x + CW - 8}" y="${y + 37}" font-size="9.5" text-anchor="end" fill="${C.dim}" ${mono}>${E(trunc(tag, 12))}</text>`);
         out.push(`</g>`);
       });
     });
     // κόμβοι
     Object.values(N).forEach(n => {
       if (n.inPanel || n.x == null) return;
-      const s = sc(n.status), onp = path.has(n.id), sel = TM.sel === n.id;
+      const s = sc(n.status), onp = path.has(n.id), sel = selId === n.id;
       const dash = ['quiet', 'unreach', 'unknown'].includes(n.status) ? ' stroke-dasharray="5 4"' : '';
       out.push(`<g class="nd" data-id="${E(n.id)}">`);
       if (diag.level === 'bad' && diag.node === n.id) out.push(`<rect class="tp-pulse" x="${n.x}" y="${n.y}" width="${BW}" height="${BH}" rx="12" fill="none" stroke="${C.red}"/>`);
@@ -212,7 +250,7 @@
   });
   const dims = svg => { const m = svg.match(/width="(\d+(?:\.\d+)?)" height="(\d+(?:\.\d+)?)"/); return [+m[1], +m[2]]; };
   async function exportPNG() {
-    const svg = svgOf(TM.d).svg, [W, H] = dims(svg), img = await svgImg(svg);
+    const svg = svgOf(TM.d, { availW: TM.availW }).svg, [W, H] = dims(svg), img = await svgImg(svg);
     const c = document.createElement('canvas'); c.width = W * 2; c.height = H * 2;
     const x = c.getContext('2d'); x.scale(2, 2); x.drawImage(img, 0, 0);
     c.toBlob(b => save('png', b), 'image/png');
@@ -260,7 +298,7 @@
     x.fillStyle = col_; x.fillRect(90, 220, 10, y - 240);
     const sy = y;
     const top = Math.max(y, sy, 380) + 20;
-    const svg = svgOf(d, { light: true }).svg, [W, H] = dims(svg), img = await svgImg(svg);
+    const svg = svgOf(d, { light: true, availW: 1500 }).svg, [W, H] = dims(svg), img = await svgImg(svg);
     const legY = PG[1] - 70, availH = legY - 30 - top, availW = PG[0] - 180, s = Math.min(availW / W, availH / H, 2.2);
     x.drawImage(img, 90 + (availW - W * s) / 2, top, W * s, H * s);
     x.font = `24px ${FONT}`; let lx = 90;
@@ -334,7 +372,7 @@
         <div style="font-size:13.5px">${E(LT(diag.text))}</div>
         ${(diag.steps || []).length ? `<ol>${diag.steps.map(s => `<li>${E(LT(s))}</li>`).join('')}</ol>` : ''}
         ${(d.issues || []).length ? `<ul class="tp-iss">${d.issues.map(i => `<li data-tpsel="${E(i.node)}" style="--c:${i.level === 'bad' ? 'var(--red)' : 'var(--yellow)'}">${E(en ? i.en : i.el)}</li>`).join('')}</ul>` : ''}</div></div>`;
-      const { svg } = svgOf(d);
+      const { svg } = svgOf(d, { availW: TM.availW = Math.max(600, (el.clientWidth || 1200) - 40) });
       TM.svg = svg;
       h += `<div class="tp-wrap" id="tp-wrap" data-noi18n>${svg}</div>
         <div class="tp-leg" data-noi18n>${['ok', 'slow', 'down', 'quiet', 'unreach'].map(k => `<span><i style="--c:var(${ST[k][0]})"></i>${E(T(ST[k][1], ST[k][2]))}</span>`).join('')}
@@ -356,10 +394,13 @@
     wrap.querySelectorAll('.tp-pop').forEach(p => p.remove());
     const n = TM.d.graph.nodes.find(x => x.id === id); const g = wrap.querySelector(`.nd[data-id="${CSS.escape(id)}"]`);
     if (!n || !g) return;
+    // καρτέλα λεπτομερειών στη γωνία του ορατού κομματιού — δεν σκεπάζει αυτό που πάτησες
     const r = g.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
-    const p = document.createElement('div'); p.className = 'tp-pop'; p.innerHTML = popHTML(n);
-    p.style.left = Math.max(4, r.left - wr.left + wrap.scrollLeft) + 'px'; p.style.top = (r.bottom - wr.top + wrap.scrollTop + 6) + 'px';
+    const p = document.createElement('div'); p.className = 'tp-pop'; p.innerHTML = popHTML(n) + `<button class="b tp-x" data-tpclose title="Esc">✕</button>`;
     wrap.appendChild(p);
+    const pw = p.offsetWidth, right = r.right - wr.left > wrap.clientWidth - pw - 30;
+    p.style.left = (wrap.scrollLeft + (right ? 12 : wrap.clientWidth - pw - 12)) + 'px';
+    p.style.top = (wrap.scrollTop + 12) + 'px';
   }
 
   document.addEventListener('click', ev => {
@@ -369,13 +410,14 @@
     if (t.dataset.tpf != null) { TM.fault = t.dataset.tpf; draw(); return run(); }
     if (t.id === 'tp-pdf' && TM.d && TM.d.graph) return exportPDF().catch(e => { TM.msg = String(e); draw(); });
     if (t.id === 'tp-png' && TM.d && TM.d.graph) return exportPNG().catch(e => { TM.msg = String(e); draw(); });
-    if (t.id === 'tp-svg' && TM.d && TM.d.graph) return save('svg', new Blob([svgOf(TM.d, { light: true }).svg], { type: 'image/svg+xml' }));
+    if (t.id === 'tp-svg' && TM.d && TM.d.graph) return save('svg', new Blob([svgOf(TM.d, { light: true, availW: TM.availW }).svg], { type: 'image/svg+xml' }));
     if (t.id === 'tp-zi' || t.id === 'tp-zo' || t.id === 'tp-zr') {
       TM.fitted = true; TM.zoom = t.id === 'tp-zr' ? 1 : Math.min(2, Math.max(0.4, TM.zoom + (t.id === 'tp-zi' ? 0.15 : -0.15)));
       const s = el.querySelector('#tp-wrap svg'); if (s) { s.style.transform = `scale(${TM.zoom})`; fitSize(s); }
       const zr = el.querySelector('#tp-zr'); if (zr) zr.textContent = Math.round(TM.zoom * 100) + '%';
       return;
     }
+    if (t.dataset.tpclose != null) { TM.sel = null; el.querySelectorAll('.tp-pop').forEach(p => p.remove()); draw(); return; }
     if (t.dataset.tpcp) { navigator.clipboard && navigator.clipboard.writeText(t.dataset.tpcp); t.textContent = '✓'; return; }
     if (t.dataset.tpwhere) return window.whereIs(t.dataset.tpwhere);
     if (t.dataset.tpprof) return window.showProfile(t.dataset.tpprof);
@@ -385,5 +427,5 @@
   });
 
   window.renderTopo = () => { load(); if (!document.querySelector('#t-topo .ctitle')) draw(); };
-  window.TOPO = TM;
+  window.TOPO = TM; TM.draw = draw;
 })();

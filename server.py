@@ -258,6 +258,28 @@ def make_handler(state):
                     if not wi:
                         return self._json({"error": "Η αναζήτηση θύρας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."}, 400)
                     return self._json(wi.refresh())
+                if u.path.startswith("/api/ssh/"):  # 🖥 SSH Explorer (μόνο κλειδιά, μόνο ανάγνωση)
+                    sb = getattr(state, "ssh", None)
+                    if not sb:
+                        return self._json({"error": "Το SSH Explorer δεν είναι διαθέσιμο σε αυτή τη λειτουργία."}, 400)
+                    act, hid, pth = u.path[9:], str(body.get("id") or ""), body.get("path")
+                    if act == "host":
+                        r = sb.delete_host(hid) if body.get("delete") else sb.add_host(body)
+                    elif act == "hostkey":
+                        r = sb.hostkey(hid)
+                    elif act == "trust":
+                        r = sb.trust(hid, str(body.get("fp") or ""))
+                    elif act == "ls":
+                        r = sb.ls(hid, pth or "~")
+                    elif act == "cat":
+                        r = sb.cat(hid, pth or "")
+                    elif act == "fetch":
+                        r = sb.fetch(hid, pth or "")
+                    elif act == "info":
+                        r = sb.info(hid)
+                    else:
+                        return self._json({"error": "not found"}, 404)
+                    return self._json(r, 400 if "error" in r and act in ("host", "trust") else 200)
                 if u.path == "/api/topomap/run":  # 🗺 διάγραμμα δικτύου
                     tm = getattr(state, "topomap", None)
                     if not tm:
@@ -652,7 +674,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -696,6 +718,24 @@ def make_handler(state):
                 if len(qq) > 64:
                     return self._json({"error": "Πολύ μεγάλο ερώτημα (έως 64 χαρακτήρες)."}, 400)
                 return self._json(wi.lookup(qq) if wi else {"query": qq, "found": False, "location": None, "off": True})
+            if u.path == "/api/ssh":  # 🖥 SSH Explorer
+                sb = getattr(state, "ssh", None)
+                return self._json(sb.view() if sb else {"hosts": [], "keys": {"keys": []}, "suggestions": [], "off": True})
+            if u.path == "/api/ssh/file":  # 🖥 κατέβασμα αρχείου από SSH (μία φορά, 5′)
+                sb = getattr(state, "ssh", None)
+                f = sb.get_file(parse_qs(u.query).get("id", [""])[0]) if sb else None
+                if not f:
+                    return self._json({"error": "Το αρχείο έληξε — πάτα ξανά κατέβασμα."}, 404)
+                self.send_response(200)
+                self.send_header("Content-Type", "application/octet-stream")
+                self.send_header("Content-Length", str(len(f["data"])))
+                self.send_header("Content-Disposition", f'attachment; filename="{f["name"]}"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Content-Security-Policy", "default-src 'none'; sandbox")
+                self.end_headers()
+                self.wfile.write(f["data"])
+                return
             if u.path == "/api/topomap/file":  # 🗺 κατέβασμα PDF/PNG/SVG που μόλις φτιάχτηκε
                 tm = getattr(state, "topomap", None)
                 f = tm.get_file(parse_qs(u.query).get("id", [""])[0]) if tm else None
