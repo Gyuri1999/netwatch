@@ -15,6 +15,12 @@ import threading
 import time
 from http.server import ThreadingHTTPServer
 
+import winplat
+
+if __name__ == "__main__":
+    winplat.ensure_utf8_mode()  # Windows: ελληνικά αρχεία/έξοδος σε UTF-8 (ξαναξεκινά με -X utf8 αν χρειάζεται)
+winplat.install_subprocess_defaults()
+
 # Συμβατότητα: όλα τα ονόματα των modules είναι διαθέσιμα και ως netwatch.<όνομα> (π.χ. για τα tests/CI).
 from core import *  # noqa: F401,F403
 from storage import *  # noqa: F401,F403
@@ -53,6 +59,11 @@ def watch_parent(pid):
     """Η εφαρμογή του Mac ξεκινά το NetWatch (και με sudo): όταν εκείνη κλείσει, κλείνουμε κι εμείς."""
     while True:
         time.sleep(1)
+        if winplat.IS_WIN:  # εκεί το os.kill(pid, 0) στέλνει Ctrl+C αντί να ελέγχει
+            if not winplat.pid_alive(pid):
+                log("Η εφαρμογή έκλεισε — τέλος.")
+                quit_now()
+            continue
         try:
             os.kill(pid, 0)
         except ProcessLookupError:
@@ -65,6 +76,12 @@ def watch_parent(pid):
 def open_browser(url):
     """Ανοίγει τον browser ως ο κανονικός χρήστης, ακόμα κι αν τρέχουμε με sudo."""
     time.sleep(1.5)
+    if winplat.IS_WIN:
+        try:
+            winplat.open_url(url)
+        except OSError:
+            pass
+        return
     cmd = ["open", url] if sys.platform == "darwin" else ["xdg-open", url]
     user = os.environ.get("SUDO_USER")
     if user and os.geteuid() == 0:
@@ -73,6 +90,23 @@ def open_browser(url):
         subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     except Exception:
         pass
+
+
+def list_ifaces():
+    """Οι διεπαφές όπως τις βλέπει το scapy (στα Windows: «Wi-Fi», «Ethernet»… μέσω Npcap)."""
+    from scapy.all import conf
+    default = detect_net()[0]
+    for i in sorted(conf.ifaces.values(), key=lambda i: str(i.name)):
+        ips = ", ".join((getattr(i, "ips", {}) or {}).get(4, []) or [getattr(i, "ip", "") or ""])
+        mark = "  ← προεπιλογή" if i.name == default else ""
+        print(f"{i.name:<28} {ips:<18} {getattr(i, 'description', '') or ''}{mark}")
+    print("\nΧρήση: netwatch.py -i \"<όνομα>\"")
+
+
+class _Server(ThreadingHTTPServer):
+    # Στα Windows το SO_REUSEADDR επιτρέπει σε ΔΕΥΤΕΡΟ πρόγραμμα να «κλέψει» μια θύρα που ήδη ακούει —
+    # τότε δεν θα βλέπαμε ποτέ «πιασμένη θύρα» και δύο NetWatch θα μοιράζονταν την 8765.
+    allow_reuse_address = not winplat.IS_WIN
 
 
 def main():
@@ -98,7 +132,11 @@ def main():
                     help="λειτουργία agent: ακούει στο LAN με HTTPS + token (για server στο Proxmox / Raspberry Pi)")
     ap.add_argument("--bind", help="διεύθυνση ακρόασης (προεπιλογή 127.0.0.1· με --agent: 0.0.0.0)")
     ap.add_argument("--no-intel", action="store_true", help="χωρίς κατέβασμα blocklists (threat intel)")
+    ap.add_argument("--list-ifaces", action="store_true", help="δείξε τις διεπαφές που βλέπει η καταγραφή και τέλος")
     args = ap.parse_args()
+    if args.list_ifaces:
+        list_ifaces()
+        return
 
     cfg_path = args.config or (os.path.join(HERE, "config.yaml") if os.path.exists(os.path.join(HERE, "config.yaml")) else None)
     cfg = load_config(cfg_path)
@@ -127,9 +165,13 @@ def main():
         state = NetState("demo", "demo0", ["192.168.1.23"], "192.168.1.1", geo=False, rdns=False, **common)
         demo_run(state)
     else:
+        if winplat.IS_WIN and not winplat.npcap_installed():
+            sys.exit("✖ Για live καταγραφή στα Windows χρειάζεται το Npcap: " + winplat.NPCAP_URL +
+                     "\n  (στην εγκατάσταση άφησε ενεργό το «WinPcap API-compatible Mode»)\n"
+                     "  Χωρίς Npcap δουλεύουν τα --demo και --pcap αρχείο.pcap")
         iface, gw, me = detect_net(args.iface)
         if not iface:
-            sys.exit("Δεν βρέθηκε interface — δώσε -i en0")
+            sys.exit("Δεν βρέθηκε interface — δώσε -i " + ('"Wi-Fi"' if winplat.IS_WIN else "en0"))
         state = NetState("live", iface, me, gw, geo=not args.no_geo, rdns=not args.no_rdns, **common)
         log(f"Interface {iface} | οι IP μου {', '.join(sorted(me))} | router {gw} | ιστορικό {hist_path}")
         seed_arp(state)
@@ -418,7 +460,7 @@ def main():
         state.agent = {"token": agent.load_token(ddir, acfg.get("token")), "fingerprint": fp}
     for port in range(args.port, args.port + 20):
         try:
-            srv = ThreadingHTTPServer((bind, port), make_handler(state))
+            srv = _Server((bind, port), make_handler(state))
             break
         except OSError:
             log(f"Η θύρα {port} είναι πιασμένη (τρέχει ήδη άλλο NetWatch;) — δοκιμάζω την {port + 1}")

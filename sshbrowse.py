@@ -26,7 +26,6 @@ import base64
 import ipaddress
 import json
 import os
-import pwd
 import re
 import secrets
 import shlex
@@ -91,6 +90,7 @@ def _user_home():
     u = os.environ.get("SUDO_USER")
     if u and hasattr(os, "geteuid") and os.geteuid() == 0:
         try:
+            import pwd  # μόνο Unix (στα Windows δεν υπάρχει sudo/geteuid, άρα δεν φτάνουμε εδώ)
             return pwd.getpwnam(u).pw_dir
         except KeyError:
             pass

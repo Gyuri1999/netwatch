@@ -72,6 +72,9 @@ def summarize(rtts, sent):
 
 
 def ping_round(host, count=PINGS, gap=PING_GAP):
+    if sys.platform == "win32":
+        import winplat
+        return summarize(*parse_ping(winplat.ping(host, count, 1500), count))
     cmd = ping_cmd(host, count, gap)
     try:
         out = subprocess.run(cmd, capture_output=True, text=True, timeout=count * gap + 8).stdout

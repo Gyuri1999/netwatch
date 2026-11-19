@@ -374,7 +374,11 @@ def demo_check(vpn=True):
 def vpn_full_tunnel(default_iface):
     """VPN που περνά ΟΛΗ την κίνηση: η προεπιλεγμένη διαδρομή πάει σε utun/tun/wg/ppp/ipsec."""
     import re
-    return bool(default_iface and re.match(r"(utun|tun|tap|wg|ppp|ipsec)\d*$", default_iface))
+    if default_iface and re.match(r"(utun|tun|tap|wg|ppp|ipsec)\d*$", default_iface):
+        return True
+    # Windows: οι διεπαφές έχουν «φιλικά» ονόματα (π.χ. «NordLynx», «WireGuard Tunnel», «OpenVPN TAP-Windows6»)
+    return bool(default_iface and re.search(r"wireguard|openvpn|nordlynx|proton|mullvad|wintun|tap-windows|\bvpn\b",
+                                            default_iface, re.I))
 
 
 class Runner:

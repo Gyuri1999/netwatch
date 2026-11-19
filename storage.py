@@ -219,6 +219,12 @@ class Notifier:
                 subprocess.run(cmd, timeout=10, capture_output=True)
             except Exception as e:
                 log("macOS notification error:", e)
+        elif self.cfg.get("macos") and sys.platform == "win32":  # ίδια ρύθμιση: «ειδοποιήσεις υπολογιστή»
+            try:
+                import winplat
+                winplat.toast(title, body)
+            except Exception as e:
+                log("Windows notification error:", e)
         for name, fn in (() if mac_only else (("telegram", self._telegram), ("ntfy", self._ntfy))):
             try:
                 fn(title, body, a["sev"])

@@ -147,6 +147,25 @@ docker compose up -d                 # Linux: run as a service, history in ./dat
 
 A native menu-bar app written in Swift (AppKit + WKWebView), compiled with `swiftc`, so Xcode is not needed. The shield icon in the menu bar turns green, yellow or red and shows the alert count. Its menu shows the latest alert and the Wi‑Fi Guard verdict, and lets you run a Wi‑Fi check or switch between **Live**, **Demo** and **pcap replay**. The dashboard opens in its own window. Downloads (incident reports, map snapshots) are saved to `~/Downloads`, and external links open in your browser. Live capture asks for your administrator password in the standard macOS dialog. The Python backend runs from `~/Library/Application Support/NetWatch`, where its history and settings also live, and it exits when the app quits. The app is signed ad hoc, so the first time you open a copy built on another Mac, use right-click → Open.
 
+### Windows 10 / 11
+
+1. Install **Python 3.9+** (`winget install Python.Python.3.12`, or python.org with *Add python.exe to PATH*).
+2. For live capture, install **[Npcap](https://npcap.com/#download)** and keep *WinPcap API-compatible Mode* ticked. Demo and pcap replay don't need it.
+3. Double-click **`run.bat`**, or from a terminal:
+
+```bat
+run.bat --demo                            :: simulated traffic and attacks
+run.bat --pcap samples\lan-attack.pcap    :: replay a recorded attack
+run.bat                                   :: live capture on the default interface (Npcap)
+run.bat -Admin                            :: as administrator: one-click IP blocking in Windows Firewall
+run.bat --list-ifaces                     :: interface names for -i "Wi-Fi" / -i "Ethernet"
+run.bat -Shortcut                         :: put a NetWatch shortcut on the desktop
+```
+
+The first run creates `.venv` and installs the dependencies, then the dashboard opens in your default browser. In Edge, *⋯ → Apps → Install this site as an app* gives it its own window and a Start menu entry. The network details come from PowerShell (`Get-NetRoute`, `Get-NetIPAddress`, `Get-NetAdapter`) and `arp -a`, ping goes through the Windows `ping`, Wi‑Fi Guard reads `netsh wlan show interfaces`, alerts show as Windows notifications, and **Block** adds `NetWatch block <ip>` rules to Windows Firewall (they're removed on quit, and any leftovers are cleaned up the next time it starts). The parsers work with localized Windows output, Greek included.
+
+Not yet on Windows: the Wi‑Fi survey (nearby networks and channels) and the Academy terminal's Unix-only tools (`dig`, `traceroute`; `nmap` works once it is installed). The Windows support is tested in CI on `windows-latest` but has had little real-world use, so please report what breaks.
+
 ## Architecture
 
 ```mermaid
@@ -228,7 +247,8 @@ The sample capture is generated reproducibly by [`tools/make_sample_pcap.py`](to
 * The thresholds are heuristics and some legitimate tools trigger them (e.g. Fing sweeps the LAN). DHCP lease changes can cause an ARP false positive.
 * Geolocation reflects the server or VPN exit, not necessarily the person behind it.
 * Beaconing can flag legitimate pollers (updaters, messengers) and general blocklists contain some false positives. Add those to the allowlist.
-* The Docker image needs Linux host networking; on macOS run NetWatch natively.
+* The Docker image needs Linux host networking; on macOS and Windows run NetWatch natively.
+* On Windows, live capture needs Npcap. If Npcap was installed with *Restrict to Administrators*, start with `run.bat -Admin`.
 
 ## Ethics
 

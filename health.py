@@ -48,6 +48,13 @@ def http_check(url, timeout=5.0):
 
 
 def ping_check(host, timeout=2):
+    if sys.platform == "win32":
+        import winplat
+        t0 = time.time()
+        m = re.search(r"time=([\d.]+)", winplat.ping(host, 1, timeout * 1000))
+        if not m:  # τα Windows δίνουν κωδικό 0 ακόμα και για «Destination host unreachable»
+            raise OSError("δεν απαντά στο ping")
+        return float(m.group(1)) if m else (time.time() - t0) * 1000
     w = ["-W", str(timeout * 1000)] if sys.platform == "darwin" else ["-W", str(timeout)]
     t0 = time.time()
     out = subprocess.run(["ping", "-c", "1", *w, host], capture_output=True, text=True, timeout=timeout + 2)

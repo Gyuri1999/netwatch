@@ -5,6 +5,8 @@ macOS: pf. Οι κανόνες μπαίνουν στο anchor `com.apple/netwatc
 Το pf ενεργοποιείται με `pfctl -E` (με «token» αναφοράς), και απενεργοποιείται με `pfctl -X token`
 όταν ξεμπλοκάρεις τα πάντα — έτσι δεν πειράζουμε ό,τι άλλο χρησιμοποιεί το pf.
 Linux: iptables (INPUT + OUTPUT DROP).
+Windows: Τείχος προστασίας των Windows (netsh advfirewall), ένας κανόνας «NetWatch block <ip>» ανά κατεύθυνση.
+Εκεί οι κανόνες ΜΕΝΟΥΝ και μετά από επανεκκίνηση, γι' αυτό τους σβήνουμε στο κλείσιμο (clear()).
 
 Χρειάζεται root (στο Live mode το NetWatch τρέχει ήδη ως root). Αλλιώς δείχνει τις εντολές για να τις τρέξεις μόνος σου.
 Οι κανόνες ζουν στη μνήμη του πυρήνα: μετά από επανεκκίνηση φεύγουν.
@@ -48,6 +50,10 @@ def pf_rules(ips):
 def commands(ips, platform=None):
     """Οι εντολές που θα έτρεχε (για να τις δείξουμε στον χρήστη)."""
     platform = platform or sys.platform
+    if platform == "win32":
+        import winplat
+        return [" ".join(f'"{a}"' if " " in a else a for a in c) for ip in sorted(ips) for c in winplat.firewall_cmds(ip)] \
+            or [f'netsh advfirewall firewall show rule name=all | findstr /C:"{winplat.RULE_PREFIX}"']
     if platform == "darwin":
         if not ips:
             return [f"sudo pfctl -a {ANCHOR} -F all"]
@@ -73,9 +79,17 @@ class Blocker:
         self.blocked = {}  # ip → {"t","why"}
         self.token = None
         self.last_error = None
+        if self.platform == "win32" and not sim and self.can_apply:
+            # αν το προηγούμενο NetWatch δεν έκλεισε κανονικά, οι κανόνες του έμειναν στο τείχος — τους σβήνουμε
+            import winplat
+            threading.Thread(target=winplat.powershell, daemon=True, args=(
+                f"Remove-NetFirewallRule -DisplayName '{winplat.RULE_PREFIX} *' -ErrorAction SilentlyContinue",)).start()
 
     @property
     def can_apply(self):
+        if self.platform == "win32" and not self.sim:
+            import winplat
+            return winplat.is_admin()
         return self.sim or (hasattr(os, "geteuid") and os.geteuid() == 0)
 
     def status(self):
@@ -108,6 +122,8 @@ class Blocker:
         try:
             if self.platform == "darwin":
                 self._apply_pf(ips)
+            elif self.platform == "win32":
+                self._apply_netsh(added, removed)
             else:
                 self._apply_iptables(added, removed)
         except Exception as e:  # δεν ρίχνουμε τον server για ένα τείχος προστασίας
@@ -141,6 +157,16 @@ class Blocker:
             ipt = "ip6tables" if ":" in ip else "iptables"
             for chain, flag in (("INPUT", "-s"), ("OUTPUT", "-d")):
                 _run([ipt, op, chain, flag, ip, "-j", "DROP", "-m", "comment", "--comment", "netwatch"])
+
+    def _apply_netsh(self, added, removed):
+        import winplat
+        for ip, add in ((added, True), (removed, False)):
+            if not ip:
+                continue
+            for cmd in winplat.firewall_cmds(ip, add):
+                rc, out = _run(cmd)
+                if rc and add:
+                    raise RuntimeError("netsh: " + out[-160:])
 
     def clear(self):
         with self.lock:

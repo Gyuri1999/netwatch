@@ -101,6 +101,9 @@ def parse_nmcli(text):
 
 
 def wifi_info():
+    if sys.platform == "win32":
+        import winplat
+        return winplat.wifi_info()
     if sys.platform == "darwin":
         return parse_system_profiler(run(["system_profiler", "SPAirPortDataType", "-json"], 20))
     return parse_nmcli(run(["nmcli", "-t", "-f", "ACTIVE,SSID,SECURITY,CHAN,SIGNAL", "dev", "wifi"]))
@@ -122,6 +125,9 @@ def private_mac(mac):
 
 
 def iface_mac(iface):
+    if sys.platform == "win32":
+        import winplat
+        return next((i["mac"] for i in winplat.net_info().get("interfaces", []) if i["name"] == iface), None)
     m = re.search(r"ether ([0-9a-f:]{17})", run(["ifconfig", iface or "en0"]))
     return m.group(1) if m else None
 
@@ -206,6 +212,9 @@ def tor_running(ports=TOR_SOCKS):
 
 
 def default_iface():
+    if sys.platform == "win32":
+        import winplat
+        return winplat.net_info().get("gateway_iface")
     m = re.search(r"interface:\s*(\S+)", run(["route", "-n", "get", "default"]))
     if m:
         return m.group(1)
