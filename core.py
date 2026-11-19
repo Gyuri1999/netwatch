@@ -85,12 +85,17 @@ MITRE = [  # (πρόθεμα τύπου, technique id, όνομα, tactic, αν�
     ("Beaconing", "T1071", "Application Layer Protocol", "Command and Control", "beaconing"),
     ("DNS tunneling", "T1071.004", "Application Layer Protocol: DNS", "Command and Control", "dns_tunnel"),
     ("DGA", "T1568.002", "Dynamic Resolution: Domain Generation Algorithms", "Command and Control", "dga"),
+    ("DNS amplification", "T1498.002", "Network DoS: Reflection Amplification", "Impact", "dns_amplification"),
+    ("DNS flood", "T1499.002", "Endpoint DoS: Service Exhaustion Flood", "Impact", "dns_flood"),
+    ("NXDOMAIN flood", "T1499.002", "Endpoint DoS: Service Exhaustion Flood", "Impact", "nxdomain_flood"),
+    ("DNS rebinding", "T1189", "Drive-by Compromise", "Initial Access", "dns_rebinding"),
     ("Νέα συσκευή", "T1200", "Hardware Additions", "Initial Access", "new_device"),
     ("Σύνδεση σε κακόβουλη IP", "T1071", "Application Layer Protocol", "Command and Control", "threat_intel"),
     ("Κίνηση από κακόβουλη IP", "T1595", "Active Scanning", "Reconnaissance", "threat_intel"),
     ("Κωδικός σε καθαρό κείμενο", "T1040", "Network Sniffing", "Credential Access", "cleartext_creds"),
     ("Evil twin Wi‑Fi", "T1557", "Adversary-in-the-Middle", "Credential Access", "wifi_guard"),
     ("DNS hijacking στο Wi‑Fi", "T1557", "Adversary-in-the-Middle", "Credential Access", "wifi_guard"),
+    ("DNSSEC bypass στο Wi‑Fi", "T1557", "Adversary-in-the-Middle", "Credential Access", "wifi_guard"),
     ("TLS interception στο Wi‑Fi", "T1557", "Adversary-in-the-Middle", "Credential Access", "wifi_guard"),
     ("Ανοιχτό Wi‑Fi", "T1040", "Network Sniffing", "Credential Access", "wifi_guard"),
     ("Παγίδα", "T1046", "Network Service Discovery", "Discovery", "honeypot"),
@@ -172,12 +177,17 @@ DEFAULT_CONFIG = {
         "beaconing": {"min_events": 8, "max_jitter": 0.15, "min_interval": 10, "max_interval": 3600},
         "dns_tunnel": {"unique_subdomains": 30, "window": 60, "min_length": 20, "min_entropy": 3.5},
         "dga": {"nxdomain": 8, "window": 60, "min_score": 0.6},
+        # απαντήσεις χωρίς ερώτημα προς μια συσκευή (ή, για ανοιχτό resolver, προς πολλές δημόσιες IP)
+        "dns_amplification": {"count": 50, "bytes": 512000, "min_servers": 3, "reflector_targets": 20, "window": 10},
+        "dns_flood": {"count": 1000, "window": 10},  # ερωτήματα προς έναν DNS server
+        "nxdomain_flood": {"count": 200, "window": 10, "same_domain": 0.6},  # NXDOMAIN από έναν server
+        "dns_rebinding": {"window": 600},  # δημόσια → ιδιωτική IP για το ίδιο όνομα μέσα σε τόσα δευτ.
         "new_device": {"warmup": 60},
     },
     "detectors": {d: True for d in (
         "port_scan", "stealth_scan", "network_sweep", "brute_force", "syn_flood", "icmp_flood",
         "arp_spoofing", "arp_flood", "rogue_dhcp", "dns_spoofing", "inbound", "suspicious_port",
-        "beaconing", "dns_tunnel", "dga", "new_device", "threat_intel", "cleartext_creds", "custom_rules", "wifi_guard", "privacy_leaks")},
+        "beaconing", "dns_tunnel", "dga", "dns_amplification", "dns_flood", "nxdomain_flood", "dns_rebinding", "new_device", "threat_intel", "cleartext_creds", "custom_rules", "wifi_guard", "privacy_leaks")},
     "allowlist": {"ips": [], "macs": [], "domains": []},
     "intel": {
         "enabled": True,

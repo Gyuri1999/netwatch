@@ -97,6 +97,41 @@ window.NW_EDU_EN = {
       risk: "HIGH: data theft or a hidden control channel that bypasses the firewall.",
       todo: ["Isolate the device", "Block the domain on the router / DNS (e.g. Pi-hole)", "Check the device for malware"]
     },
+    'DNS amplification': {
+      t: "DNS amplification (amplified DDoS)", lvl: "Attack",
+      what: "Someone sends small DNS queries to many resolvers with a forged source address — yours. The resolvers send huge answers (ANY, TXT, DNSSEC) to you.",
+      how: "A 60-byte query → an answer of up to 4000 bytes: ×50 amplification. With thousands of open resolvers the victim's line fills up. NetWatch singles out answers that nobody asked for (the query ID doesn't match). If the DNS server on your network answers public IPs en masse, it is the “amplifier” itself (an open resolver).",
+      risk: "No Internet for as long as the attack lasts. If you are the amplifier: your connection is used to attack others and your provider may cut it off.",
+      todo: ["As the victim: contact your provider (ISP) — only they can filter before your line", "As the amplifier: close port 53 to the Internet (port forwarding on the router)", "Pi-hole/AdGuard/Unbound: answer only the LAN"]
+    },
+    'DNS flood': {
+      t: "DNS flood", lvl: "Attack",
+      what: "Thousands of DNS queries per second to one DNS server so that it can't keep up answering anyone.",
+      how: "Every query costs the server memory and CPU. When it is overwhelmed, name resolution goes down: sites won't open even though the Internet works.",
+      risk: "No site opens for the whole network. If the source is a device in your home, it may be infected (botnet) or broken.",
+      todo: ["Find the source device and disconnect it", "Rate-limit queries on the Pi-hole/router", "If it comes from the Internet: your provider (ISP)"]
+    },
+    'NXDOMAIN flood': {
+      t: "NXDOMAIN flood / random subdomain (“water torture”)", lvl: "Attack",
+      what: "A flood of queries for names that don't exist, often random subdomains of one target (e.g. a8f3k.bank.com, q91zz.bank.com).",
+      how: "A non-existent name doesn't get cached, so every query travels all the way to the target's DNS server and overloads it. Your own resolver is overwhelmed along the way.",
+      risk: "Slow or dead DNS for the whole network; if one of your devices is doing it, it is taking part in an attack (botnet).",
+      todo: ["Find which device is asking (Flows / DNS) and isolate it", "Rate-limit the resolver", "If the names look like DGA across many domains, also look at the DGA alert"]
+    },
+    'DNS rebinding': {
+      t: "DNS rebinding", lvl: "Attack",
+      what: "An Internet name pointed to a public IP and suddenly points to an IP on your own network (e.g. 192.168.1.1) or to 127.0.0.1.",
+      how: "You open a malicious page. A little later the attacker's DNS changes the answer to a LAN IP. The browser thinks it is still talking to the same site, so the page can send requests to your router, camera or NAS.",
+      risk: "Router settings changed, access to devices without a password, data stolen from services in your home.",
+      todo: ["Close the tab/page that was open at that moment", "Turn on “DNS rebind protection” on the router or Pi-hole", "Put a password on everything with a web admin page on the LAN"]
+    },
+    'DNSSEC bypass': {
+      t: "DNSSEC bypass on the Wi‑Fi", lvl: "Attack (MITM)",
+      what: "The network's DNS claims it checks DNSSEC signatures, but it also accepts answers with a deliberately broken signature.",
+      how: "Wi‑Fi Guard asks for a correctly signed domain and one with a broken signature. A normal resolver rejects the second one (SERVFAIL). If it accepts it while also saying “validated” (the AD flag), something in the middle is answering in its place.",
+      risk: "Forged DNS answers (cache poisoning): you can be sent to fake pages without noticing.",
+      todo: ["Disconnect from this Wi‑Fi or turn on a VPN", "Use encrypted DNS (DoH/DoT)", "If it merely “doesn't check” DNSSEC (no bypass), set 1.1.1.1 or 9.9.9.9 on the router"]
+    },
     'DGA': {
       t: "DGA — Domain Generation Algorithm", lvl: "Serious sign of infection",
       what: "A device asks about lots of “random” domains (e.g. xk3j9qz7lp.com) that don't exist.",
@@ -306,6 +341,11 @@ window.NW_EDU_EN = {
     'Ύποπτη εξερχόμενη θύρα': ['check', "Your computer connected to a port that Tor, backdoors or botnets often use. If you run Tor, Tor Browser or a well-known program, it is harmless; if not, find which program did it."],
     'Beaconing': ['check', "A device “phones” a server at very regular intervals, like a clock. That is how botnets communicate — but so do many harmless programs (updates, smart devices)."],
     'DNS tunneling': ['bad', "Data is hidden inside DNS names to sneak out of the network. Normal programs almost never do this."],
+    'DNS amplification': ['bad', "DNS answers nobody asked for are “flooding” a device — or your DNS server is being used as an amplifier to attack others."],
+    'DNS flood': ['bad', "Thousands of DNS queries to make the DNS server stop working. If the source is your own device, something is wrong with it."],
+    'NXDOMAIN flood': ['bad', "A flood of queries for names that don't exist — to overload the resolver or a target's DNS server."],
+    'DNS rebinding': ['bad', "A site suddenly changed its address to an IP in your home — a way for a page to “talk” to your router or devices."],
+    'DNSSEC bypass': ['bad', "The Wi‑Fi accepts forged DNS answers while claiming it checks them. Don't log in on this network without a VPN."],
     'DGA': ['bad', "A device is looking up many “random” names (e.g. k3jd9fh2lq.com) that don't exist — a classic sign of malware looking for its server."],
     'Νέα συσκευή': ['ok', "A device connected to the network for the first time. Most of the time it is a phone, a tablet or something of yours/a guest's. Ask: do I recognise it? If yes, all good."],
     'Σύνδεση σε κακόβουλη IP': ['bad', "A device of yours talked to an IP that is on a public list of botnets/malicious servers. There may be an infection."],

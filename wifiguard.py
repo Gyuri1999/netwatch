@@ -254,6 +254,80 @@ def dns_check(resolve=None):
     return {"hijacked": bad, "nxdomain_hijack": nx, "ok": not bad and not nx}
 
 
+# ---------------- DNSSEC: επικυρώνει ο DNS του δικτύου τις υπογραφές; ----------------
+# Ζώνες-δοκιμής που συντηρούνται γι' αυτόν ακριβώς τον σκοπό: το «sigok» είναι σωστά υπογεγραμμένο, τα «sigfail»,
+# «badsig», «fail01» έχουν σκόπιμα χαλασμένη υπογραφή. Ένας resolver που επικυρώνει τα απορρίπτει (SERVFAIL)·
+# ένας που δεν επικυρώνει δίνει κανονικά διεύθυνση.
+DNSSEC_SIGNED = ("sigok.verteiltesysteme.net", "cloudflare.com", "isc.org")
+DNSSEC_BOGUS = ("sigfail.verteiltesysteme.net", "badsig.go.dnscheck.tools", "fail01.dnssec.works")
+
+
+def dns_query(server, name, qtype=1, timeout=2.0, txid=None, port=53):
+    """Ένα ερώτημα DNS με σκέτο UDP socket (δουλεύει ίδια σε macOS, Linux, Windows — χωρίς dig).
+    Ζητά DNSSEC (EDNS0 με DO=1, και AD=1 στην κεφαλίδα). → {rcode, ad, answers} ή None αν δεν απάντησε."""
+    import struct
+    txid = random.randrange(65536) if txid is None else txid
+    q = b"".join(bytes([len(p)]) + p.encode("idna") for p in name.rstrip(".").split(".")) + b"\0"
+    pkt = struct.pack(">HHHHHH", txid, 0x0120, 1, 0, 0, 1) + q + struct.pack(">HH", qtype, 1) \
+        + b"\0" + struct.pack(">HHIH", 41, 1232, 0x8000, 0)  # OPT: UDP 1232, DO bit
+    fam = socket.AF_INET6 if ":" in server else socket.AF_INET
+    with socket.socket(fam, socket.SOCK_DGRAM) as s:
+        s.settimeout(timeout)
+        try:
+            s.sendto(pkt, (server, port))
+            end = time.monotonic() + timeout
+            while time.monotonic() < end:
+                data, _ = s.recvfrom(4096)
+                if len(data) >= 12 and struct.unpack(">H", data[:2])[0] == txid:
+                    return parse_dns_flags(data)
+        except OSError:
+            return None
+    return None
+
+
+def parse_dns_flags(data):
+    import struct
+    _, flags, _, an, _, _ = struct.unpack(">HHHHHH", data[:12])
+    return {"rcode": flags & 0xF, "ad": bool(flags & 0x20), "answers": an}
+
+
+def system_dns_server():
+    try:
+        import netkit
+        servers = netkit._system_dns()[0]  # macOS: scutil, Linux: resolv.conf, Windows: PowerShell (winplat)
+    except Exception:
+        servers = []
+    return next((s for s in servers if "." in s), None) or (servers[0] if servers else None)
+
+
+def dnssec_check(server=None, query=None):
+    """Αποτέλεσμα:
+    validating  True: απορρίπτει τις χαλασμένες υπογραφές · False: τις δέχεται · None: άγνωστο (δεν απάντησε)
+    bypass      δηλώνει «επικυρωμένο» (AD) αλλά δέχεται και χαλασμένη υπογραφή → κάποιος στη μέση απαντά
+    ad_stripped επικυρώνεται κάπου ανάντη, αλλά ο router δεν περνά τη σημαία AD (συνηθισμένο, όχι πρόβλημα)"""
+    server = server or system_dns_server()
+    out = {"server": server, "validating": None, "bypass": False, "ad_stripped": False}
+    if not server:
+        return out
+    query = query or dns_query
+    signed = [query(server, n) for n in DNSSEC_SIGNED]
+    good = [r for r in signed if r and r["rcode"] == 0 and r["answers"]]
+    if not good:  # ούτε τα σωστά ονόματα δεν επιλύονται: δεν μπορούμε να πούμε τίποτα
+        return out
+    bogus = [r for r in (query(server, n) for n in DNSSEC_BOGUS) if r]
+    if not bogus:
+        return out
+    ad = any(r["ad"] for r in good)
+    accepted = [r for r in bogus if r["rcode"] == 0 and r["answers"]]
+    rejected = [r for r in bogus if r["rcode"] == 2]
+    if accepted:
+        out.update(validating=False, bypass=ad)
+    elif rejected:
+        out.update(validating=True, ad_stripped=not ad)
+    out.update(ad=ad, bogus_accepted=len(accepted), bogus_rejected=len(rejected))
+    return out
+
+
 def tls_check(sites=TLS_SITES, timeout=5):
     """Συνδέεται με κανονικό έλεγχο πιστοποιητικού. Αποτυχία = πιθανό TLS interception (ή captive portal)."""
     res = []
@@ -335,6 +409,19 @@ def evaluate(d):
     elif "ok" in dn:
         chk("dns", "ok", "DNS hijacking", "Ο DNS δίνει σωστές απαντήσεις.")
 
+    ds = d.get("dnssec") or {}
+    if ds.get("bypass"):
+        chk("dnssec", "bad", "DNSSEC", f"Ο DNS ({ds.get('server')}) δηλώνει ότι ελέγχει τις υπογραφές DNSSEC, αλλά "
+            "δέχτηκε και domain με σκόπιμα χαλασμένη υπογραφή — κάτι στη μέση απαντά αντί για τον πραγματικό "
+            "resolver και παρακάμπτει την προστασία.", "Αποσυνδέσου ή άνοιξε VPN· βάλε κρυπτογραφημένο DNS (DoH).", 20)
+    elif ds.get("validating") is False:
+        chk("dnssec", "warn", "DNSSEC", f"Ο DNS του δικτύου ({ds.get('server')}) δεν ελέγχει τις υπογραφές DNSSEC: "
+            "μια πλαστή απάντηση (cache poisoning) δεν θα απορριφθεί.",
+            "Βάλε DNS που επικυρώνει DNSSEC (π.χ. 1.1.1.1, 9.9.9.9) στο router, ή κρυπτογραφημένο DNS (DoH).", 3)
+    elif ds.get("validating"):
+        chk("dnssec", "ok", "DNSSEC", f"Ο DNS ({ds.get('server')}) απορρίπτει απαντήσεις με χαλασμένη υπογραφή DNSSEC"
+            + (" (η επικύρωση γίνεται ανάντη· ο router απλώς δεν περνά τη σημαία AD)." if ds.get("ad_stripped") else "."))
+
     tl = d.get("tls") or []
     failed = [t for t in tl if t.get("ok") is False]
     if failed:
@@ -414,7 +501,8 @@ def evaluate(d):
 def full_check(public=True, arp_spoof=False):
     di = default_iface()
     w = wifi_info()
-    d = {"public": public, "wifi": w, "captive": captive_portal(), "dns": dns_check(), "tls": tls_check(),
+    d = {"public": public, "wifi": w, "captive": captive_portal(), "dns": dns_check(), "dnssec": dnssec_check(),
+         "tls": tls_check(),
          "firewall": firewall(), "listening": listening(), "vpn": vpn_active(di), "tor": tor_running(),
          "private_mac": private_mac(iface_mac((w or {}).get("iface") or di)) if w else None,
          "arp_spoof": arp_spoof, "t": time.time(), "default_iface": di}
@@ -432,6 +520,7 @@ def demo_check(public=True, arp_spoof=False):
     d = {"public": public, "wifi": wifi, "demo": True,
          "captive": {"ok": False, "redirect": "http://login.cafe-wifi.example/portal", "snippet": "Welcome! Accept terms"},
          "dns": {"hijacked": [], "nxdomain_hijack": ["10.10.0.1"], "ok": False},
+         "dnssec": {"server": "10.10.0.1", "validating": False, "bypass": False},
          "tls": [{"host": h, "ok": True, "issuer": "Google Trust Services" if "google" in h else "Sectigo"}
                  for h in TLS_SITES],
          "firewall": {"enabled": True, "block_all": False, "stealth": False},
@@ -445,6 +534,7 @@ def demo_check(public=True, arp_spoof=False):
 ALERT_FOR = {  # check id → (τύπος ειδοποίησης, σοβαρότητα)
     "evil_twin": ("Evil twin Wi‑Fi", "high"),
     "dns": ("DNS hijacking στο Wi‑Fi", "high"),
+    "dnssec": ("DNSSEC bypass στο Wi‑Fi", "high"),
     "tls": ("TLS interception στο Wi‑Fi", "high"),
     "encryption": ("Ανοιχτό Wi‑Fi", "med"),
 }
@@ -452,6 +542,12 @@ ALERT_FOR = {  # check id → (τύπος ειδοποίησης, σοβαρότ
 
 def network_fingerprint():
     """(interface, gateway, MAC του gateway): αλλάζει όταν πας σε άλλο δίκτυο."""
+    if sys.platform == "win32":
+        import winplat
+        v = winplat.net_info(max_age=5)
+        gw = v.get("gateway")
+        mac = dict(winplat.arp_table()).get(gw) if gw else None
+        return (v.get("gateway_iface"), gw, mac)
     out = run(["route", "-n", "get", "default"], 5)
     gw = re.search(r"gateway:\s*(\S+)", out)
     ifc = re.search(r"interface:\s*(\S+)", out)
