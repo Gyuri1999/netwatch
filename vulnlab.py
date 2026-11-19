@@ -574,6 +574,13 @@ class VulnLab:
     def _close_listener(self, svc):
         s = self.listeners.pop(svc, None)
         if s:
+            # Στο Linux ένα σκέτο close() ΔΕΝ ξυπνά το thread που περιμένει στο accept(): ο πυρήνας κρατά τη θύρα
+            # σε LISTEN μέχρι να λήξει το timeout του και στο μεταξύ δέχεται συνδέσεις. Το shutdown() την κλείνει αμέσως
+            # (στο macOS/Windows σηκώνει OSError για socket που δεν είναι συνδεδεμένο — δεν πειράζει).
+            try:
+                s.shutdown(socket.SHUT_RDWR)
+            except OSError:
+                pass
             try:
                 s.close()
             except OSError:
@@ -659,10 +666,28 @@ class VulnLab:
         finally:
             with self.lock:
                 self.conns.discard(conn)
-            try:
-                conn.close()
-            except OSError:
-                pass
+            self._linger_close(conn)
+
+    @staticmethod
+    def _linger_close(conn, max_bytes=256 * 1024, max_s=0.5):
+        """Κλείσιμο χωρίς RST: αν ο πελάτης έστειλε περισσότερα απ' όσα διαβάσαμε (π.χ. τεράστια γραμμή → 431),
+        ένα close() με αδιάβαστα δεδομένα στέλνει RST, και τα Windows τότε πετούν και την απάντηση που ήδη στείλαμε.
+        Γι' αυτό: shutdown για εγγραφή (FIN), «άδειασμα» της εισόδου για λίγο, και μετά close."""
+        try:
+            conn.shutdown(socket.SHUT_WR)
+            conn.settimeout(0.1)
+            end, n = time.monotonic() + max_s, 0
+            while n < max_bytes and time.monotonic() < end:
+                d = conn.recv(65536)
+                if not d:
+                    break
+                n += len(d)
+        except OSError:
+            pass
+        try:
+            conn.close()
+        except OSError:
+            pass
 
     @staticmethod
     def _readline(conn, buf, deadline):
