@@ -344,7 +344,7 @@ class TopoMap:
             stt = "ok" if last and now - float(last) < SEEN_OK else "idle"
             nid = f"h:{ip}"
             node(nid, "me" if ip in me else "host", h.get("name") or ip, ip, status=stt, vlan=h.get("vlan"),
-                 sub=(h.get("type") or h.get("vendor") or "")[:40], last=last)
+                 sub=(h.get("type") or h.get("vendor") or "")[:40], last=last, icon=h.get("icon") or None, mac=h.get("mac") or None)
             edge(par, nid, h.get("port") or "", guess=guess)
         for par, n in extra.items():
             nid = f"more:{par}"

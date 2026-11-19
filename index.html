@@ -30,6 +30,7 @@ if(q.get('glass'))p.glass=q.get('glass')==='1';if(p.cb)d.classList.add('cb');if(
 <script src="/anontools.js"></script>
 <script src="/topomap.js"></script>
 <script src="/sshui.js"></script>
+<script src="/names.js"></script>
 <script src="/privtools.js"></script>
 <script src="/academy/engine.js"></script>
 <style>
@@ -740,13 +741,9 @@ const LAN={w:330,h:270,max:12,big:false};
 function lanBox(){return LAN.big?{x:10,y:10,w:W-58,h:H-20}:{x:16,y:H-LAN.h-16,w:LAN.w,h:LAN.h}}
 function homePt(){if(S.showLan&&LAN.big&&LP.inet)return LP.inet;const g=S.home||{lat:37.98,lon:23.73};return P(g.lon,g.lat)}
 const isV6=ip=>ip.includes(':'),octet=ip=>isV6(ip)?'IPv6':'.'+ip.split('.').pop();
-// ονόματα που δίνεις εσύ (✏️ στις λεπτομέρειες) — μένουν σε αυτόν τον browser, κλειδί η MAC
-let NAMES={};try{NAMES=JSON.parse(localStorage.getItem('nw-names')||'{}')}catch(e){}
-const aliasOf=h=>h&&(NAMES[h.mac||h.ip]||NAMES[h.ip])||'';
-function setAlias(ip){const h=S.hosts.get(ip);if(!h)return;const k=h.mac||h.ip;
-  const v=prompt('Όνομα για τη συσκευή '+ip+(h.vendor?' ('+h.vendor+')':'')+' — κενό για διαγραφή:',aliasOf(h)||'');if(v==null)return;
-  if(v.trim())NAMES[k]=v.trim().slice(0,32);else delete NAMES[k];try{localStorage.setItem('nw-names',JSON.stringify(NAMES))}catch(e){}
-  if(tab==='det')renderDet()}
+// ονόματα που δίνεις εσύ (✏️ ή 🏷) — αποθηκεύονται στο NetWatch (names.js, /api/names) και έρχονται ως h.alias
+const aliasOf=h=>h&&(h.alias||'')||'';
+function setAlias(ip){if(window.NAMES_UI)NAMES_UI.edit(ip)}
 const vshort=v=>!v||v==='τυχαία MAC'?'':v.replace(/[,.]?\s*\b(inc|ltd|co|corp|corporation|gmbh|llc|limited|incorporated|technologies|technology|electronics|international|trading|foundation|server solutions|communications?)\b.*$/i,'').trim().split(/\s+/).slice(0,2).join(' ').slice(0,14);
 // Μία κουκκίδα ανά ΣΥΣΚΕΥΗ: οι IPv6 διευθύνσεις (fe80::…) «κολλάνε» στη συσκευή με την ίδια MAC,
 // όλα τα broadcast/multicast γίνονται ένας κόμβος «όλοι».
@@ -1212,14 +1209,17 @@ function renderHosts(){
 
 function renderDevs(){
   const el=$('t-devs');const devs=[...S.hosts.values()].filter(h=>h.kind==='local').sort((a,b)=>(b.me-a.me)||(b.gw-a.gw)||((b.bytes_in+b.bytes_out)-(a.bytes_in+a.bytes_out)));
+  const unk=window.NAMES_UI?NAMES_UI.unnamed().length:0;
   el.innerHTML=`<div class="sm" style="margin-bottom:8px">Οι συσκευές που φάνηκαν στο τοπικό σου δίκτυο (${devs.length}). Αν δεν αναγνωρίζεις κάποια, έλεγξε τον κατασκευαστή από τη MAC.</div>`+
+  (unk?`<button class="b" id="nm-wiz" style="margin-bottom:10px;border-color:var(--cyan)">🏷 Ονόμασε τις άγνωστες (${unk})</button>`:'')+
   devs.map(h=>{const tags=[];if(h.me)tags.push('<span class="tag g">ΕΣΥ</span>');if(h.gw)tags.push('<span class="tag y">ROUTER</span>');
     if(h.threat>=2)tags.push('<span class="tag r">⚠ ΥΠΟΠΤΗ</span>');if(randMac(h.mac))tags.push('<span class="tag">τυχαία MAC (κινητό;)</span>');
     if(h.ip.includes(':'))tags.push('<span class="tag">IPv6</span>');
     const pr=Object.keys(h.protos||{}).slice(0,5).join(', ');
-    return `<div class="card click" data-sel="${esc(h.ip)}"><div style="display:flex;justify-content:space-between"><b style="color:var(--hi)">${esc(hname(h)||h.ip)}</b><span class="sm">από ${fmtT(h.first)}</span></div>
+    return `<div class="card click" data-sel="${esc(h.ip)}"><div style="display:flex;justify-content:space-between"><b style="color:var(--hi)">${h.dicon?esc(h.dicon)+' ':''}${esc(aliasOf(h)||hname(h)||h.ip)}</b><span class="sm">από ${fmtT(h.first)}</span></div>
      <div>${esc(h.ip)} ${h.mac?'· '+esc(h.mac):''}</div><div>${tags.join('')}</div>
      <div class="sm">↑ ${fmtB(h.bytes_out)} ↓ ${fmtB(h.bytes_in)} · ${esc(pr)}</div></div>`}).join('');
+  const wz=el.querySelector('#nm-wiz');if(wz)wz.onclick=()=>NAMES_UI.wizard();
   bindCommon(el)}
 
 function barList(entries,colorFn,fmt){const mx=Math.max(1,...entries.map(e=>e[1]));
@@ -1356,7 +1356,7 @@ function renderDet(){
   const al=S.alerts.filter(a=>a.actor===h.ip||a.target===h.ip);const ip=encodeURIComponent(h.ip);
   const hits=h.hits||[],mx=Math.max(1,...hits.map(x=>x[1]));const atk=h.threat>=2;
   el.innerHTML=`<h2>${flag(g?.countryCode)} ${aliasOf(h)?esc(aliasOf(h))+' · ':''}${esc(h.ip)}</h2><div>${tags.join('')}</div>
-  <div style="margin-top:6px">${h.kind==='local'?`<button class="b" onclick="setAlias('${esc(h.ip)}')" title="Δώσε όνομα στη συσκευή (π.χ. «TV σαλονιού»). Μένει σε αυτόν τον browser.">✏️ Όνομα</button> `:''}${g?`<button class="b" data-map="${esc(h.ip)}">📍 Δείξε στον χάρτη</button> `:''}<button class="b" onclick="pktOpen('${esc(h.ip)}')" title="Σπάσε ένα πραγματικό πακέτο σε επίπεδα OSI, με εξήγηση για κάθε πεδίο (CCNA)">🔬 Εξήγησέ μου ένα πακέτο</button></div>
+  <div style="margin-top:6px">${h.kind==='local'?`<button class="b" onclick="setAlias('${esc(h.ip)}')" title="Δώσε όνομα και τύπο στη συσκευή (π.χ. «TV σαλονιού»). Αποθηκεύεται στο NetWatch και φαίνεται παντού.">✏️ Όνομα</button> `:''}${g?`<button class="b" data-map="${esc(h.ip)}">📍 Δείξε στον χάρτη</button> `:''}<button class="b" onclick="pktOpen('${esc(h.ip)}')" title="Σπάσε ένα πραγματικό πακέτο σε επίπεδα OSI, με εξήγηση για κάθε πεδίο (CCNA)">🔬 Εξήγησέ μου ένα πακέτο</button></div>
   ${verdict(h,al)}
   ${h.kind==='local'?outHTML(h):''}
   ${hits.length?`<h3>🎯 ${atk?'Τι χτυπάει':'Πού συνδέεται / τι ζητάει'}</h3><div class="sm" style="margin-bottom:6px">${atk?'Οι θύρες/υπηρεσίες που δοκίμασε και γιατί τις θέλει ένας επιτιθέμενος:':'Οι υπηρεσίες στις οποίες ξεκίνησε συνδέσεις:'}</div>`+

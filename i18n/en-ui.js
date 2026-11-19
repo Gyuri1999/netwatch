@@ -2868,7 +2868,8 @@ I18N.add({
   "Ο φάκελος δεν υπάρχει ή δεν διαβάζεται.": "The folder does not exist or can't be read.",
   "Πολλές ταυτόχρονες συνδέσεις — δοκίμασε ξανά.": "Too many parallel connections — try again.",
   "Άγνωστος host.": "Unknown host.",
-  "Το SSH Explorer δεν είναι διαθέσιμο σε αυτή τη λειτουργία.": "SSH Explorer is not available in this mode."
+  "Το SSH Explorer δεν είναι διαθέσιμο σε αυτή τη λειτουργία.": "SSH Explorer is not available in this mode.",
+  "Δώσε όνομα και τύπο στη συσκευή (π.χ. «TV σαλονιού»). Αποθηκεύεται στο NetWatch και φαίνεται παντού.": "Give the device a name and type (e.g. “Living-room TV”). Saved in NetWatch and shown everywhere."
  },
  "patterns": [
   [
@@ -5902,6 +5903,10 @@ I18N.add({
   [
    "^Άδειο ή πολύ μεγάλο αρχείο \\(όριο (\\d+) MB\\)\\.$",
    "Empty or too large file (limit $1 MB)."
+  ],
+  [
+   "^🏷 Ονόμασε τις άγνωστες \\((\\d+)\\)$",
+   "🏷 Name the unknown ones ($1)"
   ]
  ]
 });

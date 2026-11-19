@@ -192,7 +192,17 @@ class NetState:
         import devtype
         t, icon, label, v = devtype.classify(h["mac"], sorted(h["names"]) + ([h["rdns"]] if h.get("rdns") else []),
                                              list(h["ports"]), gw=h["gw"], me=h["me"])
-        return {"dtype": t, "dicon": icon, "dlabel": label, "vendor": v}
+        out = {"dtype": t, "dicon": icon, "dlabel": label, "vendor": v}
+        dn = getattr(self, "devnames", None)
+        u = dn.get(h["mac"], h["ip"]) if dn else None
+        if u:  # 🏷 όνομα/τύπος που έδωσε ο χρήστης — υπερισχύει της εκτίμησης
+            if u.get("type"):
+                out["dtype"], (out["dicon"], out["dlabel"]) = u["type"], devtype.TYPES[u["type"]]
+            if u.get("name"):
+                out["alias"] = u["name"]
+            if u.get("note"):
+                out["note"] = u["note"]
+        return out
 
     def recheck_intel(self):
         with self.lock:
@@ -598,7 +608,7 @@ class NetState:
                        key=f"{dst}:{dp}" if benign else None, cooldown=3600 if benign else None, benign=benign)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
-    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "timeline", "hunt", "cases", "configbak", "changecheck", "triage", "handover", "whereis", "expiry", "segcheck", "sitecheck", "topomap", "ssh", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
+    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "timeline", "hunt", "cases", "configbak", "changecheck", "triage", "handover", "whereis", "expiry", "segcheck", "sitecheck", "topomap", "ssh", "devnames", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
             "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors", "own_tool", "test_ips")
 
     def reset(self, mode, iface, me_ips, gateway, history, feed, notifier=None):

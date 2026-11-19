@@ -68,6 +68,7 @@
   function devIcon(n) {
     if (n.kind === 'me') return '🧑‍💻';
     if (n.kind === 'more') return '➕';
+    if (n.icon && n.icon !== '❔') return n.icon;  // 🏷 τύπος που έδωσες εσύ ή εκτίμηση του NetWatch
     const s = (LT(n.sub) + ' ' + LT(n.label)).toLowerCase();
     const R = [[/iphone|android|κινητ|phone|tablet|ipad|pixel|galaxy/, '📱'], [/\btv\b|τηλεόρ|media|chromecast|roku|apple tv|sonos|speaker|ηχεί/, '📺'],
       [/cam|κάμερ|hikvision|tapo c|reolink|dahua/, '📷'], [/print|εκτυπ|hp |epson|brother|canon/, '🖨'], [/voip|τηλέφωνο ip|grandstream|yealink/, '☎️'],
@@ -228,6 +229,7 @@
     const acts = [];
     if (n.ip) acts.push(`<button class="b" data-tpcp="${E(n.ip)}">📋 IP</button>`);
     if (n.ip && window.whereIs) acts.push(`<button class="b" data-tpwhere="${E(n.ip)}">🔌 ${T('Πού είναι', 'Where')}</button>`);
+    if (n.kind === 'host' && n.ip && window.NAMES_UI) acts.push(`<button class="b" data-tpname="${E(n.ip)}">✏️ ${T('Όνομα', 'Name')}</button>`);
     if (host && window.showProfile) acts.push(`<button class="b" data-tpprof="${E(n.ip)}">👤 ${T('Προφίλ', 'Profile')}</button>`);
     if (['router', 'modem', 'isp', 'internet'].includes(n.kind)) acts.push(`<button class="b" data-tptab="lat">📈 ${T('Καθυστέρηση', 'Latency')}</button>`);
     if (n.kind === 'dns') acts.push(`<button class="b" data-tptab="dnsf">🔐 DNS</button>`);
@@ -416,6 +418,16 @@
       const s = el.querySelector('#tp-wrap svg'); if (s) { s.style.transform = `scale(${TM.zoom})`; fitSize(s); }
       const zr = el.querySelector('#tp-zr'); if (zr) zr.textContent = Math.round(TM.zoom * 100) + '%';
       return;
+    }
+    if (t.dataset.tpname) {  // νέο όνομα → ενημέρωσε αμέσως την κάρτα στο διάγραμμα
+      const ip = t.dataset.tpname;
+      return NAMES_UI.edit(ip, e => {
+        const n = TM.d && TM.d.graph && TM.d.graph.nodes.find(x => x.kind === 'host' && x.ip === ip); if (!n) return;
+        let h = null; try { h = S.hosts.get(ip); } catch (e) {}
+        if (e && e.name) n.label = e.name;
+        if (h && h.dicon) n.icon = h.dicon;
+        draw();
+      });
     }
     if (t.dataset.tpclose != null) { TM.sel = null; el.querySelectorAll('.tp-pop').forEach(p => p.remove()); draw(); return; }
     if (t.dataset.tpcp) { navigator.clipboard && navigator.clipboard.writeText(t.dataset.tpcp); t.textContent = '✓'; return; }

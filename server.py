@@ -83,6 +83,8 @@ def make_handler(state):
                 lim = 2 * 1024 * 1024 if u.path == "/api/configs/upload" else 10000  # 💾 επικόλληση ρυθμίσεων έως 512 KB
                 if u.path == "/api/segcheck/report":  # 🧱 αποτέλεσμα ελέγχου διαχωρισμού από άλλο VLAN
                     lim = 256 * 1024
+                if u.path == "/api/names":  # 🏷 πολλά ονόματα μαζί (οδηγός / μεταφορά από τον browser)
+                    lim = 256 * 1024
                 if u.path == "/api/configs/upload" and n > lim:
                     return self._json({"error": "Πολύ μεγάλο κείμενο (όριο 512 KB)."}, 413)
                 body = json.loads(self.rfile.read(min(n, lim)) or b"{}")
@@ -258,6 +260,12 @@ def make_handler(state):
                     if not wi:
                         return self._json({"error": "Η αναζήτηση θύρας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."}, 400)
                     return self._json(wi.refresh())
+                if u.path == "/api/names":  # 🏷 όνομα/τύπος συσκευής (ένα ή πολλά: {"items": [...]})
+                    dn = getattr(state, "devnames", None)
+                    if not dn:
+                        return self._json({"error": "off"}, 400)
+                    r = dn.bulk(body["items"]) if isinstance(body.get("items"), list) else dn.set(body)
+                    return self._json(r, 400 if "error" in r else 200)
                 if u.path.startswith("/api/ssh/"):  # 🖥 SSH Explorer (μόνο κλειδιά, μόνο ανάγνωση)
                     sb = getattr(state, "ssh", None)
                     if not sb:
@@ -674,7 +682,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/names.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -718,6 +726,9 @@ def make_handler(state):
                 if len(qq) > 64:
                     return self._json({"error": "Πολύ μεγάλο ερώτημα (έως 64 χαρακτήρες)."}, 400)
                 return self._json(wi.lookup(qq) if wi else {"query": qq, "found": False, "location": None, "off": True})
+            if u.path == "/api/names":  # 🏷 ονόματα συσκευών
+                dn = getattr(state, "devnames", None)
+                return self._json(dn.view() if dn else {"devices": {}, "types": [], "off": True})
             if u.path == "/api/ssh":  # 🖥 SSH Explorer
                 sb = getattr(state, "ssh", None)
                 return self._json(sb.view() if sb else {"hosts": [], "keys": {"keys": []}, "suggestions": [], "off": True})
