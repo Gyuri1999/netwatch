@@ -149,6 +149,10 @@ A native menu-bar app written in Swift (AppKit + WKWebView), compiled with `swif
 
 ### Windows 10 / 11
 
+**App (no Python needed):** download `NetWatch-windows-x64.zip` from the [Windows app workflow](../../actions/workflows/windows-app.yml) artifacts (or a Release), unzip it anywhere and run **`NetWatch.exe`**. A shield appears in the system tray: green, yellow or red, with the alert count. The dashboard opens in its own window (Edge app mode). From the tray menu you can switch between **Live**, **Live as administrator** (for one-click blocking in Windows Firewall), **Demo** and **pcap replay**, and turn on *Start with Windows*. History and settings are kept in `%LOCALAPPDATA%\NetWatch`. Live capture needs [Npcap](https://npcap.com/#download). The app isn't code-signed yet, so SmartScreen asks once (*More info → Run anyway*). Build it yourself with `winapp\build.ps1` (Windows + Python 3.12).
+
+**From source:**
+
 1. Install **Python 3.9+** (`winget install Python.Python.3.12`, or python.org with *Add python.exe to PATH*).
 2. For live capture, install **[Npcap](https://npcap.com/#download)** and keep *WinPcap API-compatible Mode* ticked. Demo and pcap replay don't need it.
 3. Double-click **`run.bat`**, or from a terminal:
