@@ -69,6 +69,15 @@ def make_handler(state):
                     return self._json(li.import_text(raw, kind=parse_qs(u.query).get("kind", ["auto"])[0]))
                 except ValueError as e:
                     return self._json({"error": str(e)}, 400)
+            if u.path == "/api/topomap/export":  # 🗺 PDF/PNG/SVG του διαγράμματος (ακατέργαστο σώμα, έως 15 MB)
+                tm = getattr(state, "topomap", None)
+                if not tm:
+                    return self._json({"error": "off"}, 400)
+                n = int(self.headers.get("Content-Length") or 0)
+                if n > 15 * 1024 * 1024:
+                    return self._json({"error": "Πολύ μεγάλο αρχείο (όριο 15 MB)."}, 413)
+                r = tm.put_file(parse_qs(u.query).get("fmt", [""])[0], self.rfile.read(n))
+                return self._json(r, 400 if "error" in r else 200)
             try:
                 n = int(self.headers.get("Content-Length") or 0)
                 lim = 2 * 1024 * 1024 if u.path == "/api/configs/upload" else 10000  # 💾 επικόλληση ρυθμίσεων έως 512 KB
@@ -249,6 +258,12 @@ def make_handler(state):
                     if not wi:
                         return self._json({"error": "Η αναζήτηση θύρας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."}, 400)
                     return self._json(wi.refresh())
+                if u.path == "/api/topomap/run":  # 🗺 διάγραμμα δικτύου
+                    tm = getattr(state, "topomap", None)
+                    if not tm:
+                        return self._json({"error": "Το διάγραμμα δικτύου δεν είναι διαθέσιμο σε αυτή τη λειτουργία."}, 400)
+                    r = tm.run(fault=str(body.get("fault") or "") or None)
+                    return self._json(r, 429 if r.get("retry_in") else 400 if "error" in r else 200)
                 if u.path in ("/api/segcheck/run", "/api/segcheck/report"):  # 🧱 έλεγχος διαχωρισμού (VLAN)
                     sc = getattr(state, "segcheck", None)
                     if not sc:
@@ -397,6 +412,8 @@ def make_handler(state):
                         return self._json({"error": "Wi‑Fi Guard off"}, 400)
                     if "trusted" in body:
                         state.wifi.set_trusted(str(body.get("ssid") or ""), bool(body["trusted"]))
+                    elif body.get("vpn_only"):
+                        state.wifi.recheck_vpn()
                     else:
                         state.wifi.start("manual")
                     return self._json(state.wifi.status())
@@ -444,6 +461,14 @@ def make_handler(state):
                     if body.get("enable"):
                         return self._json(state.honeypot.start(body.get("ports")))
                     return self._json(state.honeypot.stop())
+                if u.path == "/api/sitecheck":  # 🧅 «Πόσο ασφαλές είναι αυτό το site για την ανωνυμία μου;» (μία σελίδα, μέσω Tor)
+                    sk = getattr(state, "sitecheck", None)
+                    if not sk:
+                        return self._json({"error": "Ο έλεγχος site δεν είναι διαθέσιμος σε αυτή τη λειτουργία."}, 400)
+                    if not isinstance(body, dict):
+                        return self._json({"error": "bad json"}, 400)
+                    r = sk.start(body.get("url"), direct=body.get("direct") is True, lang=body.get("lang"))
+                    return self._json(r, r.pop("code", 200))
                 if u.path == "/api/privacy":
                     state.privacy.start(on_done=lambda r: state.publish({"type": "privacy", "result": r}))
                     return self._json(state.privacy.status())
@@ -627,7 +652,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -671,6 +696,24 @@ def make_handler(state):
                 if len(qq) > 64:
                     return self._json({"error": "Πολύ μεγάλο ερώτημα (έως 64 χαρακτήρες)."}, 400)
                 return self._json(wi.lookup(qq) if wi else {"query": qq, "found": False, "location": None, "off": True})
+            if u.path == "/api/topomap/file":  # 🗺 κατέβασμα PDF/PNG/SVG που μόλις φτιάχτηκε
+                tm = getattr(state, "topomap", None)
+                f = tm.get_file(parse_qs(u.query).get("id", [""])[0]) if tm else None
+                if not f:
+                    return self._json({"error": "Το αρχείο έληξε — πάτα ξανά εξαγωγή."}, 404)
+                self.send_response(200)
+                self.send_header("Content-Type", f["mime"])
+                self.send_header("Content-Length", str(len(f["data"])))
+                self.send_header("Content-Disposition", f'attachment; filename="{f["name"]}"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Content-Security-Policy", "default-src 'none'; sandbox")
+                self.end_headers()
+                self.wfile.write(f["data"])
+                return
+            if u.path == "/api/topomap":  # 🗺 διάγραμμα δικτύου
+                tm = getattr(state, "topomap", None)
+                return self._json(tm.view() if tm else {"running": False, "graph": None, "diag": None, "issues": [], "off": True})
             if u.path == "/api/segcheck":  # 🧱 έλεγχος διαχωρισμού (VLAN)
                 sc = getattr(state, "segcheck", None)
                 return self._json(sc.view() if sc else {"config_ok": False, "configured": False, "rules": [], "zones": [],
@@ -852,6 +895,17 @@ def make_handler(state):
                 return self._json(state.rules_view())
             if u.path == "/api/wifi":
                 return self._json(state.wifi.status() if state.wifi else {"error": "off"})
+            if u.path == "/api/sitecheck":  # 🧅 έλεγχος site: ?id= για ένα αποτέλεσμα, αλλιώς τελευταίο + ιστορικό
+                sk = getattr(state, "sitecheck", None)
+                rid = parse_qs(u.query).get("id", [""])[0]
+                if not sk:
+                    return self._json({"off": True, "running": False, "latest": None, "history": [], "tor": None}
+                                      if not rid else {"error": "off"}, 200 if not rid else 404)
+                if rid:
+                    r = sk.get(rid)
+                    return self._json(r if r else {"error": "Άγνωστο id (τα αποτελέσματα κρατιούνται μόνο στη μνήμη)."},
+                                      200 if r else 404)
+                return self._json(sk.view())
             if u.path == "/api/privacy":
                 return self._json(state.privacy.status() if state.privacy else {"error": "off"})
             if u.path == "/api/status":

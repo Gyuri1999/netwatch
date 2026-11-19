@@ -78,6 +78,8 @@ def main():
     shutil.copy2(os.path.join(ROOT, "opstools.js"), out)
     shutil.copy2(os.path.join(ROOT, "cmdxlate.js"), out)
     shutil.copy2(os.path.join(ROOT, "navplus.js"), out)
+    shutil.copy2(os.path.join(ROOT, "anontools.js"), out)
+    shutil.copy2(os.path.join(ROOT, "topomap.js"), out)
     # Ακαδημία: scripts + εικονίδια του PWA (ό,τι δεν είναι .md).
     for fp in glob.glob(os.path.join(ROOT, "academy", "*")):
         if os.path.isfile(fp) and not fp.endswith(".md"):

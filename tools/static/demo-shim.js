@@ -120,10 +120,52 @@
     }
     if (p === '/api/block' && blocked) { var b = rec(p) || {}; b.blocked = blocked; return b; }
     if (p === '/api/honeypot' && honeyOn === false) return honeyOff();
+    if (p === '/api/sitecheck') {
+      var sid = q.get('id');
+      if (sid) return siteRuns[sid] || rec('/api/sitecheck?id=' + sid) || { error: 'Άγνωστο id.' };
+      return siteView();
+    }
     if (p === '/api/whois') return { ip: q.get('ip'), text: NA };
     var r = rec(p);
     return r !== undefined ? r : { error: NA };
   }
+  // 🧅 έλεγχος site: καταγεγραμμένα demo αποτελέσματα, διαλεγμένα με λέξεις του hostname (όπως το sitecheck.demo_kind)
+  var siteRuns = {}, siteOrder = [], siteSeq = 0;
+  function siteKind(h) {
+    if (/\.onion$/.test(h)) return 'onion';
+    if (h.indexOf('duckduckgo') >= 0) return 'ddg';
+    if (/news|times|post|daily|herald|kathimerini|protothema|iefimerida|cnn|bbc/.test(h)) return 'news';
+    if (/shop|store|cart|buy|eshop|skroutz|amazon|market/.test(h)) return 'shop';
+    return 'generic';
+  }
+  function siteStart(body) {
+    var raw = String(body.url || '').trim(), u;
+    if (raw && raw.indexOf('://') < 0) raw = (/^[^\/:]+\.onion(?=[\/:]|$)/i.test(raw) ? 'http://' : 'https://') + raw;
+    try { u = new URL(raw); } catch (e) { u = null; }
+    if (!u || !/^https?:$/.test(u.protocol) || u.username || u.password || !u.hostname ||
+        /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|\[)/.test(u.hostname) || u.hostname.indexOf('.') < 0)
+      return { ok: false, error: 'Μη έγκυρη ή μη δημόσια διεύθυνση.', error_el: 'Μη έγκυρη ή μη δημόσια διεύθυνση.',
+        error_en: 'Invalid or non-public address.' };
+    var h = u.hostname.toLowerCase(), base = rec('/api/sitecheck?demo=' + siteKind(h));
+    if (!base) return { error: NA };
+    var r = JSON.parse(JSON.stringify(base));
+    r.id = 'static-' + (++siteSeq); r.url = u.href; r.final_url = u.href; r.host = h; r.onion = /\.onion$/.test(h);
+    r.fetched_at = nowS(); r.redirects = [];
+    siteRuns[r.id] = r; siteOrder.push(r.id);
+    return { ok: true, id: r.id, running: true, via: r.via };
+  }
+  function siteView() {
+    var v = rec('/api/sitecheck') || { running: false, tor: 9150, demo: true, latest: null, history: [] };
+    var mine = siteOrder.slice().reverse().map(function (i) { return siteRuns[i]; });
+    if (mine.length) v.latest = mine[0];
+    v.history = mine.map(function (r) {
+      return { id: r.id, url: r.url, host: r.host, onion: r.onion, via: r.via, grade: r.grade, score: r.score,
+        fetched_at: r.fetched_at, trackers_count: r.trackers_count, demo: true };
+    }).concat(v.history || []).slice(0, 10);
+    v.running = false;
+    return v;
+  }
+
   function honeyOff() { var h = rec('/api/honeypot') || {}; h.running = false; h.listening = []; h.ports = []; return h; }
 
   function handlePost(p, body) {
@@ -137,6 +179,7 @@
       case '/api/hunt/run': return rec('/api/hunt/run?id=' + body.id) || { error: NA };
       case '/api/whereis/refresh': case '/api/expiry/refresh': return { ok: true };
       case '/api/segcheck/run': case '/api/segcheck/report': return { ok: true, running: false };
+      case '/api/sitecheck': return siteStart(body || {});
       case '/api/scan': return { ok: true };
       case '/api/honeypot':
         honeyOn = !!body.enable;

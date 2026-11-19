@@ -25,23 +25,56 @@ IPAPI_FIELDS = "status,message,country,countryCode,city,isp,org,as,timezone,prox
 
 
 # ---------------- HTTP (απευθείας ή μέσω Tor SOCKS5) ----------------
+def _recv_exact(s, n):
+    buf = b""
+    while len(buf) < n:
+        chunk = s.recv(n - len(buf))
+        if not chunk:
+            raise OSError("SOCKS: η σύνδεση έκλεισε")
+        buf += chunk
+    return buf
+
+
+SOCKS_ERRORS = {1: "γενική αποτυχία", 2: "δεν επιτρέπεται", 3: "μη προσβάσιμο δίκτυο", 4: "μη προσβάσιμος host",
+                5: "άρνηση σύνδεσης", 6: "λήξη TTL", 7: "μη υποστηριζόμενη εντολή", 8: "μη υποστηριζόμενη διεύθυνση"}
+
+
+class SocksError(OSError):
+    def __init__(self, code):
+        super().__init__(f"SOCKS: αποτυχία σύνδεσης ({code} — {SOCKS_ERRORS.get(code, '?')})")
+        self.code = code
+
+
+def socks_connect(host, dport, port, timeout=20):
+    """SOCKS5 CONNECT με απομακρυσμένο DNS (όπως socks5h): το όνομα επιλύεται ΜΕΣΑ στο Tor.
+    Επιστρέφει συνδεδεμένο socket προς host:dport (χωρίς TLS)."""
+    s = socket.create_connection(("127.0.0.1", port), timeout=timeout)
+    try:
+        s.sendall(b"\x05\x01\x00")
+        if _recv_exact(s, 2) != b"\x05\x00":
+            raise OSError("SOCKS: άρνηση")
+        hb = host.encode("idna") if not host.isascii() else host.encode()
+        if len(hb) > 255:
+            raise OSError("SOCKS: πολύ μεγάλο όνομα")
+        s.sendall(b"\x05\x01\x00\x03" + bytes([len(hb)]) + hb + dport.to_bytes(2, "big"))
+        rep = _recv_exact(s, 4)
+        if rep[1] != 0:
+            raise SocksError(rep[1])
+        skip = {1: 4, 4: 16}.get(rep[3])
+        _recv_exact(s, (skip if skip else _recv_exact(s, 1)[0]) + 2)
+        return s
+    except BaseException:
+        s.close()
+        raise
+
+
 def socks_get(url, port, timeout=20):
     """GET μέσω SOCKS5 με απομακρυσμένο DNS (όπως socks5h): ούτε το όνομα δεν φεύγει εκτός Tor."""
     u = urlparse(url)
     host, tls = u.hostname, u.scheme == "https"
     dport = u.port or (443 if tls else 80)
-    s = socket.create_connection(("127.0.0.1", port), timeout=timeout)
+    s = socks_connect(host, dport, port, timeout)
     try:
-        s.sendall(b"\x05\x01\x00")
-        if s.recv(2) != b"\x05\x00":
-            raise OSError("SOCKS: άρνηση")
-        hb = host.encode()
-        s.sendall(b"\x05\x01\x00\x03" + bytes([len(hb)]) + hb + dport.to_bytes(2, "big"))
-        rep = s.recv(4)
-        if len(rep) < 4 or rep[1] != 0:
-            raise OSError(f"SOCKS: αποτυχία σύνδεσης ({rep[1] if len(rep) > 1 else '?'})")
-        skip = {1: 4, 4: 16}.get(rep[3])
-        s.recv((skip if skip else s.recv(1)[0]) + 2)
         if tls:
             s = ssl.create_default_context().wrap_socket(s, server_hostname=host)
         path = (u.path or "/") + (("?" + u.query) if u.query else "")

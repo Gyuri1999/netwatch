@@ -45,8 +45,15 @@
     for (const p of pts) g += `<circle cx="${p.xy[0].toFixed(0)}" cy="${p.xy[1].toFixed(0)}" r="4.5" style="fill:${col[p.role] || 'var(--mid)'}"/>`;
     return g + '</svg>';
   }
+  // το ζωντανό κύκλωμα ζωγραφίζεται σε δικό του κουτί· από κάτω (#tor-extra) μένουν τα εργαλεία ανωνυμίας (anontools.js)
+  function torLive() {
+    const t = document.getElementById('t-tor'); if (!t) return null;
+    let l = t.querySelector(':scope > #tor-live');
+    if (!l) { t.innerHTML = '<div id="tor-live"></div><div id="tor-extra"></div>'; l = t.querySelector('#tor-live'); }
+    return l;
+  }
   function drawTor() {
-    const el = document.getElementById('t-tor'), d = T.data.tor;
+    const el = torLive(), d = T.data.tor;
     if (!el) return;
     if (off(d)) return el.innerHTML = offCard('🧅 Tor', 'Δεν τρέχει Tor με ControlPort. Άνοιξε το <b>Tor Browser</b>, ή <code>brew install tor</code> και στο torrc: <code>ControlPort 9051</code> + <code>CookieAuthentication 1</code>.') + torHelp();
     let h = `<h3>🧅 Tor — το κύκλωμα των 3 κόμβων${sim(d)}</h3>`;
@@ -391,7 +398,7 @@
   window.renderIotfw = () => load('iotfw', '/api/iotfw', 6, drawFw);
 
   window.renderTrackers = () => { if (now() - (T.at.tph || 0) > 15) { T.at.tph = now(); fetch('/api/dnsfilter').then(r => r.json()).then(j => { T2d.dnsfilter = j; if (typeof tab !== 'undefined' && tab === 'trk') drawTrackers(); }).catch(() => { }); } drawTrackers(); };
-  window.renderTor = () => load('tor', '/api/tor', 5, drawTor);
+  window.renderTor = () => { torLive(); load('tor', '/api/tor', 5, drawTor); if (window.renderAnon) renderAnon(); };
   window.renderVpnm = () => { load('vpnguard', '/api/vpnguard', 5, drawVpn); load('vpn', '/api/vpn', 8, drawVpn); };
   window.renderDnsf = () => { load('dnsfilter', '/api/dnsfilter', 15, drawDns); load('encdns', '/api/encdns', 8, drawDns); };
   window.renderCams = () => load('camexp', '/api/camexp', 20, drawCams);

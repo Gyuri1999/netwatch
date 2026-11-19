@@ -161,12 +161,48 @@ def listening():
     return parse_lsof(run(["lsof", "-nP", "-iTCP", "-sTCP:LISTEN"]))
 
 
-def vpn_active(default_iface=None):
-    if default_iface and re.match(r"(utun|tun|tap|wg|ppp|ipsec)\d*", default_iface):
+TUN_RE = re.compile(r"(utun|tun|tap|wg|ppp|ipsec)\d*$")
+
+
+def egress_iface(dst="1.1.1.1"):
+    """Από ποια διεπαφή βγαίνει πραγματικά η κίνηση προς το Internet. Ένα VPN «όλης της κίνησης»
+    (π.χ. Tailscale exit node, WireGuard 0.0.0.0/0) συχνά βάζει 0/1 + 128/1 και αφήνει το «default» στο Wi‑Fi,
+    οπότε ρωτάμε για μια δημόσια διεύθυνση, όχι για το default."""
+    m = re.search(r"interface:\s*(\S+)", run(["route", "-n", "get", dst]))
+    if m:
+        return m.group(1)
+    m = re.search(r"\sdev (\S+)", run(["ip", "route", "get", dst]))
+    return m.group(1) if m else None
+
+
+def vpn_active(default_iface=None, egress=None, nc=None):
+    """True = όλη η κίνηση προς το Internet περνά από VPN· "split:<όνομα>" = συνδεδεμένο VPN που καλύπτει μόνο
+    ιδιωτικά δίκτυα (π.χ. Tailscale χωρίς exit node)· False = κανένα VPN."""
+    eg = egress if egress is not None else egress_iface()
+    if any(x and TUN_RE.match(x) for x in (eg, default_iface)):
         return True
-    if sys.platform == "darwin":
-        return "(Connected)" in run(["scutil", "--nc", "list"])
+    if nc is None:
+        nc = run(["scutil", "--nc", "list"]) if sys.platform == "darwin" else ""
+    m = re.search(r'\(Connected\)[^\n]*?"([^"]+)"', nc or "")
+    if m:
+        return "split:" + m.group(1)
     return False
+
+
+TOR_SOCKS = ((9150, "Tor Browser"), (9050, "tor"))
+
+
+def tor_running(ports=TOR_SOCKS):
+    """Ποιο Tor ακούει τοπικά (SOCKS στο 127.0.0.1): [(θύρα, όνομα)]. Μόνο σύνδεση σε localhost — τίποτα δεν φεύγει."""
+    import socket
+    out = []
+    for port, name in ports:
+        try:
+            with socket.create_connection(("127.0.0.1", port), timeout=0.3):
+                out.append([port, name])
+        except OSError:
+            pass
+    return out
 
 
 def default_iface():
@@ -327,11 +363,25 @@ def evaluate(d):
         else:
             chk("sharing", "ok", "Υπηρεσίες ανοιχτές στο δίκτυο", f"Καμία επικίνδυνη ({len(lis)} ακούν συνολικά).")
 
-    if d.get("vpn"):
+    v = d.get("vpn")
+    if isinstance(v, str) and v.startswith("split:"):
+        chk("vpn", "warn", "VPN", f"Το «{v[6:]}» είναι συνδεδεμένο, αλλά μόνο για το ιδιωτικό σου δίκτυο — η κίνηση "
+            "προς το Internet βγαίνει από το Wi‑Fi χωρίς VPN.",
+            "Για να περνά όλη η κίνηση από VPN: στο Tailscale διάλεξε Exit Node (μια συσκευή σου στο σπίτι), "
+            "ή άνοιξε ένα VPN όλης της κίνησης (Mullvad, ProtonVPN, WireGuard με 0.0.0.0/0).", 10 if public else 0)
+    elif v:
         chk("vpn", "ok", "VPN", "Ενεργό — η κίνηση πάει κρυπτογραφημένη μέχρι τον server του VPN.")
     elif public:
         chk("vpn", "warn", "VPN", "Δεν είναι ενεργό VPN.", "Σε δημόσιο Wi‑Fi άνοιξε VPN (π.χ. Tailscale exit node, "
             "Mullvad, ProtonVPN) ή χρησιμοποίησε το hotspot του κινητού.", 10)
+    else:
+        chk("vpn", "info", "VPN", "Δεν είναι ενεργό VPN — στο δικό σου δίκτυο συνήθως δεν χρειάζεται.")
+    tor = d.get("tor")
+    if tor:
+        names = " + ".join(f"{n} ({p})" for p, n in tor)
+        chk("tor", "ok", "Tor", f"Τρέχει: {names}. Ανώνυμο είναι μόνο ό,τι ανοίγεις μέσα στο Tor Browser — οι άλλες "
+            "εφαρμογές και browsers βγαίνουν κανονικά (ή από το VPN).",
+            "Για να δεις το κύκλωμα των 3 κόμβων άνοιξε την καρτέλα 🧅 Tor.")
 
     pm = d.get("private_mac")
     if pm is False:
@@ -356,7 +406,7 @@ def full_check(public=True, arp_spoof=False):
     di = default_iface()
     w = wifi_info()
     d = {"public": public, "wifi": w, "captive": captive_portal(), "dns": dns_check(), "tls": tls_check(),
-         "firewall": firewall(), "listening": listening(), "vpn": vpn_active(di),
+         "firewall": firewall(), "listening": listening(), "vpn": vpn_active(di), "tor": tor_running(),
          "private_mac": private_mac(iface_mac((w or {}).get("iface") or di)) if w else None,
          "arp_spoof": arp_spoof, "t": time.time(), "default_iface": di}
     d.update(evaluate(d))
@@ -439,6 +489,20 @@ class Guard:
             d.update(evaluate(d))
             self.result = d
             self.state.publish({"type": "wifi", "result": d})
+
+    def recheck_vpn(self):
+        """Γρήγορος έλεγχος μόνο του VPN (≈1 s): άνοιξες/έκλεισες VPN → ξανα-αξιολόγηση χωρίς τους υπόλοιπους ελέγχους."""
+        if self.sim:
+            v = (self.result or {}).get("vpn", False)
+        else:
+            v = vpn_active(default_iface())
+        tor = (self.result or {}).get("tor") if self.sim else tor_running()
+        if self.result:
+            d = dict(self.result, vpn=v, tor=tor, vpn_t=time.time())
+            d.update(evaluate(d))
+            self.result = d
+            self.state.publish({"type": "wifi", "result": d})
+        return v
 
     def start(self, reason="manual"):
         with self._lock:

@@ -45,8 +45,8 @@ GETS = ["/api/status", "/api/iot", "/api/mqtt", "/api/sensor", "/api/honeypot", 
         "/api/change", "/api/triage",
         # 💾 αντίγραφα ρυθμίσεων συσκευών, 🔌 πού είναι συνδεδεμένο, ⏳ υπενθυμίσεις λήξης
         "/api/configs", "/api/whereis/table", "/api/expiry",
-        # 🧱 έλεγχος διαχωρισμού (VLAN)
-        "/api/segcheck"]
+        # 🧱 έλεγχος διαχωρισμού (VLAN), 🧅 έλεγχος site για ανωνυμία (μετά τους demo ελέγχους παρακάτω)
+        "/api/segcheck", "/api/sitecheck"]
 LAT_HOURS = [3, 24, 168]
 HISTORY_HOURS = [1, 24, 168, 720]
 # Βγαίνουν στο internet ή χρειάζονται παράμετρο που δεν ξέρουμε — δεν καταγράφονται.
@@ -164,6 +164,25 @@ def main():
             posts[path] = c.post(path, body)
             print(f"  POST {path} → {'error' if 'error' in posts[path] else 'ok'}")
 
+        # 🧅 έλεγχος site: ένα demo αποτέλεσμα ανά «είδος» site (το shim διαλέγει με λέξεις του hostname, όπως το sitecheck.py)
+        sitechecks = {}
+        for kind, url in (("news", "https://dailynews.example.com/"), ("ddg", "https://duckduckgo.com/"),
+                          ("onion", "http://duckduckgogg42xjoc72x3sjasowoarfbgcmvfimaftt6twagswzczad.onion/"),
+                          ("shop", "https://shop.example.com/"), ("generic", "https://example.org/")):
+            for _ in range(40):
+                r = c.post("/api/sitecheck", {"url": url})
+                if not r.get("retry_in"):
+                    break
+                time.sleep(float(r["retry_in"]) + 0.2)
+            rid = r.get("id")
+            for _ in range(60):
+                res = c.get("/api/sitecheck?id=" + quote(rid)) if rid else {}
+                if not res.get("running"):
+                    break
+                time.sleep(0.5)
+            sitechecks[kind] = res
+            print(f"  POST /api/sitecheck {kind} → {res.get('grade') or res.get('error')}")
+
         while time.time() - t_start < args.seconds:
             time.sleep(1)
             el = time.time() - t_start
@@ -258,6 +277,8 @@ def main():
             api["/api/vulnlab"] = vl
         report = c.get("/report?days=7", raw=True)
         pt_report = c.get("/pentest-report?lang=el", raw=True)
+        for kind, res in sitechecks.items():
+            api["/api/sitecheck?demo=" + kind] = res
         # 📘 τεκμηρίωση δικτύου + 🔄 παράδοση βάρδιας (το shim διαλέγει ανά lang· τα αρχεία docs/network.* σε el)
         for lg in ("el", "en"):
             api["/api/docs?lang=" + lg] = c.get("/api/docs?lang=" + lg)

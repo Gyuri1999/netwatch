@@ -176,6 +176,9 @@ I18N.add({
   "Ενεργό.": "On.",
   "Ενεργό": "On",
   "Ενεργό — η κίνηση πάει κρυπτογραφημένη μέχρι τον server του VPN.": "On — traffic travels encrypted up to the VPN server.",
+  "Δεν είναι ενεργό VPN — στο δικό σου δίκτυο συνήθως δεν χρειάζεται.": "No VPN on — on your own network you usually don't need one.",
+  "Για να δεις το κύκλωμα των 3 κόμβων άνοιξε την καρτέλα 🧅 Tor.": "To see the 3-relay circuit, open the 🧅 Tor tab.",
+  "Για να περνά όλη η κίνηση από VPN: στο Tailscale διάλεξε Exit Node (μια συσκευή σου στο σπίτι), ή άνοιξε ένα VPN όλης της κίνησης (Mullvad, ProtonVPN, WireGuard με 0.0.0.0/0).": "To send all traffic through a VPN: in Tailscale pick an Exit Node (one of your devices at home), or turn on a full-tunnel VPN (Mullvad, ProtonVPN, WireGuard with 0.0.0.0/0).",
   "Ενεργή — δεν σε αναγνωρίζουν από τη συσκευή σου.": "On — networks can't recognise you by your device.",
   "Το Mac δέχεται συνδέσεις από όλο το Wi‑Fi: Δέκτης AirPlay (5000), Δέκτης AirPlay (7000), Απομακρυσμένη σύνδεση (SSH) (22).": "Your Mac accepts connections from the whole Wi‑Fi: AirPlay Receiver (5000), AirPlay Receiver (7000), Remote Login (SSH) (22).",
   "Το Mac δέχεται συνδέσεις από όλο το Wi‑Fi: Δέκτης AirPlay (5000), Δέκτης AirPlay (7000).": "Your Mac accepts connections from the whole Wi‑Fi: AirPlay Receiver (5000), AirPlay Receiver (7000).",
@@ -1507,6 +1510,14 @@ I18N.add({
   [
    "^Καμία επικίνδυνη \\((-?\\d+) ακούν συνολικά\\)\\.$",
    "None risky ($1 listening in total)."
+  ],
+  [
+   "^Τρέχει: (.+?)\\. Ανώνυμο είναι μόνο ό,τι ανοίγεις μέσα στο Tor Browser — οι άλλες εφαρμογές και browsers βγαίνουν κανονικά \\(ή από το VPN\\)\\.$",
+   "Running: $1. Only what you open inside Tor Browser is anonymous — other apps and browsers go out normally (or through the VPN)."
+  ],
+  [
+   "^Το «(.+?)» είναι συνδεδεμένο, αλλά μόνο για το ιδιωτικό σου δίκτυο — η κίνηση προς το Internet βγαίνει από το Wi‑Fi χωρίς VPN\\.$",
+   "“$1” is connected, but only for your private network — traffic to the Internet leaves through the Wi‑Fi without a VPN."
   ],
   [
    "^Το Mac δέχεται συνδέσεις από όλο το Wi‑Fi: Απομακρυσμένη σύνδεση \\(SSH\\) \\((-?\\d+)\\)\\.$",

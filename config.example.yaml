@@ -205,7 +205,7 @@ academy_terminal: true
 
 # 🧅 Tor: reads the control port (localhost only, read-only) to show the 3-hop circuit live.
 # Enable in torrc: ControlPort 9051 + CookieAuthentication 1  (Tor Browser already listens on 9151).
-# tor:
+# tor:                     # on by default (read-only, 127.0.0.1); set enabled: false to turn it off
 #   enabled: true
 #   control_port: 9051      # omit to try 9051 then 9151
 #   # cookie_file: ~/.tor/control_auth_cookie

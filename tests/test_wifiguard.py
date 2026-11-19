@@ -117,7 +117,7 @@ def test_guard_trusted_network_is_persisted(tmp_path):
     g._run("manual")
     g.set_trusted("Cafe_Free_WiFi", True)
     assert json.loads(p.read_text()) == ["Cafe_Free_WiFi"] and g.result["public"] is False
-    assert "vpn" not in {c["id"] for c in g.result["checks"]}
+    assert [c["status"] for c in g.result["checks"] if c["id"] == "vpn"] == ["info"]
     assert wg.Guard(s, trusted_path=str(p)).trusted == {"Cafe_Free_WiFi"}
 
 
@@ -149,3 +149,50 @@ def test_backend_exits_when_mac_app_dies():
                               f"netwatch.watch_parent({parent.pid})"])
     parent.wait()
     assert child.wait(timeout=10) == 0
+
+
+# ---- VPN: όλη η κίνηση vs μόνο ιδιωτικό δίκτυο (π.χ. Tailscale χωρίς exit node) ----
+TS_NC = ('Available network connection services in the current set (*=enabled):\n'
+         '* (Connected)      AEF6 VPN (io.tailscale.ipn.macsys) "Tailscale"      [VPN:io.tailscale.ipn.macsys]\n')
+
+
+def test_vpn_full_tunnel_when_internet_egress_is_tun():
+    assert wg.vpn_active("en0", egress="utun4", nc="") is True
+    assert wg.vpn_active("wg0", egress="en0", nc="") is True
+
+
+def test_vpn_split_when_connected_but_internet_via_wifi():
+    assert wg.vpn_active("en0", egress="en0", nc=TS_NC) == "split:Tailscale"
+    assert wg.vpn_active("en0", egress="en0", nc="* (Disconnected) X VPN \"Work\"") is False
+
+
+def test_split_vpn_is_a_warning_not_ok():
+    r = wg.evaluate(base(vpn="split:Tailscale"))
+    c = [x for x in r["checks"] if x["id"] == "vpn"][0]
+    assert c["status"] == "warn" and "Tailscale" in c["detail"] and "Exit Node" in c["fix"] and c["weight"] == 10
+    home = wg.evaluate(base(vpn="split:Tailscale", public=False))
+    assert [x for x in home["checks"] if x["id"] == "vpn"][0]["weight"] == 0
+    assert [x for x in wg.evaluate(base(vpn=True))["checks"] if x["id"] == "vpn"][0]["status"] == "ok"
+
+
+def test_recheck_vpn_only_updates_vpn():
+    s = nw.NetState("demo", "demo0", ["192.168.1.23"], "192.168.1.1", geo=False, rdns=False)
+    g = wg.Guard(s, sim=wg.demo_check)
+    g._run("manual")
+    before = {c["id"]: c for c in g.result["checks"]}
+    g.sim = None
+    wg.vpn_active, orig = (lambda *a, **k: True), wg.vpn_active
+    try:
+        assert g.recheck_vpn() is True
+    finally:
+        wg.vpn_active = orig
+    after = {c["id"]: c for c in g.result["checks"]}
+    assert after["vpn"]["status"] == "ok" and before["vpn"]["status"] != "ok"
+    assert set(after) - {"vpn", "tor"} == set(before) - {"vpn", "tor"}
+
+
+def test_tor_card_when_tor_socks_listening():
+    r = wg.evaluate(base(tor=[[9150, "Tor Browser"]]))
+    c = [x for x in r["checks"] if x["id"] == "tor"][0]
+    assert c["status"] == "ok" and "Tor Browser (9150)" in c["detail"] and c["weight"] == 0
+    assert "tor" not in {x["id"] for x in wg.evaluate(base(tor=[]))["checks"]}

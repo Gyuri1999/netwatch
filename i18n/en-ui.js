@@ -2825,7 +2825,17 @@ I18N.add({
   "απομονωμένο": "isolated",
   "ΔΙΑΡΡΟΗ": "LEAK",
   "κόβεται (ενώ επιτρέπεται)": "blocked (but allowed)",
-  "δεν ελέγχθηκε": "not tested"
+  "δεν ελέγχθηκε": "not tested",
+  "Υλικό": "Material",
+  "Συμπαγές": "Solid",
+  "💧 Liquid Glass (ναι / όχι)": "💧 Liquid Glass (on / off)",
+  "↻ Ξανά": "↻ Again",
+  "Άνοιξες ή έκλεισες VPN; Ξανακοίτα μόνο το VPN (1 δευτ.)": "Turned a VPN on or off? Re-check only the VPN (1 s)",
+  "Άνοιξες ή έκλεισες VPN ή Tor; Ξανακοίτα μόνο αυτά (1 δευτ.)": "Turned a VPN or Tor on or off? Re-check only those (1 s)",
+  "🗺 Διάγραμμα δικτύου": "🗺 Network diagram",
+  "Διάγραμμα δικτύου": "Network diagram",
+  "σχέδιο του δικτύου με ένα κουμπί — και πού είναι η βλάβη": "one-button drawing of your network — and where the fault is",
+  "Το διάγραμμα δικτύου δεν είναι διαθέσιμο σε αυτή τη λειτουργία.": "The network diagram is not available in this mode."
  },
  "patterns": [
   [
@@ -5847,6 +5857,10 @@ I18N.add({
   [
    "^Opened #(\\d+) \\[(\\w+)\\] (.+) (?:από|from) (\\S+(?: \\([\\d.]+\\))?) \\(new\\)$",
    "Opened #$1 [$2] $3 from $4 (new)"
+  ],
+  [
+   "^Περίμενε (\\d+)″ πριν την επόμενη χαρτογράφηση\\.$",
+   "Wait $1″ before the next mapping."
   ]
  ]
 });

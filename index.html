@@ -10,7 +10,7 @@
 <script>/* θέμα πριν από το πρώτο καρέ (χωρίς «άσπρη λάμψη») */(()=>{const d=document.documentElement;let p={};try{p=JSON.parse(localStorage.getItem('nw-look')||'{}')}catch(e){}
 const q=new URLSearchParams(location.search);if(q.get('theme'))p.theme=q.get('theme');
 const th=p.theme==='light'||(p.theme==='auto'&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';d.dataset.theme=th;
-if(p.cb)d.classList.add('cb');if(p.motion==='off')d.classList.add('nomo');window.__look=p})()</script>
+if(q.get('glass'))p.glass=q.get('glass')==='1';if(p.cb)d.classList.add('cb');if(p.glass)d.classList.add('glass');if(p.motion==='off')d.classList.add('nomo');window.__look=p})()</script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script src="/i18n.js"></script>
@@ -27,6 +27,8 @@ if(p.cb)d.classList.add('cb');if(p.motion==='off')d.classList.add('nomo');window
 <script src="/opstools.js"></script>
 <script src="/cmdxlate.js"></script>
 <script src="/navplus.js"></script>
+<script src="/anontools.js"></script>
+<script src="/topomap.js"></script>
 <script src="/privtools.js"></script>
 <script src="/academy/engine.js"></script>
 <style>
@@ -503,6 +505,76 @@ pre.snip{font-size:11.5px;background:var(--bg);padding:8px;border-radius:6px;mar
 .tk-chip{font-size:11px;font-family:var(--mono);padding:2px 7px;border-radius:7px;background:color-mix(in srgb,var(--c) 14%,transparent);color:var(--c);border:1px solid color-mix(in srgb,var(--c) 30%,transparent)}
 .tk-chip b{color:var(--hi)}
 html.nomo *,html.nomo *::before,html.nomo *::after{animation-duration:1ms!important;animation-iteration-count:1!important;transition-duration:1ms!important}
+/* ───── 💧 Liquid Glass σε στυλ macOS Tahoe: διάφανο γυαλί με «χείλος» φωτός, πλωτό sidebar,
+   κάψουλες στη γραμμή εργαλείων, ομόκεντρες γωνίες, ταπετσαρία με μπλε κύματα ───── */
+html.glass{--dim:rgb(220 232 255 / 66%);--mid:rgb(230 238 255 / 80%);--txt:rgb(240 245 255 / 92%);--gl-fill:rgb(255 255 255 / 7%);--gl-fill2:rgb(255 255 255 / 10%);--gl-edge:rgb(255 255 255 / 14%);
+  --gl-rim:rgb(255 255 255 / 42%);--gl-rim2:rgb(255 255 255 / 10%);--gl-sh:0 18px 50px -18px rgb(0 0 0 / 60%),0 2px 6px -2px rgb(0 0 0 / 30%);
+  --gl-sel:rgb(255 255 255 / 14%);--gl-blur:blur(28px) saturate(185%) brightness(1.04);
+  --panel:transparent;--panel2:var(--gl-fill);--panel3:var(--gl-fill2);--line:rgb(255 255 255 / 9%);--line2:rgb(255 255 255 / 11%);
+  --wp:radial-gradient(120% 70% at 85% 115%,#0b5fd1 0%,transparent 55%),
+       radial-gradient(90% 60% at 10% 100%,#0a3d8f 0%,transparent 60%),
+       radial-gradient(140% 55% at 50% 70%,#0f7bd8aa 0%,transparent 50%),
+       radial-gradient(120% 45% at 30% 45%,#1fa2ff66 0%,transparent 55%),
+       radial-gradient(100% 60% at 75% 10%,color-mix(in srgb,var(--cyan) 35%,transparent) 0%,transparent 60%),
+       linear-gradient(180deg,#071733 0%,#0a2a63 45%,#0b3f8f 75%,#06214f 100%)}
+html.glass[data-theme=light]{--dim:#4a5a75;--mid:#34435c;--txt:#1a2538;--gl-fill:rgb(255 255 255 / 40%);--gl-fill2:rgb(255 255 255 / 55%);--gl-edge:rgb(255 255 255 / 65%);
+  --gl-rim:rgb(255 255 255 / 95%);--gl-rim2:rgb(255 255 255 / 40%);--gl-sh:0 16px 40px -18px rgb(20 40 90 / 35%),0 1px 3px rgb(20 40 90 / 10%);
+  --gl-sel:rgb(0 0 0 / 7%);--gl-blur:blur(28px) saturate(180%) brightness(1.06);
+  --line:rgb(15 23 42 / 8%);--line2:rgb(15 23 42 / 9%);
+  --wp:radial-gradient(120% 70% at 85% 115%,#4aa3ff 0%,transparent 55%),
+       radial-gradient(90% 60% at 10% 100%,#7cc4ff 0%,transparent 60%),
+       radial-gradient(140% 55% at 50% 70%,#b9e0ff 0%,transparent 50%),
+       radial-gradient(120% 45% at 30% 40%,#e7f4ff 0%,transparent 55%),
+       radial-gradient(100% 60% at 75% 10%,color-mix(in srgb,var(--cyan) 22%,transparent) 0%,transparent 60%),
+       linear-gradient(180deg,#eef6ff 0%,#cfe6ff 50%,#8fc6ff 100%)}
+html.glass,html.glass body{background:var(--wp);background-attachment:fixed;background-size:cover}
+html.glass aside,html.glass body.v-page aside,html.glass #pagehead,html.glass body.v-page #pagehead{background:transparent;border-color:transparent}
+/* το γυαλί: διάφανο, θολό, με φωτεινό χείλος πάνω-αριστερά και απαλή σκιά */
+html.glass #rail,html.glass .card,html.glass .kpi,html.glass .al,html.glass details,html.glass .mcard,html.glass #ap,html.glass .cmdk-box,html.glass .np-it{
+  background:var(--gl-fill)!important;border:1px solid var(--gl-edge)!important;
+  -webkit-backdrop-filter:var(--gl-blur);backdrop-filter:var(--gl-blur);
+  box-shadow:inset 1px 1px 0 var(--gl-rim),inset -1px -1px 0 var(--gl-rim2),var(--gl-sh)}
+html.glass .al{border-left:3px solid var(--dim)!important}html.glass .al.high{border-left-color:var(--red)!important}html.glass .al.med{border-left-color:var(--orange)!important}html.glass .al.low{border-left-color:var(--yellow)!important}
+html.glass .card .card,html.glass .card .kpi,html.glass .card details,html.glass .card .np-it,html.glass .card .al{-webkit-backdrop-filter:none;backdrop-filter:none;background:var(--gl-fill2)!important;box-shadow:inset 1px 1px 0 var(--gl-rim2)}
+/* ομόκεντρες γωνίες */
+html.glass .card,html.glass .kpi,html.glass details,html.glass .mcard,html.glass .al{border-radius:22px}
+html.glass .card .card,html.glass .card .kpi,html.glass .card details,html.glass .np-it{border-radius:14px}
+html.glass #ap{border-radius:24px}html.glass .cmdk-box{border-radius:26px}
+/* γραμμή εργαλείων: διάφανη, τα κουμπιά γίνονται κάψουλες από γυαλί */
+html.glass header{background:transparent!important;border:0!important;box-shadow:none}
+html.glass header .b,html.glass header .hbtn,html.glass #mode-btn{border-radius:999px;background:var(--gl-fill)!important;border:1px solid var(--gl-edge)!important;
+  -webkit-backdrop-filter:var(--gl-blur);backdrop-filter:var(--gl-blur);box-shadow:inset 1px 1px 0 var(--gl-rim),0 4px 14px -6px rgb(0 0 0 / 40%);padding-left:12px;padding-right:12px}
+html.glass .chip{border-left-color:transparent}
+/* πλωτό sidebar, όπως στο Finder του Tahoe */
+@media (min-width:901px){
+  html.glass #rail{margin:6px 0 10px 10px;height:auto;align-self:stretch;border-radius:22px}
+  html.glass main{padding-bottom:0}
+}
+html.glass #rail .rg{text-transform:none;letter-spacing:0;font-size:11px;font-weight:650;color:var(--dim);margin:14px 10px 4px}
+html.glass #rail button{border-radius:10px}
+html.glass #rail button.on{background:var(--gl-sel);box-shadow:none;color:var(--hi)}
+html.glass #rail button.on .ic{color:var(--cyan)}
+/* κουμπιά, πεδία, επιλογείς: κάψουλες */
+html.glass .b,html.glass .seg button,html.glass input.f,html.glass select.f,html.glass .op-in{background:rgb(255 255 255 / 9%);border-color:var(--gl-edge);box-shadow:inset 1px 1px 0 rgb(255 255 255 / 18%);border-radius:999px}
+html.glass[data-theme=light] .b,html.glass[data-theme=light] .seg button,html.glass[data-theme=light] input.f,html.glass[data-theme=light] .op-in{background:rgb(255 255 255 / 55%)}
+html.glass .b:hover{background:rgb(255 255 255 / 17%)}
+html.glass .seg{background:rgb(0 0 0 / 16%);border-radius:999px;padding:3px;gap:3px;border:1px solid var(--gl-edge)}
+html.glass[data-theme=light] .seg{background:rgb(0 0 0 / 6%)}
+html.glass .seg button{border:0;box-shadow:none;background:transparent}
+html.glass .seg button.on{background:var(--gl-fill2);box-shadow:inset 1px 1px 0 var(--gl-rim),0 2px 8px -3px rgb(0 0 0 / 35%);color:var(--hi)}
+html.glass[data-theme=light] .seg button.on{background:#fff}
+html.glass .b.pu-go,html.glass .b.pri{background:color-mix(in srgb,var(--cyan) 70%,transparent);color:#fff;border-color:rgb(255 255 255 / 30%)}
+/* τίτλος σελίδας όπως στις εφαρμογές του macOS */
+html.glass #pagehead h2{font-size:24px;font-weight:700;letter-spacing:-.02em}
+html.glass #cmdk{background:rgb(2 8 20 / 25%);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px)}
+html.glass pre,html.glass code{background:rgb(0 0 0 / 20%);border-radius:8px}
+html.glass[data-theme=light] pre,html.glass[data-theme=light] code{background:rgb(255 255 255 / 60%)}
+html.glass ::-webkit-scrollbar-thumb{background:rgb(255 255 255 / 18%);border-radius:999px}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){html.glass{--gl-fill:rgb(14 34 72 / 92%);--gl-fill2:rgb(24 48 92 / 92%)}html.glass[data-theme=light]{--gl-fill:rgb(255 255 255 / 92%);--gl-fill2:rgb(246 249 255 / 95%)}}
+html.glass th,html.glass thead,html.glass table tr:first-child th{background:rgb(255 255 255 / 6%)!important}
+html.glass[data-theme=light] th{background:rgb(255 255 255 / 45%)!important}
+html.glass td,html.glass th{border-color:var(--line)}
+html.glass.nomo *{transition:none!important}
 </style>
 </head>
 <body>
@@ -575,7 +647,7 @@ html.nomo *,html.nomo *::before,html.nomo *::after{animation-duration:1ms!import
     <div class="tab" id="t-mqtt"></div>
     <div class="tab" id="t-pb"></div>
     <div class="tab" id="t-health"></div>
-    <div class="tab" id="t-flows"></div><div class="tab" id="t-snmp"></div><div class="tab" id="t-syslog"></div><div class="tab" id="t-ipam"></div><div class="tab" id="t-lat"></div><div class="tab" id="t-speed"></div><div class="tab" id="t-ops"></div><div class="tab" id="t-tor"></div><div class="tab" id="t-vpnm"></div><div class="tab" id="t-dnsf"></div><div class="tab" id="t-cams"></div><div class="tab" id="t-siem"></div><div class="tab" id="t-ct"></div><div class="tab" id="t-trk"></div><div class="tab" id="t-proto"></div><div class="tab" id="t-cli"></div><div class="tab" id="t-iotfw"></div><div class="tab" id="t-tm"></div><div class="tab" id="t-vlab"></div><div class="tab" id="t-purple"></div><div class="tab" id="t-cases"></div><div class="tab" id="t-hunt"></div><div class="tab" id="t-tri"></div><div class="tab" id="t-chg"></div><div class="tab" id="t-cfg"></div><div class="tab" id="t-where"></div><div class="tab" id="t-docs"></div><div class="tab" id="t-shift"></div><div class="tab" id="t-expiry"></div><div class="tab" id="t-field"></div><div class="tab" id="t-xlate"></div><div class="tab" id="t-tlsa"></div><div class="tab" id="t-seg"></div>
+    <div class="tab" id="t-flows"></div><div class="tab" id="t-snmp"></div><div class="tab" id="t-syslog"></div><div class="tab" id="t-ipam"></div><div class="tab" id="t-lat"></div><div class="tab" id="t-speed"></div><div class="tab" id="t-ops"></div><div class="tab" id="t-tor"></div><div class="tab" id="t-vpnm"></div><div class="tab" id="t-dnsf"></div><div class="tab" id="t-cams"></div><div class="tab" id="t-siem"></div><div class="tab" id="t-ct"></div><div class="tab" id="t-trk"></div><div class="tab" id="t-proto"></div><div class="tab" id="t-cli"></div><div class="tab" id="t-iotfw"></div><div class="tab" id="t-tm"></div><div class="tab" id="t-vlab"></div><div class="tab" id="t-purple"></div><div class="tab" id="t-cases"></div><div class="tab" id="t-hunt"></div><div class="tab" id="t-tri"></div><div class="tab" id="t-chg"></div><div class="tab" id="t-cfg"></div><div class="tab" id="t-where"></div><div class="tab" id="t-docs"></div><div class="tab" id="t-shift"></div><div class="tab" id="t-expiry"></div><div class="tab" id="t-field"></div><div class="tab" id="t-xlate"></div><div class="tab" id="t-tlsa"></div><div class="tab" id="t-seg"></div><div class="tab" id="t-topo"></div>
     <div class="tab" id="t-tips"></div>
     <div class="tab" id="t-hist"></div>
     <div class="tab" id="t-audit"></div>
@@ -932,7 +1004,7 @@ const SECTIONS=[
   ['🛡 Προστασία',[['alerts','⚠ Επιθέσεις','τι ύποπτο έγινε, με απλά λόγια'],['cases','🗂 Υποθέσεις','διαλογή ειδοποιήσεων σαν SOC: έρευνα, σημειώσεις, ψευδώς θετικά'],['shift','🔁 Παράδοση βάρδιας','σύνοψη για τον επόμενο: τι έγινε, τι εκκρεμεί'],['wifi','☕ Wi‑Fi','είμαι ασφαλής σε αυτό το δίκτυο;'],['priv','🕵 Ανωνυμία','Tor, VPN, διαρροές'],['audit','🛡 Έλεγχος','βαθμός ασφάλειας του σπιτιού'],['honey','🪤 Παγίδα','ψεύτικες θύρες που πιάνουν όποιον ψάχνει'],['block','🚫 Μπλοκ','IP που έκοψες με το τείχος'],['iot','🔌 IoT μου','ESP32 & Raspberry Pi: πόσο ασφαλή είναι'],['iotfw','🧱 Τείχος IoT','κάθε συσκευή μιλά μόνο με όσους πρέπει · κανόνες για τον router'],['sensor','📡 Αισθητήρες','ESP32 που φυλάνε τον αέρα (deauth, evil twin)'],['mqtt','📨 MQTT','ο broker σου: ποιος μπαίνει, τι στέλνει'],['pb','⚡ Αντιδράσεις','αυτόματα: όταν γίνει Χ, κάνε Υ']]],
   ['🌐 Το δίκτυό μου',[['devs','📟 Συσκευές','ποιος είναι συνδεδεμένος'],['tm','⏱ Μηχανή του χρόνου','γύρνα το δίκτυο σε οποιοδήποτε λεπτό του 24ώρου'],['hosts','🌍 Προορισμοί','πού μιλάει ο υπολογιστής'],['apps','📱 Εφαρμογές','ποια app μιλάει με ποιον · trackers'],['stats','📊 Στατιστικά','πρωτόκολλα, κίνηση, MITRE'],['feed','📦 Πακέτα','ζωντανά πακέτα & στρώματα OSI'],['det','🔎 Λεπτομέρειες','όλα για μία IP'],['hist','🕓 Ιστορικό','παλιές ειδοποιήσεις & συσκευές'],['health','🔎 Homelab','είναι όλα πάνω; πόσο αργούν;']]],
   ['🔴 Εργαλεία',[['pentest','🔴 Pentest','σάρωση, εργαλεία τεχνικού, CVE, lab'],['vlab','🎯 IoT Lab','χάκαρε (νόμιμα) μια ευάλωτη κάμερα στον υπολογιστή σου'],['purple','🟣 Purple team','με πιάνει το NetWatch; κάλυψη MITRE ATT&CK'],['hunt','🏹 Κυνήγι απειλών','ψάξε ενεργά ό,τι έμεινε κάτω από τα όρια'],['tlsa','🔐 TLS / SSH','βαθμός A–F για τα HTTPS/SSH των συσκευών σου'],['seg','🧱 Διαχωρισμός VLAN','είναι όντως απομονωμένα guest/IoT από το LAN σου;'],['ws','🦈 Wireshark','φίλτρα, tshark, συντομεύσεις — δοκίμασέ τα ζωντανά'],['rules','🧩 Κανόνες','γράψε δικούς σου ανιχνευτές'],['ctf','🚩 CTF','ασκήσεις ανάλυσης κίνησης']]],
-  ['🏗 Υποδομή',[['tri','🔎 Φταίει το δίκτυο;','έλεγχος με ένα κλικ + έτοιμο κείμενο για ticket'],['chg','📸 Πριν / Μετά','φωτογραφία του δικτύου πριν και μετά από μια αλλαγή'],['cfg','📑 Αντίγραφα ρυθμίσεων','backup των configs των switches/routers και τι άλλαξε'],['where','🔌 Πού είναι συνδεδεμένο;','MAC/IP → switch → θύρα → VLAN'],['docs','📘 Τεκμηρίωση','αυτόματη τεκμηρίωση σε Markdown, PDF και draw.io'],['expiry','⏰ Λήξεις','πιστοποιητικά, domains, άδειες, εγγυήσεις'],['field','📱 Field mode','τα 5 εργαλεία του τεχνικού στο κινητό'],['flows','🌊 Ροές','NetFlow / sFlow από τον router: η κίνηση όλων των συσκευών'],['snmp','🔌 Θύρες & SNMP','κίνηση ανά θύρα, σφάλματα, CPU/RAM, τοπολογία LLDP'],['syslog','📜 Syslog','τα logs του router, του Proxmox και των ESP32, με αναζήτηση'],['ipam','🗂 IPAM','διευθύνσεις, DHCP, συγκρούσεις IP, απογραφή συσκευών'],['lat','📈 Καθυστέρηση','SmokePing: ping, jitter και απώλειες στον χρόνο'],['speed','🚀 Ταχύτητα & Wi‑Fi','τεστ ταχύτητας, iperf3 και ποιο κανάλι Wi‑Fi να βάλεις'],['ops','🛠 Λειτουργία','συντήρηση, ειδοποιήσεις, Prometheus, tokens, pcap']]],
+  ['🏗 Υποδομή',[['tri','🔎 Φταίει το δίκτυο;','έλεγχος με ένα κλικ + έτοιμο κείμενο για ticket'],['topo','🗺 Διάγραμμα δικτύου','σχέδιο του δικτύου με ένα κουμπί — και πού είναι η βλάβη'],['chg','📸 Πριν / Μετά','φωτογραφία του δικτύου πριν και μετά από μια αλλαγή'],['cfg','📑 Αντίγραφα ρυθμίσεων','backup των configs των switches/routers και τι άλλαξε'],['where','🔌 Πού είναι συνδεδεμένο;','MAC/IP → switch → θύρα → VLAN'],['docs','📘 Τεκμηρίωση','αυτόματη τεκμηρίωση σε Markdown, PDF και draw.io'],['expiry','⏰ Λήξεις','πιστοποιητικά, domains, άδειες, εγγυήσεις'],['field','📱 Field mode','τα 5 εργαλεία του τεχνικού στο κινητό'],['flows','🌊 Ροές','NetFlow / sFlow από τον router: η κίνηση όλων των συσκευών'],['snmp','🔌 Θύρες & SNMP','κίνηση ανά θύρα, σφάλματα, CPU/RAM, τοπολογία LLDP'],['syslog','📜 Syslog','τα logs του router, του Proxmox και των ESP32, με αναζήτηση'],['ipam','🗂 IPAM','διευθύνσεις, DHCP, συγκρούσεις IP, απογραφή συσκευών'],['lat','📈 Καθυστέρηση','SmokePing: ping, jitter και απώλειες στον χρόνο'],['speed','🚀 Ταχύτητα & Wi‑Fi','τεστ ταχύτητας, iperf3 και ποιο κανάλι Wi‑Fi να βάλεις'],['ops','🛠 Λειτουργία','συντήρηση, ειδοποιήσεις, Prometheus, tokens, pcap']]],
   ['🔒 Ασφάλεια & ιδιωτικότητα',[['tor','🧅 Tor','το κύκλωμα των 3 κόμβων, ζωντανά'],['vpnm','🔒 VPN','WireGuard/Tailscale & kill-switch'],['dnsf','🔐 DNS','Pi-hole/AdGuard & κρυπτογραφημένο DNS ανά συσκευή'],['cams','📹 Κάμερες','έλεγχος έκθεσης — δικό σου δίκτυο, read-only'],['siem','📥 SIEM','ειδοποιήσεις Suricata & Zeek'],['ct','🔏 Πιστοποιητικά','Certificate Transparency για τα domains σου'],['trk','📡 Trackers','ποια συσκευή στέλνει σε διαφημίσεις/τηλεμετρία']]],
   ['📚 Μάθηση',[['academy','🎓 Ακαδημία','CCNA & IoT security, από το μηδέν'],['proto','🎬 Πρωτόκολλα','14 πρωτόκολλα σε κίνηση — και ζωντανά από το δίκτυό σου'],['cli','🖧 Cisco Lab','προσομοιωτής IOS: VLAN, routing, ACL, OSPF'],['xlate','🔀 Μεταφραστής εντολών','Cisco ↔ MikroTik ↔ Juniper ↔ Linux ↔ Windows'],['learn','📚 Μάθε','πώς δουλεύουν οι επιθέσεις'],['tips','💡 Συμβουλές','τι να κάνεις τώρα'],['quiz','❓ Κουίζ','τεστάρισε τι έμαθες']]]];
 const SECT_NAME={home:'🧭 Αρχική'};SECTIONS.forEach(([,l])=>l.forEach(([t,n])=>SECT_NAME[t]=n));
@@ -1000,6 +1072,7 @@ ICON_P.tour='<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2 5-5 2 2-5z"/>';
 ICON_P.vlab='<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1.5"/>';
 ICON_P.purple='<path d="M12 3 4 6v6c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V6z"/><path d="M12 3v18"/>';
 ICON_P.tlsa='<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/><path d="M12 15v2"/>';
+ICON_P.topo='<rect x="9" y="2" width="6" height="5" rx="1"/><rect x="2" y="16" width="6" height="5" rx="1"/><rect x="16" y="16" width="6" height="5" rx="1"/><path d="M12 7v4M5 16v-3h14v3"/>';
 ICON_P.seg='<rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><path d="M14 3h7v7M3 14v7h7"/><path d="m4 20 16-16"/>';
 ICON_P.cli='<rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3"/><path d="M13 15h4"/>';
 ICON_P.iotfw='<rect x="3" y="5" width="18" height="14" rx="1"/><path d="M3 10h18M3 15h18M9 5v5M15 10v5M9 15v4"/>';
@@ -1056,7 +1129,7 @@ function enterAnim(el){if(!el)return;el.classList.remove('enter');void el.offset
 // αριθμοί που «μετράνε» μέχρι την τιμή τους (μόνο όταν ανοίγει η οθόνη)
 function countUp(root){if(matchMedia('(prefers-reduced-motion: reduce)').matches)return;root.querySelectorAll('[data-count]').forEach(el=>{const m=el.textContent.match(/^(\d+)(.*)$/);if(!m||+m[1]<2)return;
   const end=+m[1],rest=m[2],t0=performance.now();const st=n=>{const k=Math.min(1,(n-t0)/600);el.textContent=Math.round(end*(1-Math.pow(1-k,3)))+rest;if(k<1)requestAnimationFrame(st)};requestAnimationFrame(st)})}
-function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,ws:renderWs,rules:renderRules,ctf:renderCtf,wifi:renderWifi,priv:renderPriv,home:renderHome,academy:renderAcademy,apps:renderApps,honey:renderHoney,block:renderBlock,iot:renderIot,sensor:renderSensor,mqtt:renderMqtt,pb:renderPb,health:renderHealth,flows:renderFlows,snmp:renderSnmp,syslog:renderSyslog,ipam:renderIpam,lat:renderLat,speed:renderSpeed,ops:renderOps,tor:renderTor,vpnm:renderVpnm,dnsf:renderDnsf,cams:renderCams,siem:renderSiem,ct:renderCt,trk:renderTrackers,proto:renderProto,cli:renderCli,iotfw:renderIotfw,tm:renderTm,vlab:renderVlab,purple:renderPurple,cases:renderCases,hunt:renderHunt,tri:renderTri,chg:renderChg,cfg:renderCfg,where:renderWhere,docs:renderDocs,shift:renderShift,expiry:renderExpiry,field:renderField,xlate:()=>window.renderXlate&&renderXlate(),tlsa:renderTlsa,seg:()=>window.renderSeg&&renderSeg()})[tab]()}
+function renderTab(){({alerts:renderAlerts,hosts:renderHosts,devs:renderDevs,stats:renderStats,feed:renderFeed,det:renderDet,learn:renderLearn,tips:renderTips,hist:renderHist,audit:renderAudit,quiz:renderQuiz,pentest:renderPentest,ws:renderWs,rules:renderRules,ctf:renderCtf,wifi:renderWifi,priv:renderPriv,home:renderHome,academy:renderAcademy,apps:renderApps,honey:renderHoney,block:renderBlock,iot:renderIot,sensor:renderSensor,mqtt:renderMqtt,pb:renderPb,health:renderHealth,flows:renderFlows,snmp:renderSnmp,syslog:renderSyslog,ipam:renderIpam,lat:renderLat,speed:renderSpeed,ops:renderOps,tor:renderTor,vpnm:renderVpnm,dnsf:renderDnsf,cams:renderCams,siem:renderSiem,ct:renderCt,trk:renderTrackers,proto:renderProto,cli:renderCli,iotfw:renderIotfw,tm:renderTm,vlab:renderVlab,purple:renderPurple,cases:renderCases,hunt:renderHunt,tri:renderTri,chg:renderChg,cfg:renderCfg,where:renderWhere,docs:renderDocs,shift:renderShift,expiry:renderExpiry,field:renderField,xlate:()=>window.renderXlate&&renderXlate(),tlsa:renderTlsa,seg:()=>window.renderSeg&&renderSeg(),topo:()=>window.renderTopo&&renderTopo()})[tab]()}
 function renderAcademy(){const el=$('t-academy');if(el.dataset.r)return;el.dataset.r=1;window.ACADEMY?ACADEMY.render(el):el.innerHTML='<div class="empty">Δεν φορτώθηκε η Ακαδημία</div>'}
 function tabHover(){return document.querySelector('.tab.on:hover')}
 
@@ -1548,7 +1621,7 @@ function ptScanHTML(){const sd=scanData,run=sd.status==='running',pr=PTIN.profil
       <div class="sm" style="white-space:normal">${[x.vendor&&'🏭 '+esc(x.vendor),x.model&&'📦 '+esc(x.model),x.os_guess&&'🖥 '+esc(x.os_guess),x.mac&&'MAC '+esc(x.mac),(x.names||[]).length>1&&'🏷 '+x.names.slice(0,4).map(esc).join(', ')].filter(Boolean).map(t=>`<span>${t}</span>`).join(' · ')}</div>
       ${x.services.length?`<table style="margin-top:4px"><tbody>${x.services.map(sv=>{const k=sv.product+' '+(sv.version||'');return `<tr><td style="width:96px">${sv.port}/${sv.proto||'tcp'} ${esc(sv.svc)}</td><td style="max-width:220px" title="${esc(sv.banner||'')}">${sv.product?`<b style="color:var(--hi)">${esc(sv.product)}</b> ${esc(sv.version||'')}`:'<span class="sm">χωρίς banner</span>'}${sv.tls?` <span class="tag">${esc(sv.tls.version||'TLS ?')}</span>`:''}</td><td>${riskTag(sv.risk)}</td><td>${sv.product&&sv.version?`<button class="b" data-cve="${esc(sv.product)}" data-ver="${esc(sv.version)}">CVE</button>`:''}</td></tr>
         ${sv.why?`<tr class="ex"><td colspan="4" class="sm">${esc(sv.why)}</td></tr>`:''}${(sv.findings||[]).map(f=>`<tr class="ex"><td colspan="4" class="sm">⚠ ${esc(f[1])}</td></tr>`).join('')}${cveCache[k]?`<tr class="ex"><td colspan="4">${cveHTML(k)}</td></tr>`:''}`}).join('')}</tbody></table>`:'<div class="sm">καμία ανοιχτή θύρα από όσες ελέγχθηκαν</div>'}
-      <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap"><button class="b" data-qt="ping" data-host="${esc(x.ip)}">📶 Ping</button><button class="b" data-qt="ports" data-host="${esc(x.ip)}">🚪 Θύρες</button>${x.services.some(s=>[80,443,8080,8443,8123,8006].includes(s.port))?`<button class="b" data-qt="http" data-host="${esc(x.services.some(s=>[443,8443,8006].includes(s.port))?'https://':'http://')}${esc(x.ip)}${(()=>{const p=x.services.find(s=>[80,443,8080,8443,8123,8006].includes(s.port)).port;return [80,443].includes(p)?'':':'+p})()}">🌐 HTTP</button>`:''}${x.mac?`<button class="b" data-qt="wol" data-host="${esc(x.mac)}">⏰ WoL</button>`:''}</div></div>`).join('')+'</div>';
+      <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap"><button class="b" data-qt="ping" data-host="${esc(x.ip)}">📶 Ping</button><button class="b" data-qt="ports" data-host="${esc(x.ip)}">🚪 Θύρες</button>${x.services.some(s=>[80,443,8080,8443,8123,8006].includes(s.port))?`<button class="b" data-qt="http" data-host="${esc(x.services.some(s=>[443,8443,8006].includes(s.port))?'https://':'http://')}${esc(x.ip)}${(()=>{const p=x.services.find(s=>[80,443,8080,8443,8123,8006].includes(s.port)).port;return [80,443].includes(p)?'':':'+p})()}">🌐 HTTP</button>`:''}${x.mac?`<button class="b" data-qt="wol" data-host="${esc(x.mac)}">⏰ WoL</button>`:''}${window.ptActHTML?ptActHTML(x):''}</div></div>`).join('')+'</div>';
   return h+`<div class="sm">Τα αποτελέσματα μπήκαν και στην καρτέλα 🛡 Έλεγχος.</div>`}
 function ptScanBind(el){
   $('pt-scan').onclick=()=>{const b={target:PTIN.target??ptTarget,profile:PTIN.profile||'quick',udp:!!PTIN.udp};if(b.profile==='custom')b.ports=PTIN.ports||'';ptTarget=b.target;
@@ -1772,7 +1845,8 @@ function connect(){const es=new EventSource('/events');es.onmessage=e=>handle(JS
 connect();loadBlock().catch(()=>{});
 
 // ================= ☕ WI‑FI GUARD =================
-let wifiData=null;
+let wifiData=null,wfVpnBusy=false;
+function wfVpn(){wfVpnBusy=true;drawWifi();fetch('/api/wifi',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({vpn_only:true})}).then(r=>r.json()).then(j=>{if(j&&j.result)wifiData=j}).catch(()=>{}).finally(()=>{wfVpnBusy=false;if(tab==='wifi')drawWifi()})}
 const SECL={none:'Ανοιχτό',wep:'WEP',wpa_personal:'WPA',wpa2_personal:'WPA2',wpa2_personal_mixed:'WPA/WPA2',wpa3_personal:'WPA3',wpa3_transition:'WPA2/WPA3',wpa2_enterprise:'WPA2 Ent.',wpa3_enterprise:'WPA3 Ent.',owe:'OWE'};
 function loadWifi(){return fetch('/api/wifi').then(r=>r.json()).then(j=>{wifiData=j;if(tab==='wifi')drawWifi();if(j.running)setTimeout(loadWifi,1500)})}
 function renderWifi(){if(!wifiData){$('t-wifi').innerHTML='<div class="empty">φόρτωση…</div>';loadWifi();return}drawWifi()}
@@ -1786,7 +1860,7 @@ function drawWifi(){const d=wifiData,r=d.result,el=$('t-wifi');const icon={ok:'�
     ${r?`<br>τελευταίος έλεγχος ${new Date(r.t*1000).toLocaleTimeString('el-GR')}${r.reason==='network-change'?' (αυτόματα — νέο δίκτυο)':r.reason==='startup'?' (αυτόματα)':''}${r.demo?' · <span class="tag">προσομοίωση</span>':''}`:''}</div>
     <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">${btn}${w&&w.ssid&&!r.demo?`<button class="b" id="wf-trust">${r.public?'🏠 Είναι δικό μου δίκτυο':'☕ Σήμανση ως δημόσιο'}</button>`:''}</div></div></div>`;
   if(d.error)h+=`<div class="card" style="color:var(--redt)">${esc(d.error)}</div>`;
-  if(r){h+=`<h3>Έλεγχοι ${r.public?'<span class="tag y">δημόσιο δίκτυο</span>':'<span class="tag g">δικό σου δίκτυο</span>'}</h3>`+r.checks.map(c=>`<div class="card"><div class="brow"><span>${icon[c.status]} <b style="color:var(--hi)">${esc(c.title)}</b></span><span class="sm">${c.weight&&c.status!=='ok'?'−'+c.weight:''}</span></div><div style="color:var(--mid);margin-top:3px;white-space:normal">${esc(c.detail)}</div>${c.fix&&c.status!=='ok'?`<div class="sm" style="margin-top:4px;white-space:normal">👉 ${esc(c.fix)}</div>`:''}</div>`).join('');
+  if(r){h+=`<h3>Έλεγχοι ${r.public?'<span class="tag y">δημόσιο δίκτυο</span>':'<span class="tag g">δικό σου δίκτυο</span>'}</h3>`+r.checks.map(c=>`<div class="card"><div class="brow"><span>${icon[c.status]} <b style="color:var(--hi)">${esc(c.title)}</b></span><span class="sm">${c.weight&&c.status!=='ok'?'−'+c.weight:''}${c.id==='vpn'||c.id==='tor'?` <button class="b" data-wfvpn title="Άνοιξες ή έκλεισες VPN ή Tor; Ξανακοίτα μόνο αυτά (1 δευτ.)" ${wfVpnBusy?'disabled':''}>${wfVpnBusy?'⏳':'↻ Ξανά'}</button>`:''}</span></div><div style="color:var(--mid);margin-top:3px;white-space:normal">${esc(c.detail)}</div>${c.fix&&c.status!=='ok'?`<div class="sm" style="margin-top:4px;white-space:normal">👉 ${esc(c.fix)}</div>`:''}</div>`).join('');
     if(w&&w.others&&w.others.length)h+=`<h3>Δίκτυα γύρω σου</h3><table><thead><tr><th>Όνομα</th><th>Ασφάλεια</th><th>Σήμα</th><th>Κανάλι</th></tr></thead><tbody>${w.others.slice().sort((a,b)=>(b.signal||-999)-(a.signal||-999)).map(o=>{const tw=o.ssid===w.ssid;return`<tr${tw?' style="background:color-mix(in srgb,var(--red) 13.3%,transparent)"':''}><td>${esc(o.ssid||'(κρυφό)')}${tw?' <span class="tag r">ίδιο όνομα!</span>':''}</td><td>${o.security==='none'?'<span class="tag y">ανοιχτό</span>':esc(SECL[o.security]||o.security)}</td><td>${o.signal!=null?o.signal+' dBm':'—'}</td><td class="sm">${esc(o.channel||'')}</td></tr>`}).join('')}</tbody></table>`;
     if(r.listening&&r.listening.length)h+=`<h3>Τι «ακούει» στο Mac σου (ορατό στο Wi‑Fi)</h3><div class="sm" style="white-space:normal">${r.listening.map(([p,port])=>`<span class="tag">${esc(p)}:${port}</span>`).join(' ')}</div>`}
   h+=`<h3>Τι βλέπει κάποιος στο ίδιο Wi‑Fi;</h3><table><thead><tr><th>Χρησιμοποιείς</th><th>Βλέπει</th></tr></thead><tbody>
@@ -1804,6 +1878,7 @@ function drawWifi(){const d=wifiData,r=d.result,el=$('t-wifi');const icon={ok:'�
     7. Μετά: <b>«Ξέχασε αυτό το δίκτυο»</b>, ώστε να μη συνδέεται αυτόματα (ούτε σε ψεύτικο με το ίδιο όνομα).</div>
   <div class="sm" style="margin-top:8px;white-space:normal">🔎 Ο έλεγχος μόνο διαβάζει — δεν αλλάζει ρυθμίσεις. Για να δουλέψει επικοινωνεί με: captive.apple.com (HTTP), DNS για one.one.one.one / dns.google / dns.quad9.net και ένα ανύπαρκτο .example, και TLS σε www.google.com, github.com, www.cloudflare.com. Σε live mode τρέχει αυτόματα κάθε φορά που αλλάζεις δίκτυο (απενεργοποίηση: <code>detectors: wifi_guard: false</code>).</div>`;
   el.innerHTML=h;
+  el.querySelectorAll('[data-wfvpn]').forEach(b=>b.onclick=wfVpn);
   $('wf-run').onclick=()=>{wifiData.running=true;drawWifi();post('/api/wifi').then(j=>{if(j.error){wifiData.error=j.error;wifiData.running=false;drawWifi()}else setTimeout(loadWifi,1200)})};
   const tb=$('wf-trust');if(tb)tb.onclick=()=>post('/api/wifi',{ssid:w.ssid,trusted:r.public}).then(j=>{if(!j.error)wifiData=j;drawWifi()})}
 
@@ -2249,6 +2324,7 @@ function cmdItems(q){const out=[],qt=q.trim(),m=qt.match(/^(\S+)\s*(.*)$/),c=m&&
   for(const [t,n,d] of secs){const hay=fold(n+' '+(d||'')+' '+(window.I18N?I18N.t(n)+' '+I18N.t(d||''):''));if(!f||hay.includes(f))sm.push({t:n,d:d||'',go:()=>showTab(t)})}
   out.push(...sm.slice(0,f?8:30));
   const acts=[['🌗 Θέμα: σκοτεινό / φωτεινό','theme light dark',()=>{LOOK.theme=document.documentElement.dataset.theme==='light'?'dark':'light';applyLook(true)}],
+    ['💧 Liquid Glass (ναι / όχι)','glass liquid transparent blur theme',()=>{LOOK.glass=!LOOK.glass;applyLook(true)}],
     ['🎨 Εμφάνιση (χρώμα, αχρωματοψία)','appearance accent color',()=>{drawAp();$('ap').classList.add('open')}],
     ['📺 Λειτουργία NOC (οθόνη τοίχου)','noc kiosk wall',()=>nocToggle(true)],
     ['🧭 Ξενάγηση στο NetWatch','tour help onboarding',()=>tourStart()]];
@@ -2373,11 +2449,11 @@ document.addEventListener('fullscreenchange',()=>setTimeout(resize,60));
 
 // ===== Εμφάνιση: θέμα, χρώμα έμφασης, αχρωματοψία, κίνηση (αποθηκεύεται στο nw-look) =====
 const ACCENTS=[['cyan','#3ec5ff','#0b84c4'],['violet','#b388ff','#7444d8'],['green','#3ddc97','#0a8f5c'],['amber','#ffb02e','#b26a00'],['pink','#ff6ad5','#c0267a'],['blue','#5b8cff','#2f5fe0']];
-const LOOK=Object.assign({theme:'dark',accent:'cyan',cb:false,motion:'auto'},window.__look||{});
+const LOOK=Object.assign({theme:'dark',accent:'cyan',cb:false,motion:'auto',glass:false},window.__look||{});
 const reduceMo=()=>LOOK.motion==='off'||matchMedia('(prefers-reduced-motion: reduce)').matches;
 function applyLook(save){const d=document.documentElement;
   const th=LOOK.theme==='light'||(LOOK.theme==='auto'&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';
-  const go=()=>{d.dataset.theme=th;d.classList.toggle('cb',!!LOOK.cb);d.classList.toggle('nomo',LOOK.motion==='off');
+  const go=()=>{d.dataset.theme=th;d.classList.toggle('cb',!!LOOK.cb);d.classList.toggle('glass',!!LOOK.glass);d.classList.toggle('nomo',LOOK.motion==='off');
     const a=ACCENTS.find(x=>x[0]===LOOK.accent)||ACCENTS[0];
     if(a[0]==='cyan')d.style.removeProperty('--cyan');else d.style.setProperty('--cyan',th==='light'?a[2]:a[1]);
     const m=document.querySelector('meta[name=theme-color]');if(m)m.content=th==='light'?'#fbfcfe':'#060a12'};
@@ -2388,12 +2464,13 @@ matchMedia('(prefers-color-scheme: light)').addEventListener?.('change',()=>LOOK
 function drawAp(){let el=$('ap');if(!el){el=document.createElement('div');el.id='ap';document.body.appendChild(el)}
   const seg=(k,opts)=>`<div class="seg">${opts.map(([v,l])=>`<button data-k="${k}" data-v="${v}" class="${LOOK[k]===v?'on':''}">${l}</button>`).join('')}</div>`;
   el.innerHTML=`<h4>Θέμα</h4>${seg('theme',[['dark','Σκοτεινό'],['light','Φωτεινό'],['auto','Αυτόματο']])}
+   <h4>Υλικό</h4>${seg('glass',[[false,'Συμπαγές'],[true,'💧 Liquid Glass (Tahoe)']])}
    <h4>Χρώμα έμφασης</h4><div class="sw">${ACCENTS.map(([n,c])=>`<button data-acc="${n}" class="${LOOK.accent===n?'on':''}" style="background:${c}" title="${n}" aria-label="${n}"></button>`).join('')}</div>
    <h4>Προσβασιμότητα</h4>
    <label><input type="checkbox" id="ap-cb" ${LOOK.cb?'checked':''}> Χρώματα για αχρωματοψία</label><div class="sm">μπλε/πορτοκαλί αντί για πράσινο/κόκκινο και σχήματα ▲ ◆ ● στη σοβαρότητα</div>
    <label><input type="checkbox" id="ap-mo" ${LOOK.motion==='off'?'checked':''}> Λιγότερη κίνηση</label>
    <h4>Οθόνη τοίχου</h4><button class="b hbtn" id="ap-noc">${ico('map')||''}<span>Λειτουργία NOC (πλήρης οθόνη)</span></button>`;
-  el.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{LOOK[b.dataset.k]=b.dataset.v;applyLook(true)});
+  el.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const v=b.dataset.v;LOOK[b.dataset.k]=v==='true'?true:v==='false'?false:v;applyLook(true)});
   el.querySelectorAll('[data-acc]').forEach(b=>b.onclick=()=>{LOOK.accent=b.dataset.acc;applyLook(true)});
   $('ap-cb').onchange=e=>{LOOK.cb=e.target.checked;applyLook(true)};
   $('ap-mo').onchange=e=>{LOOK.motion=e.target.checked?'off':'auto';applyLook(true)};

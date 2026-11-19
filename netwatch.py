@@ -261,7 +261,7 @@ def main():
         camexposure = None
     if mode != "pcap":
         gw = [state.gateway] if state.gateway else []
-        state.tor = bg(torctl.TorCtl(state, cfg.get("tor"), sim=demo)) if demo or (cfg.get("tor") or {}).get("enabled") else None
+        state.tor = bg(torctl.TorCtl(state, cfg.get("tor"), sim=demo)) if demo or (cfg.get("tor") or {}).get("enabled", True) else None
         state.wg = bg(wgstatus.WgStatus(state, cfg.get("wireguard"), sim=demo)) if demo or (cfg.get("wireguard") or {}).get("enabled", True) else None
         state.vpnguard = bg(vpnguard.VpnGuard(state, cfg.get("vpnguard"), sim=demo)) if demo or live else None
         ecfg = dict(cfg.get("encrypted_dns") or {})
@@ -316,6 +316,10 @@ def main():
         if live:
             state.segcheck.on_save = chown_to_user
         bg(state.segcheck)
+        import sitecheck  # 🧅 «Πόσο ασφαλές είναι αυτό το site για την ανωνυμία μου;» (μόνο μνήμη, ποτέ δίσκος)
+        state.sitecheck = sitecheck.SiteCheck(sim=demo)
+        import topomap  # 🗺 διάγραμμα δικτύου με ένα κουμπί + «πού είναι η βλάβη» (ping/traceroute, μόνο μνήμη)
+        state.topomap = topomap.TopoMap(state, sim=demo)
         import handover  # 🔄 παράδοση βάρδιας (SOC/NOC): σύνοψη N ωρών + σημειώσεις βάρδιας
         state.handover = handover.Handover(state, sim=demo, path=os.path.join(DATA, "handover.json") if live else None)
         if live:
@@ -331,6 +335,8 @@ def main():
         state.whereis = state.expiry = None
         state.segcheck = None
         state.handover = None
+        state.sitecheck = None
+        state.topomap = None
     icfg = cfg.get("ipam")
     if demo and not icfg:
         icfg = {"subnets": [{"cidr": "192.168.1.0/24", "name": "Σπίτι (LAN)", "vlan": 1, "gateway": "192.168.1.1", "dhcp": "192.168.1.100-192.168.1.199"}],
