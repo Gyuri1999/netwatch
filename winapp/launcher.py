@@ -118,8 +118,14 @@ def npcap_installed():
     return os.path.exists(os.path.join(root, "System32", "Npcap", "wpcap.dll"))
 
 
+# Η embeddable Python έχει αρχείο ._pth: τότε ΔΕΝ βάζει τον φάκελο του script στο sys.path και αγνοεί το PYTHONPATH.
+# Γι' αυτό ξεκινάμε με αυτό το μικρό bootstrap, που προσθέτει τον φάκελο του NetWatch και τρέχει το netwatch.py.
+BOOT = ("import os, runpy, sys; p = sys.argv[1]; sys.path.insert(0, os.path.dirname(p)); "
+        "sys.argv = sys.argv[1:]; runpy.run_path(p, run_name='__main__')")
+
+
 def backend_args(mode, pcap=None, parent=None):
-    a = [os.path.join(APPDIR, "netwatch.py"), "--no-open", "--port-file", PORTFILE,
+    a = ["-c", BOOT, os.path.join(APPDIR, "netwatch.py"), "--no-open", "--port-file", PORTFILE,
          "--parent-pid", str(parent or os.getpid())]
     if mode == "demo":
         a.append("--demo")

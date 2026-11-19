@@ -52,11 +52,22 @@ def test_sync_copies_updates_and_keeps_user_files(tmp_path):
 
 def test_backend_args():
     a = launcher.backend_args("demo", parent=42)
-    assert a[0].endswith("netwatch.py") and "--no-open" in a and "--demo" in a
+    assert a[:2] == ["-c", launcher.BOOT] and a[2].endswith("netwatch.py") and "--no-open" in a and "--demo" in a
     assert a[a.index("--parent-pid") + 1] == "42" and a[a.index("--port-file") + 1] == launcher.PORTFILE
     p = launcher.backend_args("pcap", "C:\\x y\\a.pcap")
     assert p[-3:] == ["--pcap", "C:\\x y\\a.pcap", "--loop"]
     assert "--demo" not in launcher.backend_args("live")
+
+
+def test_bootstrap_runs_script_with_its_folder_on_path(tmp_path):
+    import subprocess
+    import sys
+    _w(str(tmp_path / "helper.py"), "X = 41\n")
+    _w(str(tmp_path / "main.py"), "import sys, helper\nprint(helper.X + 1, sys.argv[1:], __name__)\n")
+    # -I: όπως η embeddable με ._pth, ο φάκελος του script ΔΕΝ μπαίνει μόνος του στο path
+    out = subprocess.run([sys.executable, "-I", "-c", launcher.BOOT, str(tmp_path / "main.py"), "--demo"],
+                         capture_output=True, text=True, cwd=str(tmp_path.parent)).stdout
+    assert out.strip() == "42 ['--demo'] __main__"
 
 
 def test_level_of():
