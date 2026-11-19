@@ -330,6 +330,15 @@ def live_capture(state, iface, bpf):
     except PermissionError:
         log("✖ Χρειάζεται sudo για καταγραφή πακέτων. Τρέξε: sudo .venv/bin/python netwatch.py  (ή --demo)")
         os._exit(1)
+    except Exception as e:
+        if os.name != "nt":
+            raise
+        # Windows: συνήθως λείπει το Npcap, ή εγκαταστάθηκε με «μόνο για διαχειριστές»
+        log(f"✖ Η καταγραφή στο «{iface}» απέτυχε: {e}")
+        log("   Έλεγξε ότι είναι εγκατεστημένο το Npcap (https://npcap.com). Αν το εγκατέστησες με "
+            "«Restrict Npcap driver's access to Administrators only», τρέξε το NetWatch ως διαχειριστής "
+            "(run.bat -Admin). Δες τις διεπαφές με: python netwatch.py --list-ifaces")
+        os._exit(1)
 
 
 # ---------------- CTF ----------------
@@ -377,8 +386,13 @@ def ctf_check_rule(level_id, qid, text):
 
 def seed_arp(state):
     try:
-        out = subprocess.run(["arp", "-an"], capture_output=True, text=True, timeout=5).stdout
-        for ip, mac in re.findall(r"\((\d+\.\d+\.\d+\.\d+)\) at ([0-9a-fA-F:]+)", out):
+        if os.name == "nt":
+            import winplat
+            pairs = winplat.arp_table()
+        else:
+            out = subprocess.run(["arp", "-an"], capture_output=True, text=True, timeout=5).stdout
+            pairs = re.findall(r"\((\d+\.\d+\.\d+\.\d+)\) at ([0-9a-fA-F:]+)", out)
+        for ip, mac in pairs:
             state.arp_table[ip] = state.arp_first[ip] = norm_mac(mac)
             state.mac_ips[norm_mac(mac)].add(ip)
         log(f"ARP πίνακας: {len(state.arp_table)} εγγραφές (router MAC: {state.arp_table.get(state.gateway, '?')})")

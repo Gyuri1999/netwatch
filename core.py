@@ -338,6 +338,9 @@ def mask_user(u):
 
 
 def detect_net(iface=None):
+    if os.name == "nt":
+        import winplat
+        return winplat.detect_net(iface)
     gw, me, found_if = None, set(), None
     try:
         out = subprocess.run(["route", "-n", "get", "default"], capture_output=True, text=True, timeout=5).stdout

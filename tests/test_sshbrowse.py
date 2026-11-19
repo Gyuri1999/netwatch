@@ -47,7 +47,7 @@ def test_hosts_validation_and_no_passwords(tmp_path):
 def test_ls_cat_and_quoting(tmp_path):
     d = tmp_path / "remote dir"
     d.mkdir()
-    (d / "a.txt").write_text("hello\nworld\n")
+    (d / "a.txt").write_bytes(b"hello\nworld\n")
     (d / "sub").mkdir()
     (d / "evil $(touch pwned) ;.txt").write_text("x")
     (d / "id_ed25519").write_text("-----BEGIN OPENSSH PRIVATE KEY-----\nabc\n-----END OPENSSH PRIVATE KEY-----\n")

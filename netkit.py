@@ -266,7 +266,11 @@ def ping(host, count=5, interval=0.3, sim=False):
     if sim:
         r = _sim_ping(ip, count)
     else:
-        out = _run(ping_cmd(ip, count, interval), timeout=count * interval + 8)
+        if sys.platform == "win32":  # χωρίς -i: τα Windows στέλνουν ένα πακέτο ανά ~1 δευτ.
+            import winplat
+            out = winplat.ping(ip, count, 1500)
+        else:
+            out = _run(ping_cmd(ip, count, interval), timeout=count * interval + 8)
         r = parse_ping(out)
         if r["sent"] == 0:
             r["sent"], r["loss_pct"] = count, 100.0
@@ -568,6 +572,10 @@ def port_check(host, ports, timeout=1.5, sim=False):
     plist = parse_ports(ports, MAX_PRIVATE_PORTS if private else MAX_PUBLIC_PORTS)
     try:
         timeout = max(0.2, min(float(timeout), 5))
+        if sys.platform == "win32":
+            # Τα Windows ξαναστέλνουν SYN μετά από RST: μια ΚΛΕΙΣΤΗ θύρα απαντά «connection refused» σε ~2 δευτ.
+            # Με μικρότερο όριο θα τη βλέπαμε «filtered».
+            timeout = max(timeout, 2.5)
     except (TypeError, ValueError):
         timeout = 1.5
     if sim:
@@ -909,6 +917,9 @@ def _read(path):
 
 def _system_dns():
     servers, search = [], []
+    if sys.platform == "win32":
+        import winplat
+        return sorted(winplat.net_info().get("dns") or [], key=lambda s: ":" in s), []
     if sys.platform == "darwin":
         servers, search = parse_scutil_dns(_run(["scutil", "--dns"]))
     if not servers:
@@ -921,6 +932,10 @@ def _system_dns():
 
 
 def _default_gateway():
+    if sys.platform == "win32":
+        import winplat
+        v = winplat.net_info()
+        return v.get("gateway"), v.get("gateway_iface")
     out = _run(["route", "-n", "get", "default"]) if sys.platform == "darwin" else ""
     gw = re.search(r"gateway:\s*(\S+)", out)
     dev = re.search(r"interface:\s*(\S+)", out)
@@ -936,6 +951,9 @@ def iface_info(sim=False):
         return dict(SIM_IFACE)
     if sys.platform == "darwin":
         ifs = parse_ifconfig(_run(["ifconfig", "-a"]))
+    elif sys.platform == "win32":
+        import winplat
+        ifs = winplat.net_info().get("interfaces") or []
     else:
         ifs = parse_ip_json(_run(["ip", "-j", "addr"])) or parse_ifconfig(_run(["ifconfig", "-a"]))
     gw, gif = _default_gateway()

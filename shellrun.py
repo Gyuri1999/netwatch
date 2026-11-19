@@ -137,7 +137,17 @@ def check(cmdline):
             return None, f"Εδώ το `{cmd}` μόνο διαβάζει: όχι επιλογές που γράφουν αρχεία ({', '.join(b for b in bad)})."
         if cmd in ("uniq", "xxd") and len([a for a in argv[1:] if not a.startswith("-")]) > 1:
             return None, f"Το `{cmd}` με δεύτερο αρχείο γράφει έξοδο σε αρχείο — όχι εδώ."
-        if cmd in ("ping", "ping6") and not any(a.startswith("-c") for a in argv):
+        if cmd in ("ping", "ping6") and sys.platform == "win32":  # Windows: -n πλήθος, χωρίς -i
+            out, it = [argv[0]], iter(argv[1:])
+            for a in it:
+                if a in ("-c", "-i", "-W", "-w", "-t"):
+                    v = next(it, "")
+                    if a == "-c":
+                        out += ["-n", v]
+                elif not a.startswith("-") or a in ("-4", "-6"):
+                    out.append(a)
+            argv[:] = out if "-n" in out else out[:1] + ["-n", "4"] + out[1:]
+        elif cmd in ("ping", "ping6") and not any(a.startswith("-c") for a in argv):
             argv[1:1] = ["-c", "4"]  # αλλιώς τρέχει για πάντα
         if cmd == "mosquitto_sub" and "-W" not in argv:
             argv += ["-W", "15"]
@@ -187,6 +197,8 @@ def run(cmdline, timeout=30):
             os.setgid(ids[1])
             os.setuid(ids[0])
     env = {"PATH": "/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin", "LANG": "en_US.UTF-8", "HOME": os.path.expanduser("~")}
+    if sys.platform == "win32":  # χωρίς SystemRoot κ.λπ. ακόμα και το ping δεν βρίσκει το Winsock
+        env = {**os.environ, "HOME": os.path.expanduser("~")}
     t0, procs, prev = time.time(), [], None
     try:
         for argv in parts:
@@ -206,7 +218,7 @@ def run(cmdline, timeout=30):
         out, code, timed = procs[-1].stdout.read() if procs[-1].stdout else b"", None, True
     except OSError as e:
         return {"ok": False, "out": str(e), "code": None, "ms": 0}
-    text = out[:LIMIT].decode("utf-8", "replace")
+    text = out[:LIMIT].decode("oem" if sys.platform == "win32" else "utf-8", "replace")
     if len(out) > LIMIT:
         text += "\n… (κόπηκε: πολύ μεγάλη έξοδος)"
     if timed:

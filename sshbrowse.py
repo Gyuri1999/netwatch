@@ -26,7 +26,7 @@ import base64
 import ipaddress
 import json
 import os
-import pwd
+import posixpath
 import re
 import secrets
 import shlex
@@ -91,6 +91,7 @@ def _user_home():
     u = os.environ.get("SUDO_USER")
     if u and hasattr(os, "geteuid") and os.geteuid() == 0:
         try:
+            import pwd  # μόνο Unix (στα Windows δεν υπάρχει sudo/geteuid, άρα δεν φτάνουμε εδώ)
             return pwd.getpwnam(u).pw_dir
         except KeyError:
             pass
@@ -509,7 +510,7 @@ class SshBrowse:
     def _demo_norm(self, p):
         p = clean_path(p)
         p = "/home/pi" + p[1:] if p.startswith("~") else p
-        p = os.path.normpath(p) if p != "/" else "/"
+        p = posixpath.normpath(p) if p != "/" else "/"  # διαδρομή του (Linux) host, όχι του δικού μας λειτουργικού
         return p
 
     def _demo_hostkey(self, hid):

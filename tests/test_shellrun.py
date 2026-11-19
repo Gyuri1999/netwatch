@@ -1,3 +1,5 @@
+import sys
+
 import pytest
 
 import shellrun as sr
@@ -32,7 +34,7 @@ def test_allows_and_ping_count():
     parts, why = sr.check("ifconfig | grep inet")
     assert why is None and parts[0] == ["ifconfig"] and parts[1] == ["grep", "inet"]
     parts, _ = sr.check("ping 127.0.0.1")
-    assert parts[0][:3] == ["ping", "-c", "4"]
+    assert parts[0][:3] == (["ping", "-n", "4"] if sys.platform == "win32" else ["ping", "-c", "4"])
     assert sr.check("nmap -sT -p 22,80 192.168.1.0/24")[1] is None
     assert sr.check("nmap -sT scanme.nmap.org")[1] is None
 

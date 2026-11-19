@@ -52,7 +52,7 @@ def keys(tmp_path):
 # --------------------------------------------------------------------------- genkey
 def test_genkey_permissions_header_and_no_overwrite(keys):
     key, pub, hdr = keys
-    assert stat.S_IMODE(os.stat(key).st_mode) == 0o600
+    assert os.name == "nt" or stat.S_IMODE(os.stat(key).st_mode) == 0o600  # Windows: ACL, όχι mode bits
     with open(key) as f:
         assert "PRIVATE KEY" in f.read()
     with open(hdr) as f:
@@ -151,9 +151,17 @@ def test_signer_refuses_rollback_bad_version_and_wrong_files(tmp_path, keys):
 HARNESS = textwrap.dedent(r"""
     #include <stdio.h>
     #include <stdlib.h>
+    #ifdef _WIN32
+    #include <fcntl.h>
+    #include <io.h>
+    #endif
     #include "signed_ota_core.h"
     using namespace signed_ota_core;
     int main(int argc, char **argv) {
+    #ifdef _WIN32
+      _setmode(_fileno(stdout), _O_BINARY);  // αλλιώς το \n γίνεται \r\n και τα bytes δεν είναι πια αυτά που υπογράφηκαν
+      _setmode(_fileno(stdin), _O_BINARY);
+    #endif
       if (argc == 4 && !strcmp(argv[1], "ver")) {
         uint32_t a[3], b[3];
         if (!parseVersion(argv[2], a) || !parseVersion(argv[3], b)) { puts("BAD"); return 0; }

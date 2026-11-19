@@ -31,6 +31,35 @@ jobs:
           assert s.alert_seq >= 8, s.alert_seq
           "
 
+  windows:
+    # Windows 11 / Server 2022: tests, εκκίνηση σε demo και αναπαραγωγή pcap (χωρίς Npcap — δεν χρειάζεται εδώ)
+    runs-on: windows-latest
+    env:
+      PYTHONUTF8: "1"
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -r requirements.txt -r requirements-dev.txt
+      - run: python -m pytest -q
+      - name: Replay sample PCAP through the detection engine
+        run: |
+          python tools/make_sample_pcap.py ci.pcap
+          python -c "import netwatch as n; me, gw = n.pcap_guess('ci.pcap'); s = n.NetState('pcap', 'ci', [me], gw, geo=False, rdns=False); n.pcap_replay(s, 'ci.pcap', speed=0); assert s.alert_seq >= 8, s.alert_seq"
+      - name: Demo mode serves the UI
+        shell: pwsh
+        run: |
+          $p = Start-Process python -ArgumentList 'netwatch.py','--demo','--no-open','--no-intel','--port-file','port.txt' -PassThru -RedirectStandardOutput demo.log -RedirectStandardError demo.err
+          for ($i = 0; $i -lt 60 -and -not (Test-Path port.txt); $i++) { Start-Sleep -Milliseconds 500 }
+          $port = Get-Content port.txt
+          $r = Invoke-WebRequest "http://127.0.0.1:$port/" -UseBasicParsing
+          Stop-Process -Id $p.Id -Force
+          Get-Content demo.log -Tail 5
+          if ($r.StatusCode -ne 200) { exit 1 }
+      - name: Windows network helpers on a real host
+        run: python -c "import winplat as w; w.install_subprocess_defaults(); print(w.detect_net()); print(w.arp_table()[:3]); print(w.ping('127.0.0.1', 2, 1000))"
+
   academy:
     runs-on: ubuntu-latest
     steps:
