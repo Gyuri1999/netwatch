@@ -233,6 +233,73 @@ def parse_cleartext(sp, dp, pl):
     return None
 
 
+def _tcp_payload(P, pl):
+    cred = parse_cleartext(P["sp"], P["dp"], pl)
+    if cred:
+        P["cred"] = cred
+    if pl[0] == 0x16:
+        ch = parse_client_hello(pl)
+        if ch:
+            P["sni"], P["ja3"], P["ja4"] = ch["sni"], ch["ja3"], ch["ja4"]
+    elif pl[:4] in (b"GET ", b"POST", b"HEAD", b"PUT "):
+        m = HTTP_HOST.search(pl[:2048])
+        if m:
+            P["http_host"] = m.group(1).decode("ascii", "ignore")
+
+
+# ---------------- γρήγορος δρόμος ----------------
+# Το scapy «ανατέμνει» κάθε πακέτο σε αντικείμενα (~100µs/πακέτο). Σε ένα download/βίντεο (χιλιάδες πακέτα/s)
+# αυτό γέμιζε τον επεξεργαστή και άργούσε όλο το UI — ειδικά στα Windows. Τα απλά IPv4 TCP/UDP τα διαβάζουμε
+# εδώ κατευθείαν από τα bytes (~5µs)· ό,τι άλλο (ARP, IPv6, VLAN, DNS, DHCP, ICMP, κομμάτια) πάει στο scapy όπως πριν.
+_TCP_FLAGS = "FSRPAUECN"
+_FLAGS_STR = {}
+SLOW_UDP = frozenset((53, 5353, 5355, 67, 68, 137, 138, 546, 547))
+_HEX = ["%02x" % i for i in range(256)]
+
+
+def _flags(v):
+    s = _FLAGS_STR.get(v)
+    if s is None:
+        s = _FLAGS_STR[v] = "".join(c for i, c in enumerate(_TCP_FLAGS) if v >> i & 1)
+    return s
+
+
+def fast_parse(b):
+    """Ethernet+IPv4+TCP/UDP απευθείας από τα bytes· None = «άσ' το στο scapy». Ίδια πεδία με το parse()."""
+    if len(b) < 34 or b[12] != 8 or b[13] != 0:  # μόνο Ethernet II / IPv4 (όχι VLAN, ARP, IPv6)
+        return None
+    vi = b[14]
+    ihl = (vi & 15) * 4
+    if vi >> 4 != 4 or ihl < 20 or len(b) < 14 + ihl + 8:
+        return None
+    if (b[20] & 0x3F) or b[21]:  # κομμάτι (fragment) → scapy
+        return None
+    proto = b[23]
+    if proto not in (6, 17):
+        return None
+    tot = b[16] << 8 | b[17]
+    end = min(len(b), 14 + tot) if tot >= ihl else len(b)
+    o = 14 + ihl
+    sp, dp = b[o] << 8 | b[o + 1], b[o + 2] << 8 | b[o + 3]
+    P = {"t": time.time(), "len": len(b), "smac": ":".join(_HEX[x] for x in b[6:12]),
+         "src": "%d.%d.%d.%d" % (b[26], b[27], b[28], b[29]), "dst": "%d.%d.%d.%d" % (b[30], b[31], b[32], b[33])}
+    if proto == 6:
+        if len(b) < o + 20:
+            return None
+        thl = (b[o + 12] >> 4) * 4
+        if thl < 20:
+            return None
+        P.update(proto="TCP", sp=sp, dp=dp, flags=_flags((b[o + 12] & 1) << 8 | b[o + 13]))
+        pl = b[o + thl:end]
+        if pl:
+            _tcp_payload(P, bytes(pl))
+        return P
+    if sp in SLOW_UDP or dp in SLOW_UDP:
+        return None
+    P.update(proto="UDP", sp=sp, dp=dp)
+    return P
+
+
 def make_parser():
     from scapy.all import ARP, DNS, ICMP, IP, TCP, UDP, Ether, IPv6
     from scapy.layers.dhcp import BOOTP  # noqa: F401  (registers DHCP dissector)
@@ -257,17 +324,7 @@ def make_parser():
             P.update(proto="TCP", sp=int(tcp.sport), dp=int(tcp.dport), flags=str(tcp.flags))
             pl = bytes(tcp.payload)
             if pl:
-                cred = parse_cleartext(P["sp"], P["dp"], pl)
-                if cred:
-                    P["cred"] = cred
-                if pl[0] == 0x16:
-                    ch = parse_client_hello(pl)
-                    if ch:
-                        P["sni"], P["ja3"], P["ja4"] = ch["sni"], ch["ja3"], ch["ja4"]
-                elif pl[:4] in (b"GET ", b"POST", b"HEAD", b"PUT "):
-                    m = HTTP_HOST.search(pl[:2048])
-                    if m:
-                        P["http_host"] = m.group(1).decode("ascii", "ignore")
+                _tcp_payload(P, pl)
         elif UDP in pkt:
             udp = pkt[UDP]
             P.update(proto="UDP", sp=int(udp.sport), dp=int(udp.dport))
@@ -307,28 +364,59 @@ def make_parser():
     return parse
 
 
+def handle_raw(state, parse, cls, data, ts, pkt=None):
+    """Ένα πακέτο από την κάρτα: γρήγορος δρόμος αν γίνεται, αλλιώς scapy."""
+    if state.feed != "live":
+        return
+    ring = getattr(state, "pcap_ring", None)
+    if ring:  # «καταγραφή γύρω από την ειδοποίηση»: τα τελευταία λεπτά σε μνήμη, για .pcap ανά ειδοποίηση
+        try:
+            ring.add(float(ts or time.time()), data)
+        except Exception:
+            pass
+    try:
+        P = fast_parse(data) if getattr(cls, "__name__", "") == "Ether" else None
+        if P is None:
+            P = parse(pkt if pkt is not None else cls(data))
+        if P:
+            P["_raw"] = data[:128]
+            state.process(P)
+    except Exception as e:
+        log("parse error:", e)
+
+
+def raw_loop(state, sock, parse, stop=None):
+    """Διαβάζει bytes από το socket του scapy (recv_raw: χωρίς ανατομή) μέχρι να κλείσει."""
+    idle = 0
+    while not (stop and stop()):
+        cls, data, ts = sock.recv_raw()
+        if data is None:  # timeout του pcap (100ms) — αν γυρνάει αμέσως, μην «γυρίζεις» τον επεξεργαστή
+            idle += 1
+            if idle > 20:
+                time.sleep(0.01)
+            continue
+        idle = 0
+        handle_raw(state, parse, cls, bytes(data), ts)
+
+
 def live_capture(state, iface, bpf):
-    from scapy.all import sniff
+    from scapy.all import conf, sniff
     parse = make_parser()
 
     def cb(pkt):
-        if state.feed != "live":
-            return
-        ring = getattr(state, "pcap_ring", None)
-        if ring:  # «καταγραφή γύρω από την ειδοποίηση»: τα τελευταία λεπτά σε μνήμη, για .pcap ανά ειδοποίηση
-            try:
-                ring.add(float(pkt.time), bytes(pkt))
-            except Exception:
-                pass
-        try:
-            P = parse(pkt)
-            if P:
-                P["_raw"] = bytes(pkt)[:128]
-                state.process(P)
-        except Exception as e:
-            log("parse error:", e)
+        handle_raw(state, parse, type(pkt), getattr(pkt, "original", None) or bytes(pkt), float(pkt.time), pkt=pkt)
     log(f"Καταγραφή στο {iface}{' με φίλτρο ' + bpf if bpf else ''} …")
     try:
+        try:
+            sock = conf.L2listen(iface=iface, filter=bpf or None)
+        except PermissionError:
+            raise
+        except Exception as e:  # π.χ. παλιό scapy/άγνωστη διεπαφή: ο κλασικός δρόμος
+            log("raw capture unavailable, using sniff():", e)
+            sock = None
+        if sock is not None and hasattr(sock, "recv_raw"):
+            raw_loop(state, sock, parse)
+            return
         sniff(iface=iface, prn=cb, store=False, filter=bpf or None)
     except PermissionError:
         log("✖ Χρειάζεται sudo για καταγραφή πακέτων. Τρέξε: sudo .venv/bin/python netwatch.py  (ή --demo)")

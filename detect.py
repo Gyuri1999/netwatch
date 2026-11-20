@@ -13,7 +13,7 @@ import time
 import packets
 from concurrent.futures import ThreadPoolExecutor
 
-from core import BRUTE_PORTS, DEFAULT_CONFIG, EXTRA_MITRE, MITRE, PLAIN_PORTS, RISKY_SERVICES, RULES_DIR, SERVICES, SEV, SUSPECT_PORTS, TOR_PORTS, Window, app_label, chown_to_user, detect_net, detector_for, dga_score, entropy, ip_kind, local_tor_running, log, mask_user, mitre_for, norm_mac, random_mac, service_port, split_domain
+from core import BRUTE_PORTS, DEFAULT_CONFIG, EXTRA_MITRE, MITRE, PLAIN_PORTS, RISKY_SERVICES, RULES_DIR, SERVICES, SEV, SUSPECT_PORTS, TOR_PORTS, DistinctWindow, Window, app_label, chown_to_user, detect_net, detector_for, dga_score, entropy, ip_kind, local_tor_running, log, mask_user, mitre_for, norm_mac, random_mac, service_port, split_domain
 from storage import History, Intel
 
 
@@ -90,7 +90,7 @@ class NetState:
         self.demo_geo = {}
         self.geo_q = queue.Queue()
         self.rdns_pool = ThreadPoolExecutor(8)
-        self.w_scan = Window(th["port_scan"]["window"])
+        self.w_scan = DistinctWindow(th["port_scan"]["window"])
         self.w_sweep = Window(max(th["ping_sweep"]["window"], th["arp_sweep"]["window"]))
         self.w_syn, self.w_icmp = Window(th["syn_flood"]["window"]), Window(th["icmp_flood"]["window"])
         self.w_arpflood, self.w_brute = Window(th["arp_flood"]["window"]), Window(th["brute_force"]["window"])
@@ -557,10 +557,10 @@ class NetState:
             syn = "S" in fl and "A" not in fl
             if syn:
                 th = self._th("port_scan")
-                dq = self.w_scan.add(src, (dst, dp), t)
-                n = len({i for _, i in dq})
+                self.w_scan.add(src, (dst, dp), t)
+                n = self.w_scan.distinct(src)
                 if n >= th["count"]:
-                    targets = len({i[0] for _, i in dq})
+                    targets = self.w_scan.distinct0(src)
                     self.alert("Port scan", "high" if to_me else "med", src, dst,
                                f"{n} απόπειρες σε {targets} στόχο(ους) μέσα σε {th['window']}s (TCP SYN scan)", t)
                 if to_me:
@@ -588,8 +588,8 @@ class NetState:
         if (proto == "UDP" and not from_me and dp is not None and dp < 1024 and (sp or 0) >= 1024
                 and dp not in (53, 67, 68, 123, 137, 138)):
             th = self._th("port_scan")
-            dq = self.w_scan.add(src, (dst, dp), t)
-            n = len({i for _, i in dq})
+            self.w_scan.add(src, (dst, dp), t)
+            n = self.w_scan.distinct(src)
             if n >= th["count"]:
                 self.alert("Port scan (UDP)", "high" if to_me else "med", src, dst,
                            f"{n} διαφορετικές UDP θύρες/στόχοι σε {th['window']}s", t)
