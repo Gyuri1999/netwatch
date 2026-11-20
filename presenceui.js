@@ -17,14 +17,14 @@
 #t-avail .ic{font-size:20px;text-align:center;position:relative}
 #t-avail .ic i{position:absolute;right:-2px;bottom:0;width:8px;height:8px;border-radius:50%;background:#3a4a63}
 #t-avail .ic i.on{background:var(--green);box-shadow:0 0 6px var(--green)}
-#t-avail .nm b{display:block;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#t-avail .nm span{font:11.5px ui-monospace,Menlo,monospace;color:var(--dim)}
-#t-avail .pct{font:700 15px ui-monospace,Menlo,monospace;text-align:right}
+#t-avail .nm b{display:block;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}#t-avail .nm span{font:11.5px ui-monospace,Menlo,Consolas,monospace;color:var(--dim)}
+#t-avail .pct{font:700 15px ui-monospace,Menlo,Consolas,monospace;text-align:right}
 #t-avail .bar{display:flex;height:22px;gap:1px;align-items:stretch}
 #t-avail .bar s{flex:1;text-decoration:none;border-radius:1px;min-width:1px}
 #t-avail .out{font-size:12px;color:var(--dim);line-height:1.35}
 #t-avail .out b{color:var(--txt)}
 #t-avail .av-det{padding:8px 10px 12px 46px;font-size:12.5px}
-#t-avail .av-det div{padding:3px 0;font-family:ui-monospace,Menlo,monospace}
+#t-avail .av-det div{padding:3px 0;font-family:ui-monospace,Menlo,Consolas,monospace}
 #t-avail .av-note{font-size:12.5px;color:var(--dim);line-height:1.55;margin-top:8px}
 `;
   document.head.appendChild(css);

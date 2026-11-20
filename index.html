@@ -43,7 +43,7 @@ if(q.get('glass'))p.glass=q.get('glass')==='1';if(p.cb)d.classList.add('cb');if(
 :root{--bg:#05080f;--panel:#0b111c;--panel2:#101828;--line:#1c2638;--txt:#cfe0f5;--dim:#6d7f99;
   --cyan:#3ec5ff;--green:#3ddc97;--yellow:#ffd23f;--orange:#ff9f43;--red:#ff3b5c;--purple:#b388ff;--pink:#ff6ad5}
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,monospace;overflow:hidden}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden}
 header{height:52px;display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--bg2),#070b14)}
 .logo{font-weight:800;letter-spacing:3px;color:var(--cyan);text-shadow:0 0 12px color-mix(in srgb,var(--cyan) 53.3%,transparent);white-space:nowrap}
 .badge{padding:2px 8px;border-radius:4px;font-size:11px;font-weight:700;letter-spacing:1px}
@@ -500,7 +500,7 @@ pre.snip{font-size:11.5px;background:var(--bg);padding:8px;border-radius:6px;mar
 .fw-r{font-size:11px;padding:1px 7px;border-radius:9px;background:color-mix(in srgb,var(--orange) 15%,transparent);color:var(--orange)}
 .fw-lanc{display:flex;gap:6px;align-items:center;margin-top:8px;cursor:pointer}
 .fw-rh{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:4px}
-.fw-code{max-height:380px;overflow:auto;background:#05080f;color:#d6e2f0;border-radius:8px;padding:10px;font:11.5px/1.5 ui-monospace,Menlo,monospace;white-space:pre;margin:0}
+.fw-code{max-height:380px;overflow:auto;background:#05080f;color:#d6e2f0;border-radius:8px;padding:10px;font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre;margin:0}
 .fw-tot{display:flex;gap:4px;flex-wrap:wrap}
 .tk-dl{display:flex;flex-direction:column;gap:6px;margin-top:8px}
 .tk-d{border:1px solid rgb(var(--w) / 8%);border-radius:10px;background:rgb(var(--w) / 2%)}
@@ -967,7 +967,7 @@ function drawLanBig(now,sel,meH,gwH,bc){
   if(meH)hub(LP.mep,'#ffffff',7,'💻','ΕΣΥ',meH.ip,meH.ip,meH);
   if(bc.length)hub(LP.bcp,'#6d7f99',5,'📢','όλοι','broadcast / multicast','@bcast');
   for(const g of LP.groups){
-    ctx.font='600 10px -apple-system,BlinkMacSystemFont,sans-serif';ctx.fillStyle='#7f93b0';ctx.fillText(fit(`${g.t.toUpperCase()}  ·  ${g.devs.length}`,g.w),g.x+2,g.y+10);
+    ctx.font='600 10px -apple-system,BlinkMacSystemFont,Segoe UI,sans-serif';ctx.fillStyle='#7f93b0';ctx.fillText(fit(`${g.t.toUpperCase()}  ·  ${g.devs.length}`,g.w),g.x+2,g.y+10);
     for(const h of g.devs){const c=LP.cards.get(h.ip);if(!c)continue;const[x,y,w,hh]=c,act=now-(h._flash||0)<1500;
       const col=nodeCol(h,act?'#3ddc97':'#1f2e47');
       ctx.fillStyle=sel===h.ip?'#16243c':act?'#0f1d2e':'#0c1524';ctx.strokeStyle=sel===h.ip?'#fff':col;ctx.lineWidth=h.threat>=2||sel===h.ip?1.6:1;roundRect(x,y,w,hh,8);ctx.fill();ctx.stroke();
@@ -1017,7 +1017,7 @@ cv.addEventListener('click',e=>{const[n,x,y]=pick(e);if(inBtn(x,y)){showTab(view
 let tab='home';
 // Ενότητες σε κάρτες: μία σειρά καρτελών + μενού «☰ Ενότητες» (και πλέγμα στην Αρχική)
 const SECTIONS=[
-  ['🛡 Προστασία',[['alerts','⚠ Επιθέσεις','τι ύποπτο έγινε, με απλά λόγια'],['cases','🗂 Υποθέσεις','διαλογή ειδοποιήσεων σαν SOC: έρευνα, σημειώσεις, ψευδώς θετικά'],['shift','🔁 Παράδοση βάρδιας','σύνοψη για τον επόμενο: τι έγινε, τι εκκρεμεί'],['wifi','☕ Wi‑Fi','είμαι ασφαλής σε αυτό το δίκτυο;'],['priv','🕵 Ανωνυμία','Tor, VPN, διαρροές'],['audit','🛡 Έλεγχος','βαθμός ασφάλειας του σπιτιού'],['honey','🪤 Παγίδα','ψεύτικες θύρες που πιάνουν όποιον ψάχνει'],['block','🚫 Μπλοκ','IP που έκοψες με το τείχος'],['iot','🔌 IoT μου','ESP32 & Raspberry Pi: πόσο ασφαλή είναι'],['iotfw','🧱 Τείχος IoT','κάθε συσκευή μιλά μόνο με όσους πρέπει · κανόνες για τον router'],['sensor','📡 Αισθητήρες','ESP32 που φυλάνε τον αέρα (deauth, evil twin)'],['mqtt','📨 MQTT','ο broker σου: ποιος μπαίνει, τι στέλνει'],['pb','⚡ Αντιδράσεις','αυτόματα: όταν γίνει Χ, κάνε Υ']]],
+  ['🛡 Προστασία',[['alerts','⚠ Επιθέσεις','τι ύποπτο έγινε, με απλά λόγια'],['cases','🗂 Υποθέσεις','διαλογή ειδοποιήσεων σαν SOC: έρευνα, σημειώσεις, ψευδώς θετικά'],['shift','🔁 Παράδοση βάρδιας','σύνοψη για τον επόμενο: τι έγινε, τι εκκρεμεί'],['wifi','☕ Wi‑Fi','είμαι ασφαλής σε αυτό το δίκτυο;'],['priv','🕵 Ανωνυμία','Tor, VPN, διαρροές'],['audit','🛡 Έλεγχος','βαθμός ασφάλειας του σπιτιού'],['honey','🍯 Παγίδα','ψεύτικες θύρες που πιάνουν όποιον ψάχνει'],['block','🚫 Μπλοκ','IP που έκοψες με το τείχος'],['iot','🔌 IoT μου','ESP32 & Raspberry Pi: πόσο ασφαλή είναι'],['iotfw','🧱 Τείχος IoT','κάθε συσκευή μιλά μόνο με όσους πρέπει · κανόνες για τον router'],['sensor','📡 Αισθητήρες','ESP32 που φυλάνε τον αέρα (deauth, evil twin)'],['mqtt','📨 MQTT','ο broker σου: ποιος μπαίνει, τι στέλνει'],['pb','⚡ Αντιδράσεις','αυτόματα: όταν γίνει Χ, κάνε Υ']]],
   ['🌐 Το δίκτυό μου',[['devs','📟 Συσκευές','ποιος είναι συνδεδεμένος'],['avail','📈 Διαθεσιμότητα','πόσο % ήταν online κάθε συσκευή και πότε «έπεσε»'],['tm','⏱ Μηχανή του χρόνου','γύρνα το δίκτυο σε οποιοδήποτε λεπτό του 24ώρου'],['hosts','🌍 Προορισμοί','πού μιλάει ο υπολογιστής'],['apps','📱 Εφαρμογές','ποια app μιλάει με ποιον · trackers'],['stats','📊 Στατιστικά','πρωτόκολλα, κίνηση, MITRE'],['feed','📦 Πακέτα','ζωντανά πακέτα & στρώματα OSI'],['det','🔎 Λεπτομέρειες','όλα για μία IP'],['hist','🕓 Ιστορικό','παλιές ειδοποιήσεις & συσκευές'],['health','🔎 Homelab','είναι όλα πάνω; πόσο αργούν;']]],
   ['🔴 Εργαλεία',[['pentest','🔴 Pentest','σάρωση, εργαλεία τεχνικού, CVE, lab'],['vlab','🎯 IoT Lab','χάκαρε (νόμιμα) μια ευάλωτη κάμερα στον υπολογιστή σου'],['purple','🟣 Purple team','με πιάνει το NetWatch; κάλυψη MITRE ATT&CK'],['hunt','🏹 Κυνήγι απειλών','ψάξε ενεργά ό,τι έμεινε κάτω από τα όρια'],['tlsa','🔐 TLS / SSH','βαθμός A–F για τα HTTPS/SSH των συσκευών σου'],['seg','🧱 Διαχωρισμός VLAN','είναι όντως απομονωμένα guest/IoT από το LAN σου;'],['l2g','🛡 Rogue DHCP / ARP','υπάρχει ψεύτικος router ή DHCP στο δίκτυό μου; + DHCP snooping/DAI'],['ws','🦈 Wireshark','φίλτρα, tshark, συντομεύσεις — δοκίμασέ τα ζωντανά'],['rules','🧩 Κανόνες','γράψε δικούς σου ανιχνευτές'],['ctf','🚩 CTF','ασκήσεις ανάλυσης κίνησης']]],
   ['🏗 Υποδομή',[['tri','🔎 Φταίει το δίκτυο;','έλεγχος με ένα κλικ + έτοιμο κείμενο για ticket'],['topo','🗺 Διάγραμμα δικτύου','σχέδιο του δικτύου με ένα κουμπί — και πού είναι η βλάβη'],['ssh','🖥 SSH Explorer','αρχεία & υγεία του Raspberry Pi σου — μόνο κλειδί, μόνο ανάγνωση'],['upd','🔄 Ενημερώσεις','νέα έκδοση από GitHub — εγκατάσταση με κλικ και έλεγχο υπογραφής'],['chg','📸 Πριν / Μετά','φωτογραφία του δικτύου πριν και μετά από μια αλλαγή'],['cfg','📑 Αντίγραφα ρυθμίσεων','backup των configs των switches/routers και τι άλλαξε'],['where','🔌 Πού είναι συνδεδεμένο;','MAC/IP → switch → θύρα → VLAN'],['docs','📘 Τεκμηρίωση','αυτόματη τεκμηρίωση σε Markdown, PDF και draw.io'],['expiry','⏰ Λήξεις','πιστοποιητικά, domains, άδειες, εγγυήσεις'],['field','📱 Field mode','τα 5 εργαλεία του τεχνικού στο κινητό'],['flows','🌊 Ροές','NetFlow / sFlow από τον router: η κίνηση όλων των συσκευών'],['snmp','🔌 Θύρες & SNMP','κίνηση ανά θύρα, σφάλματα, CPU/RAM, τοπολογία LLDP'],['syslog','📜 Syslog','τα logs του router, του Proxmox και των ESP32, με αναζήτηση'],['ipam','🗂 IPAM','διευθύνσεις, DHCP, συγκρούσεις IP, απογραφή συσκευών'],['lat','📈 Καθυστέρηση','SmokePing: ping, jitter και απώλειες στον χρόνο'],['speed','🚀 Ταχύτητα & Wi‑Fi','τεστ ταχύτητας, iperf3 και ποιο κανάλι Wi‑Fi να βάλεις'],['ops','🛠 Λειτουργία','συντήρηση, ειδοποιήσεις, Prometheus, tokens, pcap']]],
@@ -1802,7 +1802,7 @@ function ruleResHTML(){const r=ruleRes;if(!r)return'';if(r.error)return`<div cla
    <div class="sm" style="margin-top:4px">Μικρός αριθμός ειδοποιήσεων = καλός κανόνας. Πολλές = πιθανά false positives.</div></div>`}
 function drawRules(){const d=rulesData,el=$('t-rules');
   el.innerHTML=`<div class="card"><b style="color:var(--hi)">🧩 Detection engineering</b><div class="sm" style="margin-top:3px">Γράψε τον δικό σου κανόνα ανίχνευσης σε YAML, δοκίμασέ τον στην κίνηση που μόλις πέρασε και αποθήκευσέ τον — τρέχει αμέσως μαζί με τους ενσωματωμένους ανιχνευτές. Κάθε κανόνας εξάγεται και σε <b>Sigma</b> (για SIEM: Splunk, Elastic, Sentinel) και <b>Suricata</b> (IDS).${d.enabled?'':' <b style="color:var(--redt)">Οι κανόνες είναι απενεργοποιημένοι στο config.yaml (detectors.custom_rules).</b>'}</div></div>
-  <textarea id="rule-ed" spellcheck="false" rows="15" style="width:100%;box-sizing:border-box;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:8px;font:12px ui-monospace,Menlo,monospace">${esc(ruleEd)}</textarea>
+  <textarea id="rule-ed" spellcheck="false" rows="15" style="width:100%;box-sizing:border-box;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:8px;font:12px ui-monospace,Menlo,Consolas,monospace">${esc(ruleEd)}</textarea>
   <div style="display:flex;gap:6px;margin:6px 0 8px;flex-wrap:wrap"><button class="b" id="r-test">🧪 Δοκίμασε (${d.recent} πακέτα)</button><button class="b" id="r-save">💾 Αποθήκευση</button><button class="b" id="r-tpl">↺ Πρότυπο</button></div>
   ${ruleResHTML()}
   <details><summary>📖 Τι μπορώ να γράψω;</summary><div><div class="kv">${Object.entries(d.help).map(([k,v])=>`<span><code>${esc(k)}</code></span><span>${esc(v)}</span>`).join('')}
@@ -1844,7 +1844,7 @@ function drawCtf(){const d=ctfData,el=$('t-ctf');if(!d.levels.length){el.innerHT
       <div class="bar"><i style="width:${100*solved/lv.questions.length}%;background:var(--green)"></i></div>
       ${on||solved?lv.questions.map(q=>{const k=lv.id+':'+q.id,ok=ctfSolved[k];
         return `<div style="border-top:1px solid var(--line);padding:7px 0"><div class="brow"><span style="white-space:normal">${ok?'✅':'❔'} ${esc(q.q)}</span><span class="sm">${q.points}</span></div>
-        ${ok?'':q.type==='rule'?`<textarea class="ctf-rule" data-k="${k}" rows="8" spellcheck="false" placeholder="id: slow-scan&#10;match:&#10;  proto: TCP&#10;  ..." style="width:100%;box-sizing:border-box;margin-top:4px;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:6px;font:12px ui-monospace,Menlo,monospace">${esc(ctfRule[k]||'')}</textarea><button class="b" data-rule="${k}">🧪 Έλεγχος κανόνα</button>`
+        ${ok?'':q.type==='rule'?`<textarea class="ctf-rule" data-k="${k}" rows="8" spellcheck="false" placeholder="id: slow-scan&#10;match:&#10;  proto: TCP&#10;  ..." style="width:100%;box-sizing:border-box;margin-top:4px;background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:4px;padding:6px;font:12px ui-monospace,Menlo,Consolas,monospace">${esc(ctfRule[k]||'')}</textarea><button class="b" data-rule="${k}">🧪 Έλεγχος κανόνα</button>`
           :`<div style="display:flex;gap:6px;margin-top:4px"><input class="f ctf-in" data-k="${k}" style="margin:0" value="${esc(ctfIn[k]||'')}" placeholder="απάντηση"><button class="b" data-ans="${k}">Υποβολή</button></div>`}
         ${ok?'':`<button class="b" data-hint="${k}" style="margin-top:4px">💡 hint</button>`}${ctfHint[k]&&!ok?`<div class="sm" style="margin-top:3px">💡 ${esc(q.hint)}</div>`:''}
         ${ctfMsg[k]&&!ok?`<div class="sm" style="margin-top:3px;white-space:normal">${ctfMsg[k]}</div>`:''}</div>`}).join(''):''}</div>`}).join('');
@@ -1930,14 +1930,14 @@ function drawApps(){const d=appsData,el=$('t-apps');if(d.error){el.innerHTML=`<d
   el.querySelectorAll('[data-app]').forEach(r=>r.onclick=()=>{const n=r.dataset.app;appsOpen.has(n)?appsOpen.delete(n):appsOpen.add(n);drawApps()});
   el.querySelectorAll('[data-ip]').forEach(x=>x.onclick=e=>{e.preventDefault();e.stopPropagation();select(x.dataset.ip)});
   const qi=$('ap-q');qi.oninput=()=>{appsQ=qi.value;const p=qi.selectionStart;drawApps();const n=$('ap-q');n.focus();n.setSelectionRange(p,p)}}
-// ---- 🪤 Παγίδα (honeypot) ----
+// ---- 🍯 Παγίδα (honeypot) ----
 let honeyData=null,honeyT=0,honeySel=null;
 function renderHoney(){if(Date.now()-honeyT>3000){honeyT=Date.now();fetch('/api/honeypot').then(r=>r.json()).then(j=>{honeyData=j;if(tab==='honey'&&!tabHover())drawHoney()})}
   if(!honeyData)$('t-honey').innerHTML='<div class="empty">φόρτωση…</div>'}
 function drawHoney(){const d=honeyData,el=$('t-honey');if(d.error){el.innerHTML=`<div class="empty">${esc(d.error)}</div>`;return}
   if(!honeySel)honeySel=new Set(d.ports.length?d.ports:d.default);
   const on=d.running,col=on?'#3ddc97':'#6d7f99';
-  let h=`<div class="card" style="display:flex;gap:14px;align-items:center;white-space:normal"><div style="font-size:40px;filter:${on?'none':'grayscale(1)'}">🪤</div>
+  let h=`<div class="card" style="display:flex;gap:14px;align-items:center;white-space:normal"><div style="font-size:40px;filter:${on?'none':'grayscale(1)'}">🍯</div>
     <div style="flex:1"><b style="color:var(--hi)">Παγίδα: <span style="color:${col}">${on?'ΣΤΗΜΕΝΗ':'κλειστή'}</span></b>${d.demo?' <span class="tag">προσομοίωση</span>':''}
     <div class="sm" style="margin-top:3px">Ανοίγω <b>ψεύτικες</b> υπηρεσίες (SSH, Telnet, σελίδα router…) στον υπολογιστή σου. Κανείς νόμιμος δεν έχει λόγο να τις αγγίξει, οπότε <b>όποιος συνδεθεί, σκανάρει ή δοκιμάζει κωδικούς</b> και σου βγάζω ειδοποίηση με το τι έστειλε. Δεν εκτελείται τίποτα: δείχνω ένα ψεύτικο μήνυμα, καταγράφω και κλείνω.</div>
     <div style="margin-top:6px"><button class="b" id="hp-tg" style="border-color:${on?'#ff3b5c':'#3ddc97'}">${on?'⏹ Μάζεψε την παγίδα':'▶ Στήσε την παγίδα'}</button></div></div></div>`;

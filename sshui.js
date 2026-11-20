@@ -20,7 +20,7 @@
 #t-ssh .sx-h{display:flex;flex-direction:column;gap:6px}
 #t-ssh .sx-host{display:flex;gap:10px;align-items:center;padding:10px 12px;border:1px solid var(--line);border-radius:12px;cursor:pointer;background:rgb(var(--w) / 3%)}
 #t-ssh .sx-host.on{border-color:var(--cyan);background:color-mix(in srgb,var(--cyan) 10%,transparent)}
-#t-ssh .sx-host b{display:block;font-size:13.5px}#t-ssh .sx-host span{font:11.5px ui-monospace,Menlo,monospace;color:var(--dim)}
+#t-ssh .sx-host b{display:block;font-size:13.5px}#t-ssh .sx-host span{font:11.5px ui-monospace,Menlo,Consolas,monospace;color:var(--dim)}
 #t-ssh .sx-host i{font-style:normal;font-size:22px}
 #t-ssh .sx-form{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:6px}
 #t-ssh .sx-form input{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:13px inherit;min-width:0}
@@ -29,15 +29,15 @@
 #t-ssh .sx-sug button{font-size:11.5px;padding:3px 9px}
 #t-ssh .sx-tabs{display:flex;gap:4px;margin:10px 0 0}
 #t-ssh .sx-tabs button.on{border-color:var(--cyan);color:var(--cyan)}
-#t-ssh .sx-crumb{display:flex;gap:2px;flex-wrap:wrap;align-items:center;font:12.5px ui-monospace,Menlo,monospace;margin:10px 0 6px}
+#t-ssh .sx-crumb{display:flex;gap:2px;flex-wrap:wrap;align-items:center;font:12.5px ui-monospace,Menlo,Consolas,monospace;margin:10px 0 6px}
 #t-ssh .sx-crumb a{cursor:pointer;color:var(--cyan);padding:2px 5px;border-radius:5px}#t-ssh .sx-crumb a:hover{background:rgb(var(--w) / 8%)}
 #t-ssh .sx-quick{display:flex;gap:5px;flex-wrap:wrap}#t-ssh .sx-quick button{font-size:11.5px;padding:3px 9px}
 #t-ssh .sx-ls{width:100%;border-collapse:collapse;font-size:13px}
 #t-ssh .sx-ls td{padding:6px 8px;border-top:1px solid rgb(var(--w) / 6%);white-space:nowrap}
 #t-ssh .sx-ls tr.r{cursor:pointer}#t-ssh .sx-ls tr.r:hover td{background:rgb(var(--w) / 4%)}
 #t-ssh .sx-ls tr.sel td{background:color-mix(in srgb,var(--cyan) 10%,transparent)}
-#t-ssh .sx-ls td.n{white-space:normal;word-break:break-all;width:100%}#t-ssh .sx-ls td.m{color:var(--dim);font:11.5px ui-monospace,Menlo,monospace}
-#t-ssh .sx-pre{max-height:60vh;overflow:auto;background:#05080f;color:#d6e2f0;border-radius:10px;padding:10px 12px;font:12px/1.55 ui-monospace,Menlo,monospace;white-space:pre;margin-top:8px;counter-reset:ln}
+#t-ssh .sx-ls td.n{white-space:normal;word-break:break-all;width:100%}#t-ssh .sx-ls td.m{color:var(--dim);font:11.5px ui-monospace,Menlo,Consolas,monospace}
+#t-ssh .sx-pre{max-height:60vh;overflow:auto;background:#05080f;color:#d6e2f0;border-radius:10px;padding:10px 12px;font:12px/1.55 ui-monospace,Menlo,Consolas,monospace;white-space:pre;margin-top:8px;counter-reset:ln}
 #t-ssh .sx-pre span{display:block}#t-ssh .sx-pre span:before{counter-increment:ln;content:counter(ln);display:inline-block;width:3em;margin-right:12px;text-align:right;color:#4b5b70}
 #t-ssh .sx-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:10px}
 #t-ssh .sx-k{margin:0;display:flex;flex-direction:column;gap:3px}#t-ssh .sx-k b{font-size:20px}#t-ssh .sx-k span{font-size:11.5px;color:var(--dim)}
@@ -46,7 +46,7 @@
 #t-ssh .sx-chk code{display:block;margin-top:4px;font-size:11.5px;white-space:pre-wrap;color:var(--dim)}
 #t-ssh .sx-cmd{display:flex;gap:6px;align-items:center;margin-top:6px}#t-ssh .sx-cmd code{flex:1;min-width:0;background:#05080f;color:#d6e2f0;border-radius:7px;padding:7px 10px;font-size:12px;overflow-x:auto;white-space:pre}
 #t-ssh .sx-err{border-left:4px solid var(--yellow);}
-#t-ssh .sx-fp{font:12.5px ui-monospace,Menlo,monospace;background:rgb(var(--w) / 5%);padding:6px 9px;border-radius:7px;margin-top:6px;word-break:break-all}
+#t-ssh .sx-fp{font:12.5px ui-monospace,Menlo,Consolas,monospace;background:rgb(var(--w) / 5%);padding:6px 9px;border-radius:7px;margin-top:6px;word-break:break-all}
 `;
   document.head.appendChild(css);
 
@@ -98,7 +98,7 @@
   }
   function keysHTML() {
     const k = (S.d.keys || {}).keys || [], h = host() || { user: 'pi', host: '192.168.1.50', port: 22 };
-    if (k.length) return `<div class="card dim" style="margin:10px 0 0;font-size:12px">🔑 ${T('Τα κλειδιά σου', 'Your keys')}: ${k.map(x => `<div style="margin-top:4px"><b style="color:var(--txt)">${E(x.file)}</b> · ${E(x.type)}<br><span style="font:11px ui-monospace,Menlo,monospace">${E(x.fp)}</span></div>`).join('')}</div>`;
+    if (k.length) return `<div class="card dim" style="margin:10px 0 0;font-size:12px">🔑 ${T('Τα κλειδιά σου', 'Your keys')}: ${k.map(x => `<div style="margin-top:4px"><b style="color:var(--txt)">${E(x.file)}</b> · ${E(x.type)}<br><span style="font:11px ui-monospace,Menlo,Consolas,monospace">${E(x.fp)}</span></div>`).join('')}</div>`;
     return `<div class="card" style="margin:10px 0 0;border-left:4px solid var(--yellow)"><b>🔑 ${T('Δεν έχεις κλειδί SSH ακόμα', 'You have no SSH key yet')}</b>
       <div style="font-size:12.5px;margin-top:4px">${T('Δύο εντολές στο Terminal, μία φορά (τις τρέχεις εσύ — το NetWatch δεν αγγίζει κωδικούς):', 'Two commands in Terminal, once (you run them — NetWatch never touches passwords):')}</div>
       ${cmd('ssh-keygen -t ed25519', T('Πάτα Enter στις ερωτήσεις (καλό είναι να βάλεις passphrase).', 'Press Enter at the prompts (a passphrase is a good idea).'))}
@@ -152,8 +152,8 @@
         <div class="card sx-k"><span>🧠 RAM</span><b>${mp != null ? mp + '%' : '—'}</b><span>${size(m.total - m.avail)} / ${size(m.total)}</span>${mp != null ? bar(mp) : ''}</div>
       </div>
       <div class="sx-grid">
-        <div class="card" style="margin:0"><b>💽 ${T('Δίσκοι', 'Disks')}</b>${(i.disks || []).map(d => `<div style="margin-top:8px;font-size:12.5px"><span style="font-family:ui-monospace,Menlo,monospace">${E(d.mount)}</span> <span class="dim">${size(d.used)} / ${size(d.size)} · ${d.pct}%</span>${bar(d.pct)}</div>`).join('')}</div>
-        <div class="card" style="margin:0"><b>🔥 ${T('Πιο «βαριές» διεργασίες', 'Top processes')}</b>${(i.procs || []).map(p => `<div style="display:flex;gap:8px;font-size:12.5px;margin-top:5px"><span style="flex:1;font-family:ui-monospace,Menlo,monospace">${E(p.cmd)}</span><span class="dim">${p.cpu}% CPU · ${p.mem}% RAM</span></div>`).join('')}</div>
+        <div class="card" style="margin:0"><b>💽 ${T('Δίσκοι', 'Disks')}</b>${(i.disks || []).map(d => `<div style="margin-top:8px;font-size:12.5px"><span style="font-family:ui-monospace,Menlo,Consolas,monospace">${E(d.mount)}</span> <span class="dim">${size(d.used)} / ${size(d.size)} · ${d.pct}%</span>${bar(d.pct)}</div>`).join('')}</div>
+        <div class="card" style="margin:0"><b>🔥 ${T('Πιο «βαριές» διεργασίες', 'Top processes')}</b>${(i.procs || []).map(p => `<div style="display:flex;gap:8px;font-size:12.5px;margin-top:5px"><span style="flex:1;font-family:ui-monospace,Menlo,Consolas,monospace">${E(p.cmd)}</span><span class="dim">${p.cpu}% CPU · ${p.mem}% RAM</span></div>`).join('')}</div>
         <div class="card" style="margin:0"><b>🔌 ${T('Ανοιχτές θύρες', 'Listening ports')}</b><div style="display:flex;flex-wrap:wrap;gap:5px;margin-top:8px">${(i.ports || []).map(p => `<span class="tag">${p}</span>`).join('') || '—'}</div>
           <div class="dim" style="font-size:12px;margin-top:8px">IP: ${E((i.ips || []).join(', '))}</div></div>
       </div>
@@ -170,7 +170,7 @@
     let main = '';
     if (!h) main = `<div class="card dim" style="text-align:center;padding:40px">🍓 ${T('Πρόσθεσε μια συσκευή αριστερά (π.χ. το Raspberry Pi σου) για να δεις τα αρχεία και την κατάστασή της.', 'Add a device on the left (e.g. your Raspberry Pi) to browse its files and status.')}</div>`;
     else {
-      main = `<div class="card" style="margin:0"><div class="brow"><b class="ctitle">🍓 ${E(h.name)}</b><span class="dim" style="font:12px ui-monospace,Menlo,monospace">${E(h.user)}@${E(h.host)}</span>${d.demo ? '<span class="op-pill" style="--c:var(--purple)">demo</span>' : ''}<span style="flex:1"></span>
+      main = `<div class="card" style="margin:0"><div class="brow"><b class="ctitle">🍓 ${E(h.name)}</b><span class="dim" style="font:12px ui-monospace,Menlo,Consolas,monospace">${E(h.user)}@${E(h.host)}</span>${d.demo ? '<span class="op-pill" style="--c:var(--purple)">demo</span>' : ''}<span style="flex:1"></span>
         <button class="b" data-sxcp="ssh ${h.port !== 22 ? '-p ' + h.port + ' ' : ''}${E(h.user)}@${E(h.host)}" title="${T('Αντιγραφή εντολής για το Terminal', 'Copy command for Terminal')}">⌨️ Terminal</button><button class="b" id="sx-del" title="${T('Αφαίρεση', 'Remove')}">🗑</button></div>
         <div class="sx-tabs"><button class="b${S.view === 'files' ? ' on' : ''}" data-sxv="files">📁 ${T('Αρχεία', 'Files')}</button><button class="b${S.view === 'info' ? ' on' : ''}" data-sxv="info">📊 ${T('Κατάσταση', 'Status')}</button>
         ${S.busy ? '<span class="dim" style="margin-left:8px;align-self:center">⏳</span>' : ''}</div>

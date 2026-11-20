@@ -60,7 +60,7 @@ I18N.add({
   "Tor, VPN, διαρροές": "Tor, VPN, leaks",
   "🛡 Έλεγχος": "🛡 Audit",
   "βαθμός ασφάλειας του σπιτιού": "your home's security score",
-  "🪤 Παγίδα": "🪤 Honeypot",
+  "🍯 Παγίδα": "🍯 Honeypot",
   "ψεύτικες θύρες που πιάνουν όποιον ψάχνει": "fake ports that catch anyone snooping",
   "🚫 Μπλοκ": "🚫 Block",
   "IP που έκοψες με το τείχος": "IPs you cut off with the firewall",

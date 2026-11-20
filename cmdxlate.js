@@ -806,7 +806,7 @@
   const css = document.createElement('style');
   css.textContent = `
   .cx-hd p{margin:4px 0 10px;color:var(--dim);font-size:12.5px;white-space:normal}
-  .cx-q{width:100%;box-sizing:border-box;font:15px/1.3 ui-monospace,Menlo,monospace;padding:11px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);outline:none}
+  .cx-q{width:100%;box-sizing:border-box;font:15px/1.3 ui-monospace,Menlo,Consolas,monospace;padding:11px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel2);color:var(--txt);outline:none}
   .cx-q:focus{border-color:var(--cyan)}
   .cx-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
   .cx-chip{font:inherit;font-size:11.5px;padding:3px 10px;border-radius:999px;border:1px solid var(--line);background:rgb(var(--w) / 3%);color:var(--dim);cursor:pointer}
@@ -831,14 +831,14 @@
   .cx-c .vl{display:none;font-size:10.5px;font-weight:700;color:var(--dim);text-transform:uppercase;margin-bottom:3px}
   .cx-c.hit .vl{color:var(--green)}
   .cx-cmd{position:relative;display:flex;gap:4px;align-items:flex-start}
-  .cx-cmd code{flex:1;min-width:0;display:block;font:11.5px/1.45 ui-monospace,Menlo,monospace;background:var(--panel2);border:1px solid rgb(var(--w) / 6%);border-radius:6px;padding:5px 7px;color:var(--txt);overflow-wrap:anywhere;white-space:pre-wrap}
+  .cx-cmd code{flex:1;min-width:0;display:block;font:11.5px/1.45 ui-monospace,Menlo,Consolas,monospace;background:var(--panel2);border:1px solid rgb(var(--w) / 6%);border-radius:6px;padding:5px 7px;color:var(--txt);overflow-wrap:anywhere;white-space:pre-wrap}
   .cx-cmd code span{display:block}
   .cx-cmd code span.cm{color:var(--dim)}
   .cx-cp{flex:none;font:inherit;font-size:11px;padding:2px 5px;border-radius:6px;border:1px solid var(--line);background:rgb(var(--w) / 3%);color:var(--txt);cursor:pointer;opacity:.75}
   .cx-cp:hover{opacity:1;border-color:var(--cyan)}
   .cx-na{color:var(--dim)}
   .cx-empty{padding:18px;text-align:center;color:var(--dim);font-size:13px}
-  .cx-kbd{font:11px ui-monospace,Menlo,monospace;padding:0 5px;border:1px solid var(--line);border-radius:4px;color:var(--dim)}
+  .cx-kbd{font:11px ui-monospace,Menlo,Consolas,monospace;padding:0 5px;border:1px solid var(--line);border-radius:4px;color:var(--dim)}
   @media(max-width:700px){
     .cx-grid{border:0;gap:10px;overflow:visible}
     .cx-head{display:none}

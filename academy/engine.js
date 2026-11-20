@@ -271,7 +271,7 @@
   function Term(host, code) {
     if (host.innerHTML) { host.innerHTML = ''; return; }  // 2ο κλικ = κλείσιμο
     const cmds = String(code).split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#')).map(l => l.replace(/\s+#.*$/, ''));
-    host.innerHTML = `<div class="ac-cli ac-real"><div class="sm" style="font-family:-apple-system,sans-serif;margin-bottom:6px">Πατάς μια εντολή → μπαίνει στη γραμμή → <b>Enter</b>. Τρέχει <b>στο Mac σου</b>, ως ο χρήστης σου, μόνο ασφαλείς εντολές δικτύου (χωρίς sudo). Για εντολές του Raspberry Pi σού λέω την αντίστοιχη του Mac.</div>
+    host.innerHTML = `<div class="ac-cli ac-real"><div class="sm" style="font-family:-apple-system,Segoe UI,sans-serif;margin-bottom:6px">Πατάς μια εντολή → μπαίνει στη γραμμή → <b>Enter</b>. Τρέχει <b>στο Mac σου</b>, ως ο χρήστης σου, μόνο ασφαλείς εντολές δικτύου (χωρίς sudo). Για εντολές του Raspberry Pi σού λέω την αντίστοιχη του Mac.</div>
       <div class="ac-chips">${cmds.map((c, i) => `<button class="b ac-chip" data-i="${i}" title="βάλ' την στη γραμμή">${E(c)}</button>`).join('')}</div>
       <div class="ac-term"></div><div style="display:flex;gap:6px;margin-top:6px"><span class="ac-prompt">you@mac ~ %</span><input class="ac-in" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="γράψε εντολή και Enter (↑ ιστορικό)"></div></div>`;
     const term = host.querySelector('.ac-term'), inp = host.querySelector('.ac-in');
@@ -679,7 +679,7 @@
   .ac-goal{background:#3ddc9712;border-color:#3ddc97}.ac-nw{background:#3ec5ff0d;border-color:#3ec5ff;display:flex;gap:10px;align-items:center;flex-wrap:wrap}.ac-nw p{display:inline}
   .ac-table{border-collapse:collapse;margin:8px 0 12px;width:100%;font-size:12.5px}.ac-table th,.ac-table td{border:1px solid #1f3352;padding:5px 8px;text-align:left;vertical-align:top}.ac-table th{background:#101828;color:#3ec5ff}
   .ac-code{margin:10px 0;border:1px solid #1f3352;border-radius:8px;overflow:hidden}.ac-codeh{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:5px 10px;background:#101828;font-size:12px;color:#fff}
-  .ac-code pre{margin:0;padding:10px 12px;background:#060a12;overflow:auto;font:12.5px/1.55 ui-monospace,Menlo,monospace;color:#cfe0f5;max-height:520px}
+  .ac-code pre{margin:0;padding:10px 12px;background:#060a12;overflow:auto;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;color:#cfe0f5;max-height:520px}
   .ac-kw{color:#c792ea}.ac-str{color:#c3e88d}.ac-com{color:#6d7f99;font-style:italic}.ac-num{color:#f78c6c}
   .ac-explain{padding:8px 12px;border-top:1px solid #1f3352;background:#0b111c;font-size:12.5px}.ac-explain p{margin:0 0 6px}
   .ac-anim{background:#060a12;border:1px solid #1f3352;border-radius:10px;padding:8px;margin:10px 0}.ac-anim svg{width:100%;height:auto;display:block;max-height:340px}
@@ -690,12 +690,12 @@
   .ac-opt{display:block;width:100%;text-align:left;margin:4px 0;padding:7px 10px;white-space:normal;font-size:12.5px}.ac-opt.ok{border-color:#3ddc97;background:#3ddc9722}.ac-opt.bad{border-color:#ff3b5c;background:#ff3b5c22}
   .ac-why{margin-top:6px;font-size:12.5px}.ac-why p{display:inline}
   .ac-blockt{color:#3ec5ff;font-weight:600;margin:14px 0 4px}
-  .ac-cli{background:#05070b;border:1px solid #1f3352;border-radius:8px;padding:10px;font:12.5px/1.5 ui-monospace,Menlo,monospace}
+  .ac-cli{background:#05070b;border:1px solid #1f3352;border-radius:8px;padding:10px;font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace}
   .ac-term{max-height:240px;overflow:auto;white-space:pre-wrap;color:#cfe0f5}.ac-out{color:#9fb4d0}.ac-err{color:#ff8da0}
-  .ac-task{margin-top:8px;font-family:-apple-system,sans-serif;font-size:12.5px}.ac-prompt{color:#3ddc97;align-self:center}
+  .ac-task{margin-top:8px;font-family:-apple-system,Segoe UI,sans-serif;font-size:12.5px}.ac-prompt{color:#3ddc97;align-self:center}
   .ac-in{flex:1;background:#0b111c;border:1px solid #1f3352;border-radius:4px;color:#fff;padding:4px 6px;font:inherit}
-  .ac-termh .ac-cli{border:0;border-top:1px solid #1f3352;border-radius:0}.ac-chips{display:flex;flex-wrap:wrap;gap:4px}.ac-chip{font:11.5px ui-monospace,Menlo,monospace;text-align:left;white-space:normal;max-width:100%}
-  .ac-cmd{color:#3ddc97;margin-top:6px}.ac-hint{color:#ffd23f;font-family:-apple-system,sans-serif;white-space:normal}.ac-hint code{background:#1a2538;padding:0 4px;border-radius:3px}.ac-real .ac-term{max-height:340px}
+  .ac-termh .ac-cli{border:0;border-top:1px solid #1f3352;border-radius:0}.ac-chips{display:flex;flex-wrap:wrap;gap:4px}.ac-chip{font:11.5px ui-monospace,Menlo,Consolas,monospace;text-align:left;white-space:normal;max-width:100%}
+  .ac-cmd{color:#3ddc97;margin-top:6px}.ac-hint{color:#ffd23f;font-family:-apple-system,Segoe UI,sans-serif;white-space:normal}.ac-hint code{background:#1a2538;padding:0 4px;border-radius:3px}.ac-real .ac-term{max-height:340px}
   .ac-tools{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:8px}.ac-tool{cursor:pointer;display:flex;flex-direction:column;gap:2px;margin:0!important;white-space:normal}.ac-tool:hover{border-color:#3ec5ff}.ac-tool b{color:#fff}
   .ac-big{font-size:24px;font-weight:800;color:#3ec5ff;line-height:1.2}.ac-dom{display:flex;gap:8px;align-items:center;margin:3px 0;font-size:12px}.ac-dom>span:first-child{width:210px}.ac-dbar{flex:1}
   .ac-cardwrap{max-width:620px;margin:20px auto}.ac-card{background:#101828;border:1px solid #1f3352;border-radius:12px;padding:26px 24px;min-height:150px;margin:8px 0;text-align:center;font-size:15px}.ac-card p{margin:0 0 6px}
@@ -703,7 +703,7 @@
   .ac-qnav{display:flex;flex-wrap:wrap;gap:3px;margin:10px 0}.ac-qnav button{width:28px;height:24px;font-size:11px;background:#101828;border:1px solid #1f3352;color:#9fb4d0;border-radius:4px;cursor:pointer}.ac-qnav .ans{background:#3ec5ff33;color:#fff}.ac-qnav .flag{border-color:#ffd23f}.ac-qnav .cur{outline:2px solid #3ec5ff}
   .ac-opt.sel{border-color:#3ec5ff;background:#3ec5ff22}
   .ac-sub{background:#101828;border:1px solid #1f3352;border-radius:8px;padding:10px 12px}.ac-row{display:flex;gap:8px;align-items:center;margin:3px 0}.ac-row span{width:190px;font-size:12px;color:#9fb4d0}
-  .ac-row input{flex:1;background:#060a12;border:1px solid #1f3352;border-radius:4px;color:#fff;padding:4px 6px;font:12.5px ui-monospace,Menlo,monospace}
+  .ac-row input{flex:1;background:#060a12;border:1px solid #1f3352;border-radius:4px;color:#fff;padding:4px 6px;font:12.5px ui-monospace,Menlo,Consolas,monospace}
   .ac-foot{display:flex;justify-content:space-between;gap:8px;margin-top:24px;padding-top:12px;border-top:1px solid #1f3352}.ac-done{border-color:#3ddc97}
   .ac-li{display:flex;gap:6px;align-items:baseline;padding:4px 6px;border-radius:5px;cursor:pointer;font-size:12px}.ac-li:hover{background:#ffffff08}.ac-li span:first-of-type{flex:1}
   #ac-overlay th{position:static;text-transform:none}#ac-overlay td{white-space:normal;max-width:none;overflow:visible;text-overflow:clip}

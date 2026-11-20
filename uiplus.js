@@ -270,7 +270,7 @@
   const css = `
   .tm-strip{margin-top:10px;position:relative}.tm-svg{width:100%;height:86px;display:block;cursor:crosshair;touch-action:none}
   .tm-bar{fill:color-mix(in srgb,var(--cyan) 55%,transparent)}.tm-grid{stroke:rgb(var(--w) / 8%);stroke-width:1;vector-effect:non-scaling-stroke}
-  .tm-hl{fill:var(--dim);font-size:10px;font-family:ui-monospace,Menlo,monospace}
+  .tm-hl{fill:var(--dim);font-size:10px;font-family:ui-monospace,Menlo,Consolas,monospace}
   .tm-cl{stroke:var(--hi,#fff);stroke-width:2;vector-effect:non-scaling-stroke}.tm-win{fill:rgb(var(--w) / 10%)}
   .tm-range{width:100%;margin:6px 0 2px;accent-color:var(--cyan)}
   .tm-ctl{display:flex;flex-wrap:wrap;gap:4px;align-items:center}.tm-ctl .b.on{background:color-mix(in srgb,var(--cyan) 22%,transparent);border-color:var(--cyan)}
