@@ -28,6 +28,13 @@ jobs:
           $p = Start-Process dist\NetWatch\NetWatch.exe -ArgumentList '--selftest' -Wait -PassThru
           Get-Content "$env:LOCALAPPDATA\NetWatch\selftest.txt"
           if ($p.ExitCode -ne 0) { Get-Content "$env:LOCALAPPDATA\NetWatch\netwatch.log" -Tail 40; exit 1 }
+      - name: Agent mode certificate with the bundled Python (no openssl on PATH)
+        shell: pwsh
+        run: |
+          $env:PATH = "$env:SystemRoot\System32"
+          $d = Join-Path $env:RUNNER_TEMP 'agentcert'
+          & dist\NetWatch\python\python.exe -c "import sys; sys.path.insert(0, r'dist\NetWatch\app'); import agent; c, k, fp = agent.ensure_cert(sys.argv[1]); agent.tls_context(c, k); print('cert OK', fp)" $d
+          if ($LASTEXITCODE) { exit 1 }
       - uses: actions/upload-artifact@v4
         with:
           name: NetWatch-windows-x64
