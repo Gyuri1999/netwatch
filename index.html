@@ -33,6 +33,7 @@ if(q.get('glass'))p.glass=q.get('glass')==='1';if(p.cb)d.classList.add('cb');if(
 <script src="/names.js"></script>
 <script src="/vlsm.js"></script>
 <script src="/updateui.js"></script>
+<script src="/golive.js"></script>
 <script src="/presenceui.js"></script>
 <script src="/l2guardui.js"></script>
 <script src="/acl.js"></script>
@@ -1519,7 +1520,7 @@ function handle(m){
   if(m.type==='snapshot'){if(S.feedKind!==undefined&&(S.feedKind!==m.feed||S.ctf!==m.ctf)){S.feed=[];S.links.clear();S.out.clear();S.sel=null;setAC(0);auditData=null;histData=null;S.feedEx=null}
     S.feedKind=m.feed;S.ctf=m.ctf;S.hosts.clear();upsert(m.hosts);S.me=new Set(m.me);S.gw=m.gw;S.home=m.home;S.mode=m.mode;S.alerts=[];
     S.features=m.features;m.alerts.slice().reverse().forEach(a=>addAlert(a,true));$('na').textContent=S.alerts.length;
-    $('mode').textContent=m.feed==='ctf'?'🚩 CTF':{demo:'DEMO',pcap:'▶ PCAP'}[m.mode]||'● LIVE';$('mode').className='badge '+(m.mode==='live'?'live':'demo');
+    $('mode').textContent=m.feed==='ctf'?'🚩 CTF':{demo:'DEMO',pcap:'▶ PCAP'}[m.mode]||'● LIVE';$('mode').className='badge '+(m.mode==='live'?'live':'demo');if(window.goLiveCheck)goLiveCheck(m);
     $('iface').textContent=`${m.iface} · ${m.me.filter(i=>!i.includes(':'))[0]||m.me[0]||'?'}`;setStats(m.stats);renderTab();return}
   if(m.type==='home'){S.home=m.home;return}
   if(m.type==='privacy'){if(privData){privData.result=m.result;privData.running=false}if(tab==='priv')renderPriv();return}

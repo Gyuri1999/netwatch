@@ -17,6 +17,17 @@ from core import BRUTE_PORTS, DEFAULT_CONFIG, EXTRA_MITRE, MITRE, PLAIN_PORTS, R
 from storage import History, Intel
 
 
+def host_info():
+    """Πού τρέχει το backend — για τις οδηγίες «Πώς περνάω σε Live» όταν η εφαρμογή ανοίγει σε Demo."""
+    import sys
+    out = {"os": sys.platform, "docker": os.path.exists("/.dockerenv")}
+    if sys.platform == "win32":
+        root = os.environ.get("SystemRoot", r"C:\Windows")
+        out["npcap"] = any(os.path.exists(os.path.join(root, d, *f)) for d in ("System32", "Sysnative")
+                           for f in (("Npcap", "wpcap.dll"), ("wpcap.dll",)))
+    return out
+
+
 class NetState:
     def __init__(self, mode, iface, me_ips, gateway, geo=True, rdns=True, cfg=None, history=None, intel=None):
         self.lock = threading.RLock()
@@ -1201,7 +1212,7 @@ class NetState:
                     "me": sorted(self.me), "gw": self.gateway, "home": self.home,
                     "hosts": [self.ser(h) for h in self.hosts.values()],
                     "alerts": list(self.alerts)[:200], "stats": self._stats(1), "features": self.features(),
-                    "feed": self.feed, "ctf": self.ctf_level}
+                    "feed": self.feed, "ctf": self.ctf_level, "host": host_info()}
 
     def status(self):
         """Μικρή περίληψη για την εφαρμογή του Mac (εικονίδιο στη γραμμή μενού)."""
