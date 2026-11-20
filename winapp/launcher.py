@@ -115,7 +115,10 @@ def sync_app(src=SRC, dst=APPDIR):
 # ---------------- backend ----------------
 def npcap_installed():
     root = os.environ.get("SystemRoot", r"C:\Windows")
-    return os.path.exists(os.path.join(root, "System32", "Npcap", "wpcap.dll"))
+    # Npcap: System32\Npcap\wpcap.dll · σε «WinPcap API-compatible Mode» και System32\wpcap.dll
+    # (Sysnative: αν τρέχουμε 32-bit σε 64-bit Windows, το System32 «ανακατευθύνεται» στο SysWOW64)
+    return any(os.path.exists(os.path.join(root, d, *f)) for d in ("System32", "Sysnative")
+               for f in (("Npcap", "wpcap.dll"), ("wpcap.dll",)))
 
 
 # Η embeddable Python έχει αρχείο ._pth: τότε ΔΕΝ βάζει τον φάκελο του script στο sys.path και αγνοεί το PYTHONPATH.
@@ -310,7 +313,10 @@ class App:
     def __init__(self):
         self.backend = Backend()
         s = load_settings()
-        self.mode = s.get("mode") or ("live" if npcap_installed() else "demo")
+        self.mode = s.get("mode") or "live"   # 1η φορά: Live (αν λείπει το Npcap, το launch ρωτά και πέφτει σε Demo)
+        # Αν είχε πέσει σε Demo ΜΟΝΟ επειδή έλειπε το Npcap και τώρα εγκαταστάθηκε → πίσω σε Live αυτόματα
+        if s.get("no_npcap") and npcap_installed():
+            self.mode = "live"
         self.pcap = s.get("pcap")
         self.admin = bool(s.get("admin"))
         self.status = {}
@@ -322,7 +328,8 @@ class App:
     def launch(self, mode=None, pcap=None, admin=None, open_after=True):
         mode = mode or self.mode
         admin = self.admin if admin is None else admin
-        if mode == "live" and not npcap_installed():
+        no_npcap = mode == "live" and not npcap_installed()
+        if no_npcap:
             if message("Για Live καταγραφή χρειάζεται το δωρεάν Npcap.\n\nΝα ανοίξει η σελίδα λήψης; "
                        "(Στην εγκατάσταση άφησε τσεκαρισμένο το «WinPcap API-compatible Mode».)\n\n"
                        "Μέχρι τότε ξεκινά σε Demo.", yesno=True):
@@ -331,7 +338,7 @@ class App:
         if mode == "pcap" and not (pcap and os.path.isfile(pcap)):
             mode = "demo"
         self.mode, self.pcap, self.admin = mode, pcap, admin and mode == "live"
-        save_settings(mode=mode, pcap=pcap, admin=self.admin)
+        save_settings(mode=mode, pcap=pcap, admin=self.admin, no_npcap=no_npcap)
         self.status, self.msg = {}, "Ξεκινά…"
         self.refresh_icon()
 
