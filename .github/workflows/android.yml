@@ -1,0 +1,67 @@
+name: Android app
+
+# Χτίζει το NetWatch-android.apk (σύντροφος του agent mode), τρέχει τα unit tests, και ένα test απέναντι σε
+# πραγματικό agent (demo) σε αυτόν τον runner. Σε tag v* το επισυνάπτει στο GitHub Release.
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+    paths: ["android/**", ".github/workflows/android.yml", "agent.py", "server.py"]
+  pull_request:
+    paths: ["android/**", ".github/workflows/android.yml", "agent.py", "server.py"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      HAS_KEYSTORE: ${{ secrets.NETWATCH_KEYSTORE_B64 != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Demo agent for the live test
+        run: |
+          python -m pip install -q -r requirements.txt
+          python netwatch.py --agent --demo --bind 127.0.0.1 --no-open --no-intel --history :memory: > agent.log 2>&1 &
+          for i in $(seq 1 60); do grep -q "SHA-256" agent.log && break; sleep 1; done
+          echo "NETWATCH_AGENT_URL=https://127.0.0.1:8765/?$(grep -ao 'token=[A-Za-z0-9_-]*' agent.log | head -1)" >> "$GITHUB_ENV"
+          echo "NETWATCH_AGENT_FP=$(grep -a 'SHA-256' agent.log | grep -oE '([0-9A-F]{2}:){31}[0-9A-F]{2}')" >> "$GITHUB_ENV"
+      - name: Release signing key (optional secret)
+        if: env.HAS_KEYSTORE == 'true'
+        env:
+          KS: ${{ secrets.NETWATCH_KEYSTORE_B64 }}
+        run: |
+          echo "$KS" | base64 -d > "$RUNNER_TEMP/netwatch.jks"
+          echo "NETWATCH_KEYSTORE=$RUNNER_TEMP/netwatch.jks" >> "$GITHUB_ENV"
+      - name: Unit tests and release APK
+        working-directory: android
+        env:
+          NETWATCH_VERSION: ${{ github.ref_type == 'tag' && github.ref_name || '' }}
+          NETWATCH_KEYSTORE_PASSWORD: ${{ secrets.NETWATCH_KEYSTORE_PASSWORD }}
+          NETWATCH_KEY_ALIAS: ${{ secrets.NETWATCH_KEY_ALIAS }}
+          NETWATCH_KEY_PASSWORD: ${{ secrets.NETWATCH_KEY_PASSWORD }}
+        run: |
+          ./gradlew --no-daemon testDebugUnitTest assembleRelease
+          grep -q 'tests="1" skipped="0" failures="0" errors="0"' app/build/test-results/testDebugUnitTest/TEST-io.github.netwatch.android.AgentLiveTest.xml
+          cp app/build/outputs/apk/release/app-release.apk ../NetWatch-android.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NetWatch-android
+          path: NetWatch-android.apk
+      - name: Attach to release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # το Release το φτιάχνει το release.yml (macOS)· περιμένουμε να υπάρξει
+          for i in $(seq 1 40); do gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && break; sleep 15; done
+          gh release upload "$GITHUB_REF_NAME" NetWatch-android.apk --clobber

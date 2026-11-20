@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">NetWatch</string>
+    <string name="setup_title">Connect to your NetWatch agent</string>
+    <string name="setup_intro">Start NetWatch with --agent on your home server or PC. It prints a link like https://192.168.1.10:8765/?token=… and a SHA-256 fingerprint. Paste the whole link here.</string>
+    <string name="setup_hint" translatable="false">https://192.168.1.10:8765/?token=…</string>
+    <string name="connect">Connect</string>
+    <string name="connecting">Connecting…</string>
+    <string name="bad_url">This doesn\'t look like an agent link. It must start with https:// and contain ?token=</string>
+    <string name="conn_failed">Could not reach the agent: %1$s\n\nAre you on the same network as the agent?</string>
+    <string name="bad_token">The agent refused the token. Copy the link again from the agent\'s output (or data/agent-token).</string>
+    <string name="fp_title">Check the fingerprint</string>
+    <string name="fp_message">The agent presented this certificate:\n\n%1$s\n\nDoes it match the SHA-256 fingerprint the agent printed when it started? If it doesn\'t, someone may be intercepting the connection.</string>
+    <string name="fp_yes">It matches</string>
+    <string name="fp_no">It doesn\'t</string>
+    <string name="cert_mismatch">The agent\'s certificate changed. The connection was blocked. If you regenerated the certificate, choose “Change agent”.</string>
+    <string name="menu_notify">Alert notifications</string>
+    <string name="menu_change">Change agent</string>
+    <string name="menu_reload">Reload</string>
+    <string name="channel_name">NetWatch alerts</string>
+    <string name="channel_desc">Serious alerts from your NetWatch agent, checked every 15 minutes while you are on the same network</string>
+    <string name="notif_more">and %1$d more</string>
+    <string name="paste">Paste</string>
+</resources>

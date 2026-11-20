@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="setup_title">Σύνδεση με τον agent του NetWatch</string>
+    <string name="setup_intro">Ξεκίνα το NetWatch με --agent στον server ή στο PC του σπιτιού. Τυπώνει έναν σύνδεσμο σαν https://192.168.1.10:8765/?token=… και ένα SHA-256 fingerprint. Επικόλλησε εδώ όλο τον σύνδεσμο.</string>
+    <string name="connect">Σύνδεση</string>
+    <string name="connecting">Σύνδεση…</string>
+    <string name="bad_url">Δεν μοιάζει με σύνδεσμο του agent. Πρέπει να ξεκινά με https:// και να έχει ?token=</string>
+    <string name="conn_failed">Δεν βρέθηκε ο agent: %1$s\n\nΕίσαι στο ίδιο δίκτυο με τον agent;</string>
+    <string name="bad_token">Ο agent δεν δέχτηκε το token. Αντέγραψε ξανά τον σύνδεσμο από την έξοδο του agent (ή από το data/agent-token).</string>
+    <string name="fp_title">Έλεγξε το fingerprint</string>
+    <string name="fp_message">Ο agent έδειξε αυτό το πιστοποιητικό:\n\n%1$s\n\nΤαιριάζει με το SHA-256 fingerprint που τύπωσε ο agent όταν ξεκίνησε; Αν όχι, κάποιος μπορεί να παρεμβάλλεται στη σύνδεση.</string>
+    <string name="fp_yes">Ταιριάζει</string>
+    <string name="fp_no">Δεν ταιριάζει</string>
+    <string name="cert_mismatch">Το πιστοποιητικό του agent άλλαξε και η σύνδεση μπλοκαρίστηκε. Αν έφτιαξες νέο πιστοποιητικό, διάλεξε «Αλλαγή agent».</string>
+    <string name="menu_notify">Ειδοποιήσεις</string>
+    <string name="menu_change">Αλλαγή agent</string>
+    <string name="menu_reload">Ανανέωση</string>
+    <string name="channel_name">Ειδοποιήσεις NetWatch</string>
+    <string name="channel_desc">Σοβαρές ειδοποιήσεις από τον agent του NetWatch, κάθε 15 λεπτά όσο είσαι στο ίδιο δίκτυο</string>
+    <string name="notif_more">και άλλες %1$d</string>
+    <string name="paste">Επικόλληση</string>
+</resources>
