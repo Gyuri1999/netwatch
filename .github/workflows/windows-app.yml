@@ -19,6 +19,14 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - name: Set version from tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: pwsh
+        # αλλιώς το app γράφει την έκδοση του αρχείου VERSION στο repo (και ο updater συγκρίνει λάθος)
+        run: |
+          $v = $env:GITHUB_REF_NAME -replace '^v', ''
+          if ($v -notmatch '^\d+\.\d+(\.\d+)?$') { Write-Error "tag must look like v1.2.0"; exit 1 }
+          Set-Content -Path VERSION -Value $v -NoNewline -Encoding ascii
       - name: Build
         shell: pwsh
         run: ./winapp/build.ps1

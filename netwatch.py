@@ -278,10 +278,15 @@ def main():
                                                                    on_save=chown_to_user if live else None)
     if live:
         threading.Thread(target=state.presence.run_forever, daemon=True).start()
+    import alerthyg  # 🔕 σίγαση ειδοποιήσεων με λήξη + 🧐 «γιατί χτύπησε;» (data/mutes.json· στο demo μόνο μνήμη)
+    state.hygiene = alerthyg.AlertHygiene(state, path=os.path.join(DATA, "mutes.json") if live else None,
+                                          on_save=chown_to_user if live else None)
     import l2guard  # 🛡 rogue DHCP / ARP spoofing με ένα κουμπί (DHCPDISCOVER + ARP μόνο στο τοπικό LAN)
     state.l2guard = l2guard.L2Guard(state, sim=demo) if mode != "pcap" else None
     import updater  # 🔄 ενημερώσεις από GitHub (αυτόματα μόνο έλεγχος· εγκατάσταση με κλικ και έλεγχο υπογραφής)
-    state.updater = updater.Updater(state, sim=demo, cfg=cfg.get("updates"))
+    # Προσομοίωση μόνο στο dev demo (git checkout)· σε εγκατεστημένο app (Mac/Windows/Docker) το demo
+    # κάνει κανονικό (read-only) έλεγχο στο GitHub — αλλιώς έδειχνε ψεύτικη «v1.1.0».
+    state.updater = updater.Updater(state, sim=demo and updater.detect_kind(updater.HERE) == "git", cfg=cfg.get("updates"))
     if live:
         threading.Thread(target=state.updater.run_forever, daemon=True).start()
     elif demo:

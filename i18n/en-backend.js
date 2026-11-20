@@ -889,6 +889,7 @@ I18N.add({
   "Το branch δεν παρακολουθεί κάποιο remote (git branch -u origin/main).": "The branch does not track a remote (git branch -u origin/main).",
   "Αυτή η έκδοση δεν έχει NetWatch.zip / SHA256SUMS — κατέβασέ τη από τη σελίδα του GitHub.": "This release has no NetWatch.zip / SHA256SUMS — download it from the GitHub page.",
   "Αυτή η έκδοση δεν είναι υπογεγραμμένη — για ασφάλεια δεν εγκαθίσταται αυτόματα.": "This release is not signed — for safety it is not installed automatically.",
+  "Στα Windows: κατέβασε το NetWatch-windows-x64.zip από το GitHub, κλείσε το NetWatch (εικονίδιο ασπίδας → Έξοδος) και αντικατέστησε τον παλιό φάκελο. Οι ρυθμίσεις σου μένουν.": "On Windows: download NetWatch-windows-x64.zip from GitHub, quit NetWatch (shield icon → Έξοδος / Exit) and replace the old folder. Your settings are kept.",
   "Έχεις τοπικές αλλαγές στον κώδικα — κάνε commit/stash πρώτα (δεν τις πειράζω).": "You have local code changes — commit/stash them first (I won't touch them).",
   "Σε Docker: docker compose pull && docker compose up -d": "On Docker: docker compose pull && docker compose up -d",
   "Κατέβασε τη νέα έκδοση από τη σελίδα του GitHub.": "Download the new version from the GitHub page.",
