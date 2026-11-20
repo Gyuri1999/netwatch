@@ -67,3 +67,10 @@ def test_update_routes(api):
     assert code == 200 and v["available"]
     code, r = _req(base + "/api/update/install", {}, headers={"Content-Type": "text/plain"})
     assert code == 403
+
+
+def test_snapshot_reports_host_for_golive_hint():
+    import detect
+    h = detect.host_info()
+    assert h["os"] and isinstance(h["docker"], bool)
+    assert ("npcap" in h) == (h["os"] == "win32")

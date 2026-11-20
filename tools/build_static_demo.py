@@ -83,6 +83,7 @@ def main():
     shutil.copy2(os.path.join(ROOT, "sshui.js"), out)
     shutil.copy2(os.path.join(ROOT, "vlsm.js"), out)
     shutil.copy2(os.path.join(ROOT, "updateui.js"), out)
+    shutil.copy2(os.path.join(ROOT, "golive.js"), out)
     shutil.copy2(os.path.join(ROOT, "presenceui.js"), out)
     shutil.copy2(os.path.join(ROOT, "l2guardui.js"), out)
     shutil.copy2(os.path.join(ROOT, "acl.js"), out)
