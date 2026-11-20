@@ -20,7 +20,7 @@ html.light #gl-box{background:#fff}
 #gl-box ol{margin:0;padding-left:22px;font-size:14px;line-height:1.6}
 #gl-box li{margin:6px 0}
 #gl-box code{background:rgb(127 127 127 / 18%);padding:1px 5px;border-radius:4px;font-size:12.5px}
-#gl-box pre{background:#05080f;color:#d6e2f0;border-radius:8px;padding:8px 10px;font:12px/1.5 ui-monospace,Menlo,monospace;overflow:auto;margin:6px 0 0;white-space:pre-wrap;word-break:break-all}
+#gl-box pre{background:#05080f;color:#d6e2f0;border-radius:8px;padding:8px 10px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;overflow:auto;margin:6px 0 0;white-space:pre-wrap;word-break:break-all}
 #gl-box .gl-ok{border-left:3px solid var(--green);padding:6px 10px;margin-top:12px;font-size:13px;line-height:1.5;background:rgb(127 127 127 / 8%);border-radius:6px}
 #gl-box .gl-foot{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-top:16px}
 #gl-box label{font-size:12.5px;color:var(--dim);display:flex;gap:6px;align-items:center;cursor:pointer}

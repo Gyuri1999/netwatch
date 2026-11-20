@@ -15,10 +15,10 @@
 #t-l2g .lg-chk{display:grid;grid-template-columns:28px minmax(0,1fr);gap:8px;padding:9px 10px;border-radius:10px;margin-top:6px;background:rgb(var(--w,255 255 255) / 4%);font-size:13.5px;line-height:1.5}
 #t-l2g table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:6px}
 #t-l2g th{text-align:left;color:var(--dim);font-size:11px;font-weight:600;padding:6px;border-bottom:1px solid var(--line)}
-#t-l2g td{padding:6px;border-bottom:1px solid rgb(var(--w,255 255 255) / 6%);font-family:ui-monospace,Menlo,monospace;white-space:nowrap}
+#t-l2g td{padding:6px;border-bottom:1px solid rgb(var(--w,255 255 255) / 6%);font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap}
 #t-l2g tr.rogue td{background:color-mix(in srgb,var(--red) 12%,transparent)}
 #t-l2g .lg-wrap{overflow:auto}
-#t-l2g pre{background:#05080f;color:#d6e2f0;border-radius:10px;padding:10px 12px;font:12px/1.5 ui-monospace,Menlo,monospace;overflow:auto;margin:8px 0 0}
+#t-l2g pre{background:#05080f;color:#d6e2f0;border-radius:10px;padding:10px 12px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;overflow:auto;margin:8px 0 0}
 #t-l2g .lg-th{font-size:13px;line-height:1.65}
 #t-l2g .lg-th code{background:rgb(var(--w,255 255 255) / 8%);padding:0 4px;border-radius:4px}
 #t-l2g .lg-go{border-color:var(--cyan)!important;color:var(--cyan)!important;font-weight:600;padding:8px 16px!important;font-size:13.5px!important}

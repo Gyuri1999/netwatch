@@ -200,14 +200,14 @@ access-list 10 deny   any`,
   css.textContent = `
 #t-acl .at-grid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px;align-items:start}
 @media(max-width:1000px){#t-acl .at-grid{grid-template-columns:minmax(0,1fr)}}
-#t-acl textarea{width:100%;box-sizing:border-box;min-height:250px;background:#05080f;color:#d6e2f0;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:12.5px/1.55 ui-monospace,Menlo,monospace;resize:vertical}
-#t-acl input,#t-acl select{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:13px ui-monospace,Menlo,monospace;min-width:0;width:100%;box-sizing:border-box}
+#t-acl textarea{width:100%;box-sizing:border-box;min-height:250px;background:#05080f;color:#d6e2f0;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;resize:vertical}
+#t-acl input,#t-acl select{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:13px ui-monospace,Menlo,Consolas,monospace;min-width:0;width:100%;box-sizing:border-box}
 #t-acl .at-pk{display:grid;grid-template-columns:repeat(auto-fit,minmax(105px,1fr));gap:6px;align-items:end}
 #t-acl .at-pk label{font-size:11px;color:var(--dim);display:block;margin-bottom:3px;font-weight:600}
 #t-acl .at-lbl{font-size:12px;color:var(--dim);font-weight:600;margin:10px 0 4px}
 #t-acl .at-ace{display:grid;grid-template-columns:26px 22px minmax(0,1fr);gap:6px;align-items:start;padding:7px 8px;border-radius:9px;margin-top:4px;border:1px solid transparent;font-size:12.5px}
-#t-acl .at-ace code{font:12.5px ui-monospace,Menlo,monospace;word-break:break-all}
-#t-acl .at-ace .n{color:var(--dim);font:11px ui-monospace,Menlo,monospace;padding-top:2px}
+#t-acl .at-ace code{font:12.5px ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
+#t-acl .at-ace .n{color:var(--dim);font:11px ui-monospace,Menlo,Consolas,monospace;padding-top:2px}
 #t-acl .at-ace .w{color:var(--dim);font-size:11.5px;margin-top:2px}
 #t-acl .at-ace.hit.permit{border-color:var(--green);background:color-mix(in srgb,var(--green) 12%,transparent)}
 #t-acl .at-ace.hit.deny{border-color:var(--red);background:color-mix(in srgb,var(--red) 12%,transparent)}

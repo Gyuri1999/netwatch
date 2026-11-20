@@ -715,7 +715,7 @@
   .cl-tabs{display:flex;gap:2px;padding:6px 6px 0;background:rgb(var(--w) / 4%);border-bottom:1px solid rgb(var(--w) / 10%)}
   .cl-dt{background:none;border:none;color:var(--dim);font:12px var(--mono,ui-monospace,monospace);padding:6px 11px;border-radius:7px 7px 0 0;cursor:pointer}
   .cl-dt:hover{color:#cfe0f5}.cl-dt.on{background:#05080f;color:#7ee787;box-shadow:inset 0 2px 0 #7ee787}.cl-sp{flex:1}
-  .cl-scr{height:360px;overflow:auto;padding:10px 12px;font:12.5px/1.45 var(--mono,ui-monospace,SFMono-Regular,Menlo,monospace);color:#d6e2f0;cursor:text}
+  .cl-scr{height:360px;overflow:auto;padding:10px 12px;font:12.5px/1.45 var(--mono,ui-monospace,SFMono-Regular,Menlo,Consolas,monospace);color:#d6e2f0;cursor:text}
   .cl-out{margin:0;white-space:pre-wrap;word-break:break-word;font:inherit;color:inherit;background:none;border:0;padding:0}
   .cl-line{display:flex;align-items:baseline;gap:6px}.cl-pr{color:#7ee787;white-space:pre}
   .cl-in{flex:1;background:none;border:0;outline:none;color:#fff;font:inherit;padding:0;caret-color:#7ee787;min-width:0}

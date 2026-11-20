@@ -115,7 +115,7 @@
 document.addEventListener('DOMContentLoaded', () => {
   document.querySelectorAll('[data-langswitch]').forEach(b => {
     b.setAttribute('data-noi18n', '');
-    b.textContent = I18N.lang === 'en' ? '🇬🇷 ΕΛ' : '🇬🇧 EN';
+    b.textContent = I18N.lang === 'en' ? '🌐 ΕΛ' : '🌐 EN';
     b.title = I18N.lang === 'en' ? 'Ελληνικά' : 'English';
     b.onclick = () => I18N.set(I18N.lang === 'en' ? 'el' : 'en');
   });

@@ -15,7 +15,7 @@
 #upd-pill.on{display:inline-flex;align-items:center;gap:4px}
 #t-upd .up-hero{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
 #t-upd .up-ic{font-size:34px}
-#t-upd .up-ver{font:600 13px ui-monospace,Menlo,monospace;background:rgb(var(--w,255 255 255) / 6%);border-radius:8px;padding:3px 8px}
+#t-upd .up-ver{font:600 13px ui-monospace,Menlo,Consolas,monospace;background:rgb(var(--w,255 255 255) / 6%);border-radius:8px;padding:3px 8px}
 #t-upd .up-notes{font-size:13px;line-height:1.6;max-height:320px;overflow:auto;background:rgb(var(--w,255 255 255) / 4%);border-radius:10px;padding:10px 14px;margin-top:10px}
 #t-upd .up-notes h1,#t-upd .up-notes h2,#t-upd .up-notes h3{font-size:14px;margin:8px 0 4px}
 #t-upd .up-bar{height:8px;border-radius:99px;background:rgb(var(--w,255 255 255) / 8%);overflow:hidden;margin-top:8px}

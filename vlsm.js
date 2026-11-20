@@ -146,24 +146,24 @@
 #t-vlsm .vl-grid{display:grid;grid-template-columns:minmax(260px,340px) minmax(0,1fr);gap:12px;align-items:start}
 @media(max-width:900px){#t-vlsm .vl-grid{grid-template-columns:minmax(0,1fr)}}
 #t-vlsm .vl-grid>div{min-width:0}
-#t-vlsm input[type=text],#t-vlsm input[type=number]{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:13px ui-monospace,Menlo,monospace;min-width:0;width:100%;box-sizing:border-box}
+#t-vlsm input[type=text],#t-vlsm input[type=number]{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:8px;padding:7px 9px;font:13px ui-monospace,Menlo,Consolas,monospace;min-width:0;width:100%;box-sizing:border-box}
 #t-vlsm .vl-req{display:grid;grid-template-columns:14px minmax(0,1fr) 84px 28px;gap:6px;align-items:center;margin-top:6px}
 #t-vlsm .vl-dot{width:12px;height:12px;border-radius:3px}
 #t-vlsm .vl-lbl{font-size:12px;color:var(--dim);font-weight:600;margin:10px 0 4px}
 #t-vlsm .vl-chk{display:flex;gap:6px;align-items:center;font-size:12.5px;margin-top:6px;cursor:pointer}
 #t-vlsm table.vl-t{width:100%;border-collapse:collapse;font-size:12.5px}
 #t-vlsm table.vl-t th{text-align:left;color:var(--dim);font-weight:600;font-size:11px;padding:6px;border-bottom:1px solid var(--line);white-space:nowrap}
-#t-vlsm table.vl-t td{padding:6px;border-bottom:1px solid rgb(var(--w,255 255 255) / 6%);font-family:ui-monospace,Menlo,monospace;white-space:nowrap}
+#t-vlsm table.vl-t td{padding:6px;border-bottom:1px solid rgb(var(--w,255 255 255) / 6%);font-family:ui-monospace,Menlo,Consolas,monospace;white-space:nowrap}
 #t-vlsm table.vl-t td.nm{font-family:inherit;font-weight:600}
 #t-vlsm table.vl-t tr{cursor:pointer}#t-vlsm table.vl-t tr.sel td{background:color-mix(in srgb,var(--cyan) 9%,transparent)}
 #t-vlsm .vl-wrap{overflow:auto}
 #t-vlsm .vl-why{font-size:13px;line-height:1.6;background:rgb(var(--w,255 255 255) / 4%);border-radius:10px;padding:10px 12px;margin-top:10px}
 #t-vlsm .vl-why code,#t-vlsm .vl-note code{background:rgb(var(--w,255 255 255) / 8%);padding:0 4px;border-radius:4px}
-#t-vlsm pre.vl-cfg{background:#05080f;color:#d6e2f0;border-radius:10px;padding:10px 12px;font:12px/1.5 ui-monospace,Menlo,monospace;max-height:340px;overflow:auto;margin:8px 0 0;white-space:pre}
+#t-vlsm pre.vl-cfg{background:#05080f;color:#d6e2f0;border-radius:10px;padding:10px 12px;font:12px/1.5 ui-monospace,Menlo,Consolas,monospace;max-height:340px;overflow:auto;margin:8px 0 0;white-space:pre}
 #t-vlsm .vl-kv{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:8px}
 #t-vlsm .vl-kv div{background:rgb(var(--w,255 255 255) / 4%);border-radius:10px;padding:8px 10px}
-#t-vlsm .vl-kv b{display:block;font-size:11px;color:var(--dim);font-weight:600}#t-vlsm .vl-kv span{font:600 14px ui-monospace,Menlo,monospace;word-break:break-all}
-#t-vlsm .vl-bin{font:13px/1.9 ui-monospace,Menlo,monospace;overflow:auto;white-space:nowrap}
+#t-vlsm .vl-kv b{display:block;font-size:11px;color:var(--dim);font-weight:600}#t-vlsm .vl-kv span{font:600 14px ui-monospace,Menlo,Consolas,monospace;word-break:break-all}
+#t-vlsm .vl-bin{font:13px/1.9 ui-monospace,Menlo,Consolas,monospace;overflow:auto;white-space:nowrap}
 #t-vlsm .vl-bin .n{color:var(--cyan)}#t-vlsm .vl-bin .h{color:var(--orange)}
 #t-vlsm .vl-err{color:var(--red);font-size:13px;margin-top:6px}
 #t-vlsm .vl-note{font-size:12.5px;color:var(--dim);margin-top:6px;line-height:1.55}
@@ -187,10 +187,10 @@
   }
   function bar(r) {
     const pc = n => (n / r.base.size * 100).toFixed(3) + '%';
-    const segs = r.rows.map((row, k) => `<div data-row="${k}" title="${E(row.name)} ${n2ip(row.net)}/${row.p}" style="position:absolute;top:0;bottom:0;left:${pc(row.net - r.base.net)};width:max(2px,calc(${pc(row.size)} - 2px));background:${COLS[row.i % COLS.length]};opacity:${k === sel ? 1 : .8};border-radius:5px;cursor:pointer;overflow:hidden;white-space:nowrap;font:600 11px -apple-system,system-ui,sans-serif;color:#06101c;padding:0 6px;line-height:36px${k === sel ? ';box-shadow:0 0 0 2px #fff inset' : ''}">${E(row.name)} /${row.p}</div>`).join('');
+    const segs = r.rows.map((row, k) => `<div data-row="${k}" title="${E(row.name)} ${n2ip(row.net)}/${row.p}" style="position:absolute;top:0;bottom:0;left:${pc(row.net - r.base.net)};width:max(2px,calc(${pc(row.size)} - 2px));background:${COLS[row.i % COLS.length]};opacity:${k === sel ? 1 : .8};border-radius:5px;cursor:pointer;overflow:hidden;white-space:nowrap;font:600 11px -apple-system,system-ui,Segoe UI,sans-serif;color:#06101c;padding:0 6px;line-height:36px${k === sel ? ';box-shadow:0 0 0 2px #fff inset' : ''}">${E(row.name)} /${row.p}</div>`).join('');
     const free = r.free.map(f => `<div style="position:absolute;top:0;bottom:0;left:${pc(f.net - r.base.net)};width:calc(${pc(2 ** (32 - f.p))} - 2px);border-radius:5px;border:1px dashed rgb(255 255 255 / 22%);background:repeating-linear-gradient(45deg,rgb(255 255 255 / 4%) 0 6px,transparent 6px 12px)"></div>`).join('');
     return `<div style="position:relative;height:36px">${free}${segs}</div>
-      <div style="display:flex;justify-content:space-between;font:11px ui-monospace,Menlo,monospace;color:var(--dim);margin-top:3px"><span>${n2ip(r.base.net)}</span><span>${n2ip(r.base.net + r.base.size - 1)}</span></div>`;
+      <div style="display:flex;justify-content:space-between;font:11px ui-monospace,Menlo,Consolas,monospace;color:var(--dim);margin-top:3px"><span>${n2ip(r.base.net)}</span><span>${n2ip(r.base.net + r.base.size - 1)}</span></div>`;
   }
   function why(x) {
     const need = x.hosts + 2, b = 32 - x.p;

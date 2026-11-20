@@ -74,7 +74,7 @@
     w: 640, h: 270, speed: 2800,
     intro: 'Ένας επιτιθέμενος καταγράφει την κίνηση (π.χ. με Wireshark σε mirror port). Τι βλέπει με **Telnet** και τι με **SSH**;',
     nodes: [
-      { id: 'adm', x: 80, y: 100, icon: '🧑‍💻', label: 'Admin PC' },
+      { id: 'adm', x: 80, y: 100, icon: '🖥️', label: 'Admin PC' },
       { id: 'sw', x: 320, y: 100, icon: '🔲', label: 'SW1' },
       { id: 'r1', x: 560, y: 100, icon: '🔀', label: 'R1' },
       { id: 'att', x: 320, y: 215, icon: '🕵️', label: 'Sniffer\n(Wireshark)', w: 76 },

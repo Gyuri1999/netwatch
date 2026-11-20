@@ -30,7 +30,7 @@
 .nm-row .ic{font-size:20px;text-align:center;position:relative}
 .nm-row .ic i{position:absolute;right:0;top:0;width:8px;height:8px;border-radius:50%;background:#3a4a63}
 .nm-row .ic i.live{background:var(--green);box-shadow:0 0 8px var(--green)}
-.nm-row .meta b{display:block;font:600 13px ui-monospace,Menlo,monospace}.nm-row .meta span{font-size:11.5px;color:var(--dim)}
+.nm-row .meta b{display:block;font:600 13px ui-monospace,Menlo,Consolas,monospace}.nm-row .meta span{font-size:11.5px;color:var(--dim)}
 .nm-row select{background:var(--bg);color:var(--txt);border:1px solid var(--line);border-radius:10px;padding:8px;font:13px inherit;min-width:0}
 .nm-tip{font-size:12.5px;line-height:1.55;background:rgb(var(--w,255 255 255) / 4%);border-radius:10px;padding:10px 12px;margin-top:10px}
 .nm-foot{display:flex;gap:8px;justify-content:flex-end;align-items:center;margin-top:14px}
@@ -69,7 +69,7 @@
     const ov = document.createElement('div'); ov.className = 'nm-ov'; ov.setAttribute('data-noi18n', '');
     const draw = () => {
       ov.innerHTML = `<div class="nm-box" role="dialog" aria-modal="true"><h3>🏷 ${T('Όνομα συσκευής', 'Device name')}</h3>
-        <div class="dim" style="font:12px ui-monospace,Menlo,monospace">${E(h.ip)}${h.mac ? ' · ' + E(h.mac) : ''}${h.vendor ? ' · ' + E(h.vendor === 'τυχαία MAC' ? T(h.vendor, 'random MAC') : h.vendor) : ''}</div>
+        <div class="dim" style="font:12px ui-monospace,Menlo,Consolas,monospace">${E(h.ip)}${h.mac ? ' · ' + E(h.mac) : ''}${h.vendor ? ' · ' + E(h.vendor === 'τυχαία MAC' ? T(h.vendor, 'random MAC') : h.vendor) : ''}</div>
         <div class="nm-lbl">${T('Όνομα', 'Name')}</div><input class="nm-in" id="nm-name" maxlength="40" placeholder="${T('π.χ. Κινητό Μαρίας, TV σαλονιού', 'e.g. Maria’s phone, Living-room TV')}" value="${E(cur.name || h.alias || '')}">
         <div class="nm-lbl">${T('Τι είναι;', 'What is it?')}</div><div class="nm-types">${N.types.map(t => `<button class="nm-t${t.id === typ ? ' on' : ''}" data-nmt="${t.id}">${t.icon} ${E(tl(t))}</button>`).join('')}</div>
         <div class="nm-lbl">${T('Σημείωση (προαιρετικά)', 'Note (optional)')}</div><input class="nm-in" id="nm-note" maxlength="200" placeholder="${T('π.χ. στο γραφείο, θύρα 4 του switch', 'e.g. in the office, switch port 4')}" value="${E(cur.note || '')}">

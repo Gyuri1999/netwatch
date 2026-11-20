@@ -7,7 +7,7 @@
   const LT = x => x && typeof x === 'object' ? (EN() ? x.en : x.el) || x.el || x.en || '' : String(x == null ? '' : x);
   const TM = { d: null, msg: null, zoom: 1, sel: null, busy: false, fault: '' };
   const BW = 176, BH = 60, GAP = 26, ROW = 104, PAD = 30;
-  const ICON = { internet: '☁️', dns: '🔤', isp: '🏢', modem: '📟', router: '🛜', switch: '🔀', ap: '📶', host: '💻', me: '🧑‍💻', more: '➕' };
+  const ICON = { internet: '☁️', dns: '🔤', isp: '🏢', modem: '📟', router: '📡', switch: '🔀', ap: '📶', host: '💻', me: '👤', more: '➕' };
   const ST = {
     ok: ['--green', 'απαντά', 'answers'], slow: ['--yellow', 'αργό / απώλειες', 'slow / loss'], down: ['--red', 'ΔΕΝ απαντά', 'NOT answering'],
     quiet: ['--cyan', 'σιωπηλό (κόβει το ping, η κίνηση περνά)', 'quiet (drops ping, traffic passes)'],
@@ -66,7 +66,7 @@
   //    οι συσκευές ως πλέγμα από κάρτες που γεμίζει το πλάτος της οθόνης ──
   const CW = 214, CH = 50, CG = 10, HG = 70;
   function devIcon(n) {
-    if (n.kind === 'me') return '🧑‍💻';
+    if (n.kind === 'me') return '👤';
     if (n.kind === 'more') return '➕';
     if (n.icon && n.icon !== '❔') return n.icon;  // 🏷 τύπος που έδωσες εσύ ή εκτίμηση του NetWatch
     const s = (LT(n.sub) + ' ' + LT(n.label)).toLowerCase();
@@ -145,7 +145,7 @@
     const path = new Set(d.path || []);
     const out = [];
     const font = 'font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif"';
-    const mono = 'font-family="ui-monospace,Menlo,monospace"';
+    const mono = 'font-family="ui-monospace,Menlo,Consolas,monospace"';
     const trunc = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; };
     out.push(`<svg xmlns="http://www.w3.org/2000/svg" width="${L.W}" height="${L.H}" viewBox="0 0 ${L.W} ${L.H}" ${font}>`);
     out.push(`<rect width="100%" height="100%" fill="${C.bg}"/>`);
@@ -259,7 +259,7 @@
   }
 
   // ── PDF (A4 οριζόντιο): σελ. 1 διάγνωση + διάγραμμα, σελ. 2+ πίνακας συσκευών. Κάθε σελίδα = εικόνα JPEG μέσα σε PDF. ──
-  const PG = [2480, 1754], FONT = '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+  const PG = [2480, 1754], FONT = '-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif';
   function wrap(x, text, maxW) {
     const out = []; let line = '';
     String(text || '').split(/\s+/).forEach(w => { const t = line ? line + ' ' + w : w; if (x.measureText(t).width > maxW && line) { out.push(line); line = w; } else line = t; });
@@ -320,7 +320,7 @@
         let cx2 = 90;
         cols.forEach(([, w], k) => {
           let v = k === 6 ? r[6] : r[k]; x.fillStyle = k === 6 ? ({ '--green': '#16a34a', '--yellow': '#ca8a04', '--red': '#dc2626', '--cyan': '#0891b2' }[r[7]] || '#64748b') : '#0f172a';
-          if (k === 1 || k === 4) x.font = `24px ui-monospace,Menlo,monospace`; else x.font = `25px ${FONT}`;
+          if (k === 1 || k === 4) x.font = `24px ui-monospace,Menlo,Consolas,monospace`; else x.font = `25px ${FONT}`;
           while (v.length > 3 && x.measureText(v).width > w - 20) v = v.slice(0, -2);
           if (v !== (k === 6 ? r[6] : r[k])) v += '…';
           x.fillText(v, cx2, ry); cx2 += w;
