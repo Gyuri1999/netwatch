@@ -30,8 +30,6 @@ android {
                 storePassword = System.getenv("NETWATCH_KEYSTORE_PASSWORD")
                 keyAlias = System.getenv("NETWATCH_KEY_ALIAS") ?: "netwatch"
                 keyPassword = System.getenv("NETWATCH_KEY_PASSWORD") ?: System.getenv("NETWATCH_KEYSTORE_PASSWORD")
-            } else {
-                initWith(getByName("debug"))
             }
         }
     }
@@ -41,7 +39,9 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("release")
+            // Χωρίς κλειδί release: το debug του AGP (το φτιάχνει μόνο του και σε καθαρό runner του CI)
+            val hasKey = System.getenv("NETWATCH_KEYSTORE")?.let { file(it).exists() } == true
+            signingConfig = signingConfigs.getByName(if (hasKey) "release" else "debug")
         }
     }
     compileOptions {
