@@ -134,26 +134,134 @@
   }
   A.Anim = Anim;
 
+  // ---------- IOS: συντομογραφίες, γνωστές εντολές ανά mode ----------
+  const W = s => s.split(' ');
+  const IOS = (() => {
+    const EXEC = W('enable ping traceroute telnet ssh show exit logout terminal disable');
+    const PRIV = EXEC.concat(W('configure copy write reload clear debug undebug erase dir more verify'));
+    const CFG = W('hostname interface router ip ipv6 vlan line access-list enable username service banner no crypto security login aaa spanning-tree cdp lldp ntp logging snmp-server clock do end exit default vtp boot archive errdisable mac port-channel');
+    const IF = W('ip ipv6 shutdown no description duplex speed switchport spanning-tree channel-group encapsulation standby cdp lldp storm-control bandwidth mtu do end exit default interface');
+    const MODES = { exec: EXEC, priv: PRIV, cfg: CFG, if: IF,
+      line: W('password login transport exec-timeout logging privilege access-class history no do end exit'),
+      router: W('network router-id passive-interface default-information neighbor auto-summary version redistribute maximum-paths no do end exit'),
+      vlan: W('name state no do end exit'), dhcp: W('network default-router dns-server domain-name lease no do end exit'),
+      nacl: W('permit deny remark no do end exit') };
+    const WORDS = [...new Set(Object.values(MODES).flat().concat(W(
+      'in out run interfaces running-config startup-config terminal memory address brief route routing vlans mode access trunk allowed native add remove nonegotiate full half auto ospf eigrp rip area originate default-gateway access-group standard extended host any eq console vty local input output key generate rsa modulus secret password-encryption motd set timezone version neighbors detail portfast bpduguard priority port-security maximum violation restrict protect sticky mac-address address-table dynamic dhcp pool excluded-address helper-address nat inside outside source list overload static translations statistics server synchronous community preempt etherchannel summary dot1q counters all history users protocols arp unicast-routing name-server range fastethernet gigabitethernet ethernet loopback serial tunnel snooping trust inspection errors status config domain-name pruning active desirable passive lacp pagp sessions')))];
+    const IFN = W('fastethernet gigabitethernet ethernet tengigabitethernet loopback serial vlan port-channel tunnel');
+    const NEXT = { configure: W('terminal memory'), mode: W('access trunk dynamic'), switchport: W('mode access trunk port-security nonegotiate voice'), copy: W('running-config startup-config'),
+      show: W('running-config startup-config interfaces ip vlan version clock history cdp lldp mac spanning-tree etherchannel port-security access-lists'), ip: W('address route access-group helper-address nat ospf dhcp domain-name routing interface'),
+      access: W('vlan'), trunk: W('allowed native encapsulation') };
+    const NEED = new Set(W('show interface hostname ip ipv6 router vlan line access-list username description duplex speed switchport network permit deny name copy ping traceroute telnet ssh clear debug encapsulation channel-group standby password transport banner crypto service spanning-tree router-id passive-interface configure default-router dns-server'));
+    const modeOf = pr => !/^[A-Za-z][\w-]*(\([\w-]+\))?[>#]$/.test(String(pr).trim()) ? 'sh' : /\(config\)#\s*$/.test(pr) ? 'cfg' : /\(config-(sub)?if/.test(pr) ? 'if' : /config-line/.test(pr) ? 'line' : /config-router/.test(pr) ? 'router'
+      : /config-vlan/.test(pr) ? 'vlan' : /dhcp-config/.test(pr) ? 'dhcp' : /nacl/.test(pr) ? 'nacl' : /\(.*\)#\s*$/.test(pr) ? 'cfg' : />\s*$/.test(pr) ? 'exec' : 'priv';
+    // «sh int f0/1» → «show interfaces fastethernet0/1». bad/amb = θέση άγνωστης/διφορούμενης λέξης (μόνο στην εντολή)
+    function expand(line, mode) {
+      const toks = line.trim().split(/\s+/).filter(Boolean), out = []; let m = mode, bad = -1, amb = -1, cmdAt = 0;
+      if (mode === 'sh') return { text: toks.join(' '), toks, raw: toks, bad, amb, m, cmdAt };  // Linux lab: όπως το γράφεις
+      toks.forEach((tok, i) => {
+        const t = tok.toLowerCase();
+        if (i === 0 && mode !== 'exec' && mode !== 'priv' && 'do'.startsWith(t) && t.length >= 2) { out.push('do'); m = 'priv'; cmdAt = 1; return; }
+        const im = t.match(/^([a-z-]+)(\d[\d/.:]*)$/);
+        if (im) { const c = IFN.find(w => w.startsWith(im[1])); if (c) { out.push(c + im[2]); return; } }
+        if (!/^[a-z]/.test(t)) { out.push(t); return; }
+        const first = i === cmdAt || (i === cmdAt + 1 && out[cmdAt] === 'no'), sub = !/^(exec|priv|cfg)$/.test(m), pool = first ? (sub ? [...new Set(MODES[m].concat(MODES.cfg))] : MODES[m]) : WORDS;
+        if (pool.includes(t)) { out.push(t); return; }
+        let c = pool.filter(w => w.startsWith(t));
+        if (c.length > 1 && c.includes('interface') && c.includes('interfaces')) c = [out[out.length - 1] === 'show' ? 'interfaces' : 'interface'];
+        if (c.length > 1 && t === 'conf') c = ['configure'];
+        if (c.length > 1 && NEXT[out[out.length - 1]]) { const n = c.filter(w => NEXT[out[out.length - 1]].includes(w)); if (n.length === 1) c = n; }
+        if (c.length === 1) out.push(c[0]);
+        else { out.push(t); if (pool !== WORDS) { if (c.length > 1) { if (amb < 0) amb = i; } else if (bad < 0) bad = i; } }
+      });
+      return { text: out.join(' '), toks: out, raw: toks, bad, amb, m, cmdAt };
+    }
+    return { MODES, modeOf, expand, NEED, IFN };
+  })();
+  A.IOS = IOS;
+
   // ---------- προσομοιωτής Cisco IOS (καθοδηγούμενος) ----------
   function Cli(host, b) {
     const steps = b.steps || []; let k = 0;
     host.innerHTML = `<div class="ac-cli"><div class="ac-term"></div><div class="ac-task"></div>
-      <div style="display:flex;gap:6px;margin-top:6px"><span class="ac-prompt"></span><input class="ac-in" spellcheck="false" autocomplete="off" autocapitalize="off"><button class="b ac-hint">💡</button></div></div>`;
+      <div style="display:flex;gap:6px;margin-top:6px"><span class="ac-prompt"></span><input class="ac-in" spellcheck="false" autocomplete="off" autocapitalize="off" placeholder="εντολή… (? = βοήθεια, Tab = συμπλήρωση, ↑ = ιστορικό)"><button class="b ac-hint">💡</button></div></div>`;
     const term = host.querySelector('.ac-term'), task = host.querySelector('.ac-task'), prompt = host.querySelector('.ac-prompt'), inp = host.querySelector('.ac-in');
     const print = (t, cls) => { const d = document.createElement('div'); if (cls) d.className = cls; d.textContent = t; term.appendChild(d); term.scrollTop = 1e9; };
     if (b.banner) print(b.banner, 'sm');
     let pr = b.prompt || 'Router>';
+    const hist = [], cfg = []; let hi = 0, wrote = false;
     const show = () => { prompt.textContent = pr;
-      if (k >= steps.length) { task.innerHTML = '✅ <b>Το lab ολοκληρώθηκε!</b>' + (b.done ? ' ' + md(b.done) : ''); inp.disabled = true; return; }
+      if (k >= steps.length) { task.innerHTML = '✅ <b>Το lab ολοκληρώθηκε!</b>' + (b.done ? ' ' + md(b.done) : ''); return; }
       task.innerHTML = `<b style="color:#ffd23f">Βήμα ${k + 1}/${steps.length}:</b> ${inline(steps[k].task)}`; };
     host.querySelector('.ac-hint').onclick = () => { if (k < steps.length) task.innerHTML += `<div class="sm">Απάντηση: <code>${E(steps[k].ans || steps[k].expect)}</code></div>`; };
+    const test = (st, v, ex) => {
+      const c = [v, ex.text]; if (ex.toks[0] === 'do') c.push(v.replace(/^\s*do?\s+/i, ''), ex.toks.slice(1).join(' '));
+      try { const re = new RegExp(st.expect, 'i'); return c.some(x => re.test(x)); } catch (er) { return c.some(x => x.toLowerCase() === String(st.ans || '').toLowerCase()); }
+    };
+    const host_ = () => (pr.match(/^[^(>#]+/) || ['Router'])[0];
+    const clock = () => { const d = new Date(); return '*' + d.toTimeString().slice(0, 8) + '.' + String(d.getMilliseconds()).padStart(3, '0') + ' UTC ' + d.toDateString(); };
+    const runCfg = () => { const L = ['Building configuration...', '', 'Current configuration : ' + (200 + cfg.join('').length) + ' bytes', '!', 'hostname ' + host_(), '!'];
+      cfg.forEach(([m, c]) => L.push((m === 'cfg' ? '' : ' ') + c)); L.push('!', 'end'); return L.join('\n'); };
+    // απάντηση σε σωστή εντολή IOS που δεν είναι το τρέχον βήμα
+    const known = ex => {
+      const t = ex.toks[0] === 'do' ? ex.toks.slice(1) : ex.toks, s = t.join(' ');
+      if (t[0] !== 'show') return null;
+      if (/^show run(ning-config)?\b/.test(s)) return runCfg();
+      if (/^show start(up-config)?\b/.test(s)) return wrote ? runCfg().replace('Current configuration', 'Using') : 'startup-config is not present';
+      if (/^show history/.test(s)) return hist.slice(-10).map(x => '  ' + x).join('\n');
+      if (/^show clock/.test(s)) return clock();
+      if (/^show version/.test(s)) return 'Cisco IOS Software, Version 15.2(4)E10, RELEASE SOFTWARE (fc2)\n' + host_() + ' uptime is 2 hours, 14 minutes\nSystem image file is "flash:c2960-lanbasek9-mz.152-4.E10.bin"';
+      return '';
+    };
+    const run = v => {
+      const mode = IOS.modeOf(pr), ex = IOS.expand(v, mode), st = steps[k];
+      print(pr + ' ' + v);
+      if (mode === 'sh') {
+        if (st && test(st, v, ex)) { if (st.out) print(st.out, 'ac-out'); if (st.next) pr = st.next; k++; show(); }
+        else print(st ? st.err || 'Όχι αυτή — δοκίμασε ξανά (💡 για βοήθεια)' : '✓', st ? 'ac-err' : 'sm');
+        return;
+      }
+      if (/\?$/.test(v)) {  // ? = βοήθεια
+        const base = v.replace(/\?$/, '').trim(), words = IOS.MODES[ex.m] || [];
+        print(base ? words.filter(w => w.startsWith(base.split(/\s+/).pop().toLowerCase())).join('  ') || '% Unrecognized command' : words.map(w => '  ' + w).join('\n'), 'ac-out');
+        if (st) print('💡 Το βήμα ζητάει: ' + (st.ans || '—'), 'ac-cmd'); return;
+      }
+      if (st && test(st, v, ex)) {
+        if (st.out) print(st.out, 'ac-out');
+        if (mode !== 'exec' && mode !== 'priv' && !/^(do|end|exit)$/.test(ex.toks[0] || '')) cfg.push([mode, ex.text]);
+        if (/^(copy run(ning-config)? start(up-config)?|write( memory)?)$/.test(ex.text)) wrote = true;
+        if (st.next) pr = st.next; k++; show(); return;
+      }
+      // ίδια εντολή show αλλά πιο γενική (π.χ. «show interfaces» αντί «show interfaces f0/1») → μετράει
+      const ax = st && st.ans ? IOS.expand(st.ans, mode) : null;
+      if (ax && ax.toks[0] === 'show' && ex.toks[0] === 'show' && ex.toks.length >= 2 && ex.toks.length < ax.toks.length && ax.text.startsWith(ex.text + ' ')) {
+        if (st.out) print(st.out + '\n  …', 'ac-out');
+        print('✓ Σωστό — έτσι βλέπεις όλα μαζί. Με «' + st.ans + '» βλέπεις μόνο αυτό που ζητάει το βήμα.', 'ac-cmd');
+        if (st.next) pr = st.next; k++; show(); return;
+      }
+      if (ex.amb >= 0) { print('% Ambiguous command:  "' + v + '"', 'ac-err'); return; }
+      if (ex.bad >= 0) {
+        const col = pr.length + 1 + v.indexOf(ex.raw[ex.bad]);
+        print(' '.repeat(Math.max(0, col)) + '^', 'ac-err'); print("% Invalid input detected at '^' marker.", 'ac-err');
+        const pv = IOS.expand(v, 'priv');
+        if (mode !== 'exec' && mode !== 'priv' && pv.bad < 0 && pv.amb < 0) print('💡 Είσαι σε configuration mode — οι εντολές του privileged mode θέλουν «do» μπροστά: do ' + v, 'ac-cmd');
+        else if (mode === 'exec' && IOS.expand(v, 'priv').bad < 0) print('💡 Αυτή θέλει privileged mode — γράψε πρώτα «enable».', 'ac-cmd');
+        else if (mode === 'priv' && IOS.expand(v, 'cfg').bad < 0) print('💡 Αυτή είναι εντολή ρύθμισης — μπες πρώτα με «conf t».', 'ac-cmd');
+        else if (st && st.err) print(st.err, 'ac-err');
+        else print('(💡 για τη σωστή εντολή του βήματος, ? για τις διαθέσιμες)', 'sm');
+        return;
+      }
+      const c0 = ex.toks[0] === 'do' ? ex.toks[1] : ex.toks[0], n = ex.toks.length - (ex.toks[0] === 'do' ? 1 : 0) - (c0 === 'no' ? 1 : 0);
+      if (IOS.NEED.has(c0 === 'no' ? ex.toks[ex.cmdAt + 1] : c0) && n < 2) { print('% Incomplete command.', 'ac-err'); return; }
+      const o = known(ex);
+      if (o) print(o, 'ac-out');
+      print(k >= steps.length ? '✓ Σωστή εντολή IOS.' : 'ℹ️ Σωστή εντολή IOS' + (o ? '' : ' (ο προσομοιωτής του μαθήματος δεν έχει έξοδο γι’ αυτήν — δοκίμασέ την ελεύθερα στο 🖧 Cisco Lab)') + ' — αλλά το βήμα ζητάει κάτι άλλο. 💡 για βοήθεια.', 'sm');
+    };
     inp.onkeydown = e => {
+      if (e.key === 'ArrowUp' || e.key === 'ArrowDown') { e.preventDefault(); hi = Math.max(0, Math.min(hist.length, hi + (e.key === 'ArrowUp' ? -1 : 1))); inp.value = hist[hi] || ''; return; }
+      if (e.key === 'Tab') { e.preventDefault(); const ex = IOS.expand(inp.value, IOS.modeOf(pr)); if (inp.value.trim() && ex.bad < 0 && ex.amb < 0) inp.value = ex.text + ' '; return; }
       if (e.key !== 'Enter') return; const v = inp.value.trim(); inp.value = ''; if (!v) return;
-      print(pr + ' ' + v); const st = steps[k]; if (!st) return;
-      let ok = false; try { ok = new RegExp(st.expect, 'i').test(v); } catch (er) { ok = v.toLowerCase() === String(st.ans || '').toLowerCase(); }
-      if (ok) { if (st.out) print(st.out, 'ac-out'); if (st.next) pr = st.next; k++; }
-      else print(st.err || '% Invalid input detected — δοκίμασε ξανά (💡 για βοήθεια)', 'ac-err');
-      show();
+      hist.push(v); hi = hist.length; run(v);
     };
     show();
   }
@@ -560,7 +668,7 @@
   .ac-dstep{display:flex;gap:12px;align-items:center;cursor:pointer;white-space:normal}.ac-dstep.ok{opacity:.65}.ac-dico{font-size:22px}
   .ac-dhome{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.ac-dhome>div{flex:1;min-width:160px}
   #ac-overlay{position:fixed;inset:0;z-index:200;background:#000b;display:none;align-items:center;justify-content:center;padding:18px}
-  .ac-win{width:min(980px,100%);height:100%;background:var(--panel,#0b111c);border:1px solid var(--line,#1c2638);border-radius:12px;display:flex;flex-direction:column;box-shadow:0 20px 60px #000c}
+  .ac-win{width:min(980px,100%);height:100%;background:#0b111c;border:1px solid var(--line,#1c2638);border-radius:12px;display:flex;flex-direction:column;box-shadow:0 20px 60px #000c}
   .ac-top{display:flex;justify-content:space-between;align-items:center;padding:8px 12px;border-bottom:1px solid var(--line,#1c2638)}
   .ac-body{flex:1;overflow:auto;padding:16px 22px 30px;font-size:13.5px;line-height:1.65;color:#cfe0f5}
   .ac-title{margin:0 0 12px;color:#fff;font-size:20px}

@@ -1,0 +1,41 @@
+// Έλεγχος υπολογισμών του vlsm.js με γνωστές απαντήσεις CCNA.
+const V = require('../../vlsm.js'); const bad = []; let n = 0;
+const eq = (a, b, m) => { n++; if (JSON.stringify(a) !== JSON.stringify(b)) bad.push(`${m}: ${JSON.stringify(a)} ≠ ${JSON.stringify(b)}`); };
+const c = (s) => { const p = V.parse(s); return V.calc(p.ip, p.p); };
+let x = c('192.168.10.77/27');
+eq([V.n2ip(x.net), V.n2ip(x.first), V.n2ip(x.last), V.n2ip(x.bc), x.mask, x.wild, x.usable], ['192.168.10.64', '192.168.10.65', '192.168.10.94', '192.168.10.95', '255.255.255.224', '0.0.0.31', 30], '/27');
+eq(x.magic, { octet: 4, block: 32 }, 'magic /27');
+x = c('172.16.45.200 255.255.240.0');
+eq([V.n2ip(x.net), V.n2ip(x.bc), x.p, x.usable, x.wild], ['172.16.32.0', '172.16.47.255', 20, 4094, '0.0.15.255'], '/20');
+x = c('10.1.1.1/30'); eq([x.usable, V.n2ip(x.last)], [2, '10.1.1.2'], '/30');
+x = c('10.1.1.0/31'); eq([x.usable, V.n2ip(x.first), V.n2ip(x.last)], [2, '10.1.1.0', '10.1.1.1'], '/31');
+x = c('8.8.8.8/32'); eq([x.usable, V.n2ip(x.first)], [1, '8.8.8.8'], '/32');
+x = c('0.0.0.0/0'); eq([x.size, V.n2ip(x.bc)], [2 ** 32, '255.255.255.255'], '/0');
+eq(!!V.parse('10.0.0.1 255.0.255.0').error, true, 'non-contiguous mask');
+eq(!!V.parse('10.0.0.300/8').error, true, 'bad octet');
+eq(!!V.parse('10.0.0.1/33').error, true, 'bad prefix');
+eq([2, 3, 6, 10, 14, 50, 62, 63, 126, 300].map(h => V.prefixFor(h)), [30, 29, 29, 28, 28, 26, 26, 25, 25, 23], 'prefixFor');
+eq([V.prefixFor(2, true), V.prefixFor(1, true)], [31, 32], 'p31');
+// κλασική άσκηση: 192.168.10.0/24 → 50, 20, 10, 2, 2
+let r = V.vlsm('192.168.10.0/24', [{ name: 'A', hosts: 50 }, { name: 'B', hosts: 20 }, { name: 'C', hosts: 10 }, { name: 'W1', hosts: 2 }, { name: 'W2', hosts: 2 }]);
+eq(r.rows.map(y => y.name + ' ' + V.n2ip(y.net) + '/' + y.p), ['A 192.168.10.0/26', 'B 192.168.10.64/27', 'C 192.168.10.96/28', 'W1 192.168.10.112/30', 'W2 192.168.10.116/30'], 'vlsm order');
+eq([r.used, r.free.map(f => V.n2ip(f.net) + '/' + f.p)], [120, ['192.168.10.120/29', '192.168.10.128/25']], 'vlsm free');
+eq(r.fail.length, 0, 'fits');
+r = V.vlsm('192.168.1.0/26', [{ name: 'big', hosts: 100 }, { name: 'ok', hosts: 20 }]);
+eq([r.fail.map(f => f.name), r.rows.map(y => y.name)], [['big'], ['ok']], 'overflow');
+r = V.vlsm('10.0.0.77/24', [{ name: 'a', hosts: 5 }]); eq([r.base.fixed, V.n2ip(r.rows[0].net)], [true, '10.0.0.0'], 'host bits base');
+const cfg = V.iosConfig(V.vlsm('192.168.10.0/24', [{ name: 'LAN A', hosts: 50 }, { name: 'WAN', hosts: 2 }]), { ospf: true, dhcp: true });
+eq(['ip address 192.168.10.1 255.255.255.192', 'network 192.168.10.0 0.0.0.63 area 0', 'ip dhcp pool LAN-A', 'interface Serial0/0/1'].map(t => cfg.includes(t)), [true, true, true, true], 'ios cfg');
+eq(cfg.includes('ip dhcp pool WAN'), false, 'no dhcp on /30');
+// IPv6
+eq(V.v6short(V.v6parse('2001:0db8:0000:0000:0000:ff00:0042:8329').n), '2001:db8::ff00:42:8329', 'v6 compress');
+eq(V.v6short(V.v6parse('2001:db8:0:0:1:0:0:1').n), '2001:db8::1:0:0:1', 'v6 first longest run');
+eq(V.v6full(V.v6parse('fe80::1').n), 'fe80:0000:0000:0000:0000:0000:0000:0001', 'v6 expand');
+eq(V.v6short(V.v6parse('::ffff:192.168.1.1').n), '::ffff:c0a8:101', 'v6 mapped v4');
+eq([V.v6parse('1::2::3'), V.v6parse('12345::'), V.v6parse('1:2:3:4:5:6:7')], [null, null, null], 'v6 invalid');
+eq(['fe80::1', 'fd00::1', 'ff02::1', '2600::1', '2001:db8::1', '::1'].map(a => V.v6type(V.v6parse(a).n).split(' ')[0]), ['link-local', 'unique', 'multicast', 'global', ...(['τεκμηρίωσης', 'documentation'].slice(0, 1)), 'loopback'], 'v6 type');
+const sn = V.v6subnets(V.v6parse('2001:db8:acad::/48').n, 48, 64, 3);
+eq([sn.list.map(s => s.net), sn.total.toString()], [['2001:db8:acad::/64', '2001:db8:acad:1::/64', '2001:db8:acad:2::/64'], '65536'], 'v6 subnets');
+const e = V.eui64('00:1A:2B:3C:4D:5E'); eq([e.iid, e.ll, e.flipped], ['021a:2bff:fe3c:4d5e', 'fe80::21a:2bff:fe3c:4d5e', '02'], 'eui64');
+eq(V.eui64('zz'), null, 'eui64 bad');
+console.log(bad.length ? bad.join('\n') : `OK ${n} checks`); process.exit(bad.length ? 1 : 0);

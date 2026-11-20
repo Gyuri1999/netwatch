@@ -269,7 +269,16 @@ def main():
         threading.Thread(target=state.health.run_forever, daemon=True).start()
     # ---- υποδομή (όπως στα επαγγελματικά NMS): NetFlow/sFlow, SNMP, syslog, IPAM, latency, ταχύτητα, Wi‑Fi, pcap ----
     DATA = os.path.join(HERE, "data")
+    import devnames  # 🏷 ονόματα/τύποι συσκευών που δίνεις εσύ (data/devnames.json· στο demo μόνο μνήμη)
+    state.devnames = devnames.DevNames(None if mode == "demo" else os.path.join(DATA, "devnames.json"),
+                                       on_save=chown_to_user if mode != "demo" else None)
     demo, live = mode == "demo", mode == "live"
+    import updater  # 🔄 ενημερώσεις από GitHub (αυτόματα μόνο έλεγχος· εγκατάσταση με κλικ και έλεγχο υπογραφής)
+    state.updater = updater.Updater(state, sim=demo, cfg=cfg.get("updates"))
+    if live:
+        threading.Thread(target=state.updater.run_forever, daemon=True).start()
+    elif demo:
+        state.updater.check(force=True)  # στο demo: ψεύτικη νέα έκδοση, χωρίς δίκτυο
 
     def bg(obj):
         if obj is not None and hasattr(obj, "run_forever"):

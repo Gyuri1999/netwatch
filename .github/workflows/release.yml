@@ -1,6 +1,9 @@
 name: Release
 
-# Push a tag like v1.2.0 to build NetWatch.app on macOS and attach NetWatch.dmg to a GitHub Release.
+# Push a tag like v1.2.0 → builds NetWatch.app on macOS and publishes a GitHub Release with:
+#   NetWatch.dmg (manual install), NetWatch.zip (in-app updater), SHA256SUMS and SHA256SUMS.sig.
+# The signature is made with the NETWATCH_RELEASE_KEY secret (see tools/release_key.sh); the app only
+# self-updates when SHA256SUMS.sig verifies against the public key in update_signers.
 on:
   push:
     tags: ["v*"]
@@ -13,9 +16,32 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Set version from tag
+        run: |
+          V="${GITHUB_REF_NAME#v}"
+          [[ "$V" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || { echo "tag must look like v1.2.0"; exit 1; }
+          echo "$V" > VERSION
       - name: Build NetWatch.app and NetWatch.dmg
         run: ./macapp/build.sh --dmg
+      - name: Zip, checksum and sign
+        env:
+          KEY: ${{ secrets.NETWATCH_RELEASE_KEY }}
+        run: |
+          cd dist
+          ditto -c -k --keepParent NetWatch.app NetWatch.zip
+          shasum -a 256 NetWatch.zip NetWatch.dmg > SHA256SUMS
+          if [ -n "$KEY" ]; then
+            umask 077; printf '%s\n' "$KEY" > "$RUNNER_TEMP/k"
+            ssh-keygen -Y sign -f "$RUNNER_TEMP/k" -n netwatch-update SHA256SUMS
+            rm -f "$RUNNER_TEMP/k"
+            ssh-keygen -Y verify -f ../update_signers -I netwatch-release -n netwatch-update -s SHA256SUMS.sig < SHA256SUMS
+          else
+            echo "::warning::NETWATCH_RELEASE_KEY not set — release is unsigned, apps will not self-update"
+          fi
       - name: Publish the release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "$GITHUB_REF_NAME" dist/NetWatch.dmg --title "NetWatch $GITHUB_REF_NAME" --generate-notes
+        run: |
+          cd dist
+          FILES="NetWatch.dmg NetWatch.zip SHA256SUMS"; [ -f SHA256SUMS.sig ] && FILES="$FILES SHA256SUMS.sig"
+          gh release create "$GITHUB_REF_NAME" $FILES --title "NetWatch $GITHUB_REF_NAME" --generate-notes

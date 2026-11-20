@@ -185,13 +185,16 @@ def _collect_hosts(state):
         if hasattr(state, "_dtype"):
             dt = _safe(lambda h=h: state._dtype(h), {}) or {}
         names = sorted(h.get("names") or ())
-        out[ip] = {"ip": ip, "mac": h.get("mac") or arp.get(ip) or "", "name": (names[0] if names else (h.get("rdns") or ""))[:64],
+        out[ip] = {"ip": ip, "mac": h.get("mac") or arp.get(ip) or "", "icon": dt.get("dicon") or "",
+                   "name": (dt.get("alias") or (names[0] if names else (h.get("rdns") or "")))[:64],
                    "vendor": (dt.get("vendor") or "")[:40], "type": (dt.get("dlabel") or dt.get("dtype") or "")[:40],
                    "first": h.get("first"), "last": h.get("last"), "gw": bool(h.get("gw")), "me": bool(h.get("me")),
                    "switch": "", "port": "", "vlan": None}
+    dn = getattr(state, "devnames", None)
     for ip, mac in arp.items():
         if ip not in out and _lan_ip(ip):
-            out[ip] = {"ip": ip, "mac": mac or "", "name": "", "vendor": "", "type": "", "first": None, "last": None,
+            u = (dn.get(mac, ip) if dn else None) or {}
+            out[ip] = {"ip": ip, "mac": mac or "", "name": u.get("name") or "", "vendor": "", "type": "", "first": None, "last": None, "icon": "",
                        "gw": ip == getattr(state, "gateway", None), "me": ip in (getattr(state, "me", None) or ()),
                        "switch": "", "port": "", "vlan": None}
     return out
@@ -424,7 +427,7 @@ def build(state, lang="el", now=None):
     expiring.sort(key=lambda x: x["days_left"])
 
     end_rows = [{k: h.get(k) for k in ("ip", "mac", "name", "vendor", "type", "switch", "port", "vlan", "subnet", "first",
-                                        "last", "netdev")} for h in end[:MAX_HOSTS]]
+                                        "last", "netdev", "icon")} for h in end[:MAX_HOSTS]]
     doc = {"lang": lang, "generated": now, "mode": mode, "demo": mode == "demo",
            "title": _L(lang, "Τεκμηρίωση δικτύου", "Network documentation"),
            "gateway": gw, "subnets": subnets, "vlans": [vlans[k] for k in sorted(vlans)], "devices": netdevs,
