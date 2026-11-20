@@ -340,6 +340,41 @@ class Window:
             del self.d[k]
 
 
+class DistinctWindow(Window):
+    """Window που ξέρει σε O(1) πόσα *διαφορετικά* items (και πρώτα στοιχεία τους) έχει ανά κλειδί.
+    Το port scan μετρούσε `len({i for _, i in dq})` σε κάθε SYN — με χιλιάδες SYN αυτό γονάτιζε τον επεξεργαστή."""
+
+    def __init__(self, span):
+        super().__init__(span)
+        self.c = collections.defaultdict(collections.Counter)
+        self.c0 = collections.defaultdict(collections.Counter)
+
+    def add(self, key, item, t):
+        dq, c, c0 = self.d[key], self.c[key], self.c0[key]
+        dq.append((t, item))
+        c[item] += 1
+        c0[item[0]] += 1
+        while dq and dq[0][0] < t - self.span:
+            _, old = dq.popleft()
+            for cc, k in ((c, old), (c0, old[0])):
+                cc[k] -= 1
+                if not cc[k]:
+                    del cc[k]
+        return dq
+
+    def distinct(self, key):
+        return len(self.c.get(key, ()))
+
+    def distinct0(self, key):
+        return len(self.c0.get(key, ()))
+
+    def gc(self, t):
+        for k in [k for k, dq in self.d.items() if not dq or dq[-1][0] < t - self.span]:
+            del self.d[k]
+            self.c.pop(k, None)
+            self.c0.pop(k, None)
+
+
 def mask_user(u):
     """Δείχνουμε μόνο τα 2 πρώτα γράμματα του ονόματος χρήστη."""
     if not u:

@@ -110,6 +110,9 @@ class _Server(ThreadingHTTPServer):
 
 
 def main():
+    # Η καταγραφή πακέτων κρατά συνέχεια το GIL· με μικρότερο διάστημα εναλλαγής τα αιτήματα του UI
+    # (κουμπιά/καρτέλες) παίρνουν σειρά γρηγορότερα αντί να περιμένουν 5ms σε κάθε βήμα.
+    sys.setswitchinterval(0.001)
     ap = argparse.ArgumentParser(description="NetWatch — live network map & attack detector")
     ap.add_argument("--demo", action="store_true", help="προσομοίωση κίνησης & επιθέσεων (χωρίς root)")
     ap.add_argument("-i", "--iface", help="interface (π.χ. en0)")
