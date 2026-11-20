@@ -83,6 +83,9 @@ def main():
     shutil.copy2(os.path.join(ROOT, "sshui.js"), out)
     shutil.copy2(os.path.join(ROOT, "vlsm.js"), out)
     shutil.copy2(os.path.join(ROOT, "updateui.js"), out)
+    shutil.copy2(os.path.join(ROOT, "presenceui.js"), out)
+    shutil.copy2(os.path.join(ROOT, "l2guardui.js"), out)
+    shutil.copy2(os.path.join(ROOT, "acl.js"), out)
     shutil.copy2(os.path.join(ROOT, "names.js"), out)
     # Ακαδημία: scripts + εικονίδια του PWA (ό,τι δεν είναι .md).
     for fp in glob.glob(os.path.join(ROOT, "academy", "*")):
