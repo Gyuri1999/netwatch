@@ -44,4 +44,12 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$env:GITHUB_REF_NAME" dist/NetWatch-windows-x64.zip --clobber
+        # Το release το δημιουργεί το release.yml (macOS): περίμενε έως 15′ να υπάρξει, αντί να αποτύχεις
+        run: |
+          for ($i = 0; $i -lt 60; $i++) {
+            gh release view "$env:GITHUB_REF_NAME" *> $null
+            if ($LASTEXITCODE -eq 0) { break }
+            Write-Host "release $env:GITHUB_REF_NAME not created yet - waiting..."; Start-Sleep -Seconds 15
+          }
+          gh release upload "$env:GITHUB_REF_NAME" dist/NetWatch-windows-x64.zip --clobber
+          if ($LASTEXITCODE) { exit 1 }

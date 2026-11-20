@@ -23,8 +23,9 @@ HAS_SIG = bool(shutil.which("ssh-keygen")) and subprocess.run(["ssh-keygen", "-Y
 def test_versions_and_kind(tmp_path):
     assert updater.newer("v1.2.0", "1.1.9") and updater.newer("1.10", "1.9.5") and not updater.newer("v1.0", "1.0.0")
     assert not updater.newer("latest", "1.0") and updater.vtuple("v2.3") == (2, 3, 0)
-    assert updater.bundle_of("/Users/x/Applications/NetWatch.app/Contents/Resources/netwatch") == "/Users/x/Applications/NetWatch.app"
-    assert updater.bundle_of("/Users/x/netwatch") is None
+    app = os.path.join(os.sep, "Users", "x", "Applications", "NetWatch.app")
+    assert updater.bundle_of(os.path.join(app, "Contents", "Resources", "netwatch")) == app
+    assert updater.bundle_of(os.path.join(os.sep, "Users", "x", "netwatch")) is None
     (tmp_path / ".git").mkdir()
     assert updater.detect_kind(str(tmp_path)) == "git"
     (tmp_path / "VERSION").write_text("1.4.2\n")
