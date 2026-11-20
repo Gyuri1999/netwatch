@@ -34,6 +34,7 @@ if(q.get('glass'))p.glass=q.get('glass')==='1';if(p.cb)d.classList.add('cb');if(
 <script src="/vlsm.js"></script>
 <script src="/updateui.js"></script>
 <script src="/golive.js"></script>
+<script src="/alertwhy.js"></script>
 <script src="/presenceui.js"></script>
 <script src="/l2guardui.js"></script>
 <script src="/acl.js"></script>
@@ -1175,8 +1176,8 @@ function alertHTML(a){const h=S.hosts.get(a.actor),g=h?.geo,open=S.openEdu.has(a
   <div style="color:var(--mid)">${esc(a.detail)}</div>
   ${vv?`<div style="margin-top:6px;padding:6px 8px;border-radius:6px;background:${vv[0]}14;border-left:3px solid ${vv[0]};white-space:normal"><b style="color:${vv[0]}">${vv[1]}</b> — <span style="color:var(--txt)">${esc(vv[2])}</span>${vv[3]?` — <span style="color:var(--txt)">${vv[3]}</span>`:''}${!a.benign&&!a.selftest&&e?`<div class="sm" style="margin-top:3px">👉 ${esc(e.todo[0])}</div>`:''}</div>`:''}
   ${a.mitre?`<div style="margin-top:4px"><a class="mitre" target="_blank" href="${esc(a.mitre.url)}" title="${esc(a.mitre.name)}">MITRE ATT&amp;CK ${esc(a.mitre.id)}</a> <span class="sm">${esc(a.mitre.tactic)} · ${esc(a.mitre.name)}</span></div>`:''}
-  <div class="act"><button class="b" data-sel="${esc(a.actor)}">🔎 ${a.sev==='high'&&!a.benign?'Ανάλυση επιτιθέμενου':'Ποιος είναι;'}</button>${a.case?`<button class="b" onclick="openCase(${a.case})">🗂 Υπόθεση #${a.case}</button>`:''}<button class="b" data-edu="${a.id}">${open?'▾':'ℹ'} Πες μου περισσότερα</button>${MODE==='tech'&&!a.lab?`<a class="b" href="/api/pcap/alert?id=${a.id}" download title="Τα πακέτα από 60″ πριν έως 30″ μετά (για το Wireshark)">⬇ .pcap</a>`:''}${g?`<button class="b" data-map="${esc(a.actor)}">📍 Χάρτης</button>`:''}${!a.benign&&!a.selftest&&a.sev!=='low'&&canBlock(a.actor)?`<button class="b" data-block="${esc(a.actor)}" data-why="${esc(a.type)}" style="border-color:color-mix(in srgb,var(--red) 33.3%,transparent)">${blockedSet.has(a.actor)?'✅ Μπλοκαρισμένο':'🚫 Μπλόκαρε'}</button>`:''}</div>
-  ${open?eduHTML(a.type):''}</div>`}
+  <div class="act"><button class="b" data-sel="${esc(a.actor)}">🔎 ${a.sev==='high'&&!a.benign?'Ανάλυση επιτιθέμενου':'Ποιος είναι;'}</button>${a.case?`<button class="b" onclick="openCase(${a.case})">🗂 Υπόθεση #${a.case}</button>`:''}<button class="b" data-edu="${a.id}">${open?'▾':'ℹ'} Πες μου περισσότερα</button>${window.ALWHY?ALWHY.buttons(a):''}${MODE==='tech'&&!a.lab?`<a class="b" href="/api/pcap/alert?id=${a.id}" download title="Τα πακέτα από 60″ πριν έως 30″ μετά (για το Wireshark)">⬇ .pcap</a>`:''}${g?`<button class="b" data-map="${esc(a.actor)}">📍 Χάρτης</button>`:''}${!a.benign&&!a.selftest&&a.sev!=='low'&&canBlock(a.actor)?`<button class="b" data-block="${esc(a.actor)}" data-why="${esc(a.type)}" style="border-color:color-mix(in srgb,var(--red) 33.3%,transparent)">${blockedSet.has(a.actor)?'✅ Μπλοκαρισμένο':'🚫 Μπλόκαρε'}</button>`:''}</div>
+  ${window.ALWHY?ALWHY.panel(a):''}${open?eduHTML(a.type):''}</div>`}
 function bindCommon(el){
   el.querySelectorAll('[data-sel]').forEach(d=>d.onclick=e=>{e.stopPropagation();select(d.dataset.sel)});
   el.querySelectorAll('[data-map]').forEach(d=>d.onclick=e=>{e.stopPropagation();S.sel=d.dataset.map;focusHost(d.dataset.map)});
@@ -1210,7 +1211,7 @@ function drawBlock(){const d=blockData,el=$('t-block');if(d.error&&!d.blocked){e
 let alSeen=-1;
 function renderAlerts(){const el=$('t-alerts');if(!S.alerts.length)return;setTimeout(()=>{alSeen=Math.max(alSeen,...S.alerts.map(a=>a.id))},0);
   const counts={};S.alerts.forEach(a=>counts[a.sev]=(counts[a.sev]||0)+1);
-  el.innerHTML=`<div style="margin-bottom:8px"><button class="b" onclick="exportReport()">⬇ Αναφορά συμβάντος (JSON)</button></div><div class="sm" style="margin-bottom:8px">${counts.high||0} σοβαρές · ${counts.med||0} μέτριες · ${counts.low||0} χαμηλές — πάτα «Πες μου περισσότερα» για αναλυτική εξήγηση</div>`+S.alerts.slice(0,200).map(alertHTML).join('');bindCommon(el)}
+  el.innerHTML=`<div style="margin-bottom:8px"><button class="b" onclick="exportReport()">⬇ Αναφορά συμβάντος (JSON)</button></div><div class="sm" style="margin-bottom:8px">${counts.high||0} σοβαρές · ${counts.med||0} μέτριες · ${counts.low||0} χαμηλές — πάτα «Πες μου περισσότερα» για αναλυτική εξήγηση ή «🧐 Γιατί;» για τα στοιχεία</div>`+(window.ALWHY?ALWHY.header():'')+S.alerts.filter(a=>!window.ALWHY||ALWHY.visible(a)).slice(0,200).map(alertHTML).join('');bindCommon(el)}
 
 let sortK='bytes',sortD=-1;
 document.querySelectorAll('#t-hosts th').forEach(th=>th.onclick=()=>{const k=th.dataset.s;sortD=sortK===k?-sortD:(k==='bytes'?-1:1);sortK=k;renderHosts()});

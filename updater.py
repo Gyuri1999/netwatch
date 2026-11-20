@@ -224,6 +224,7 @@ class Updater:
         lt = {k: v for k, v in (self.latest or {}).items() if not k.startswith("_")} or None
         return {"version": self.version, "kind": self.kind, "latest": lt, "available": self.available(), "error": self.err,
                 "checked": self.checked, "auto": self.auto, "git": self.git, "job": dict(self.job), "page": PAGE,
+                "sim": bool(self.sim), "os": sys.platform,
                 "signed": bool(lt and SIG in (lt.get("assets") or [])), "can_install": self._can_install()[0], "why_not": self._can_install()[1]}
 
     def _can_install(self):
@@ -242,6 +243,8 @@ class Updater:
             return True, ""
         if self.kind == "docker":
             return False, "Σε Docker: docker compose pull && docker compose up -d"
+        if sys.platform == "win32":
+            return False, "Στα Windows: κατέβασε το NetWatch-windows-x64.zip από το GitHub, κλείσε το NetWatch (εικονίδιο ασπίδας → Έξοδος) και αντικατέστησε τον παλιό φάκελο. Οι ρυθμίσεις σου μένουν."
         return False, "Κατέβασε τη νέα έκδοση από τη σελίδα του GitHub."
 
     def run_forever(self):

@@ -260,6 +260,15 @@ def make_handler(state):
                     if not wi:
                         return self._json({"error": "Η αναζήτηση θύρας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."}, 400)
                     return self._json(wi.refresh())
+                if u.path in ("/api/alerts/mute", "/api/alerts/unmute"):  # 🔕 σίγαση με λήξη
+                    hy = getattr(state, "hygiene", None)
+                    if not hy:
+                        return self._json({"error": "off"}, 400)
+                    if u.path == "/api/alerts/unmute":
+                        r = hy.unmute(body.get("id"))
+                    else:
+                        r = hy.mute(body.get("type"), body.get("actor"), body.get("minutes", 1440), body.get("note"))
+                    return self._json(r, 400 if r.get("error") else 200)
                 if u.path == "/api/app/mode":  # 🟢 αλλαγή Live/Demo από τον πίνακα (μόνο με τον launcher των Windows)
                     d = getattr(state, "app_ctl", None)
                     m = str(body.get("mode") or "")
@@ -704,7 +713,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/acl.js", "/names.js", "/golive.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -748,6 +757,25 @@ def make_handler(state):
                 if len(qq) > 64:
                     return self._json({"error": "Πολύ μεγάλο ερώτημα (έως 64 χαρακτήρες)."}, 400)
                 return self._json(wi.lookup(qq) if wi else {"query": qq, "found": False, "location": None, "off": True})
+            if u.path in ("/api/alerts/why", "/api/alerts/noise", "/api/alerts/hygiene"):  # 🔕 υγιεινή + 🧐 γιατί
+                hy = getattr(state, "hygiene", None)
+                if not hy:
+                    return self._json({"error": "off"}, 400)
+                pq = parse_qs(u.query)
+                if u.path == "/api/alerts/why":
+                    try:
+                        aid = int(pq.get("id", ["0"])[0])
+                    except ValueError:
+                        return self._json({"error": "Λάθος id."}, 400)
+                    r = hy.why(aid)
+                    return self._json(r, 404 if r.get("error") else 200)
+                if u.path == "/api/alerts/noise":
+                    try:
+                        hours = int(pq.get("hours", ["24"])[0])
+                    except ValueError:
+                        hours = 24
+                    return self._json(hy.noise(hours))
+                return self._json(hy.view())
             if u.path == "/api/presence":  # 📈 διαθεσιμότητα ανά συσκευή
                 pr = getattr(state, "presence", None)
                 if not pr:

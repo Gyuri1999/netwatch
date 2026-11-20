@@ -308,6 +308,12 @@ class NetState:
         if k in self.cooldown and t - self.cooldown[k] < cd:
             return
         self.cooldown[k] = t
+        hy = getattr(self, "hygiene", None)
+        if hy and benign is None:  # 🔕 σίγαση από τον χρήστη → φαίνεται αχνά, χωρίς ειδοποίηση/υπόθεση
+            try:
+                benign = hy.match(typ, actor, t)
+            except Exception as e:
+                log("hygiene:", e)
         cs = getattr(self, "cases", None)
         if cs and benign is None:  # 🗂 σημειώθηκε «ψευδώς θετικό» σε υπόθεση → φαίνεται, αλλά ως αθώα
             try:
@@ -628,7 +634,7 @@ class NetState:
                        key=f"{dst}:{dp}" if benign else None, cooldown=3600 if benign else None, benign=benign)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
-    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "timeline", "hunt", "cases", "configbak", "changecheck", "triage", "handover", "whereis", "expiry", "segcheck", "sitecheck", "topomap", "ssh", "devnames", "updater", "l2guard", "presence", "app_ctl", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
+    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "timeline", "hunt", "cases", "configbak", "changecheck", "triage", "handover", "whereis", "expiry", "segcheck", "sitecheck", "topomap", "ssh", "devnames", "updater", "l2guard", "presence", "app_ctl", "hygiene", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
             "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors", "own_tool", "test_ips")
 
     def reset(self, mode, iface, me_ips, gateway, history, feed, notifier=None):

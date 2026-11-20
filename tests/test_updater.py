@@ -188,3 +188,15 @@ def test_demo_simulates(tmp_path):
     v = u.check(force=True)
     assert v["available"] and v["can_install"]
     assert u.restart()["demo"]
+
+
+def test_view_reports_sim_and_windows_hint(monkeypatch):
+    u = updater.Updater(sim=True)
+    u.check(force=True)
+    assert u.view()["sim"] is True
+    w = updater.Updater(fetch=lambda *a, **k: json.dumps({"tag_name": "v99.0.0", "assets": []}))
+    w.kind = "files"
+    monkeypatch.setattr(updater.sys, "platform", "win32")
+    w.check(force=True)
+    v = w.view()
+    assert v["sim"] is False and v["available"] and not v["can_install"] and "NetWatch-windows-x64.zip" in v["why_not"]
