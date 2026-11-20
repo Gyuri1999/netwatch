@@ -880,7 +880,37 @@ I18N.add({
   "- Λειτουργικό: Linux/macOS/IoT (εκτίμηση από TTL)": "- OS: Linux/macOS/IoT (guessed from TTL)",
   "- Λειτουργικό: Windows (εκτίμηση από TTL)": "- OS: Windows (guessed from TTL)",
   "- Λειτουργικό: δικτυακός εξοπλισμός — router/switch/εκτυπωτής (εκτίμηση από TTL)": "- OS: network gear — router/switch/printer (guessed from TTL)",
-  "- Κατασκευαστής: τυχαία MAC (κινητό/laptop με ιδιωτικότητα)": "- Vendor: random MAC (phone/laptop with privacy on)"
+  "- Κατασκευαστής: τυχαία MAC (κινητό/laptop με ιδιωτικότητα)": "- Vendor: random MAC (phone/laptop with privacy on)",
+  "Δεν υπάρχει ακόμα καμία έκδοση (release) στο GitHub.": "There is no release on GitHub yet.",
+  "Το branch δεν παρακολουθεί κάποιο remote (git branch -u origin/main).": "The branch does not track a remote (git branch -u origin/main).",
+  "Αυτή η έκδοση δεν έχει NetWatch.zip / SHA256SUMS — κατέβασέ τη από τη σελίδα του GitHub.": "This release has no NetWatch.zip / SHA256SUMS — download it from the GitHub page.",
+  "Αυτή η έκδοση δεν είναι υπογεγραμμένη — για ασφάλεια δεν εγκαθίσταται αυτόματα.": "This release is not signed — for safety it is not installed automatically.",
+  "Έχεις τοπικές αλλαγές στον κώδικα — κάνε commit/stash πρώτα (δεν τις πειράζω).": "You have local code changes — commit/stash them first (I won't touch them).",
+  "Σε Docker: docker compose pull && docker compose up -d": "On Docker: docker compose pull && docker compose up -d",
+  "Κατέβασε τη νέα έκδοση από τη σελίδα του GitHub.": "Download the new version from the GitHub page.",
+  "Δεν υπάρχει νεότερη έκδοση.": "There is no newer version.",
+  "Η ενημέρωση τρέχει ήδη.": "The update is already running.",
+  "Δεν υπάρχει κλειδί υπογραφής στο app (update_signers) — δεν γίνεται ασφαλής αυτόματη εγκατάσταση.": "There is no signing key in the app (update_signers) — a safe automatic install is not possible.",
+  "Το SHA-256 του NetWatch.zip δεν ταιριάζει — δεν εγκαταστάθηκε τίποτα.": "The SHA-256 of NetWatch.zip does not match — nothing was installed.",
+  "Το SHA256SUMS δεν περιέχει το NetWatch.zip.": "SHA256SUMS does not list NetWatch.zip.",
+  "Ύποπτος σύνδεσμος κατεβάσματος — σταματάω.": "Suspicious download link — stopping.",
+  "Το zip δεν περιέχει ένα NetWatch.app.": "The zip does not contain a NetWatch.app.",
+  "Το νέο app έχει άλλο bundle id — σταματάω.": "The new app has a different bundle id — stopping.",
+  "Ο κώδικας ενημερώθηκε (git pull). Κάνε επανεκκίνηση για να φορτώσει.": "The code was updated (git pull). Restart to load it.",
+  "Demo: η νέα έκδοση «εγκαταστάθηκε» (στο demo δεν αλλάζει τίποτα).": "Demo: the new version was “installed” (nothing changes in the demo).",
+  "Οι ενημερώσεις δεν είναι διαθέσιμες σε αυτή τη λειτουργία.": "Updates are not available in this mode.",
+  "Κάνε επανεκκίνηση με το χέρι.": "Please restart manually.",
+  "ξεκινάω…": "starting…",
+  "κατέβασμα SHA256SUMS + υπογραφής": "downloading SHA256SUMS + signature",
+  "έλεγχος υπογραφής": "verifying signature",
+  "κατέβασμα NetWatch.zip": "downloading NetWatch.zip",
+  "αποσυμπίεση": "unpacking",
+  "έλεγχος του νέου app": "checking the new app",
+  "αντικατάσταση": "replacing",
+  "κατέβασμα SHA256SUMS": "downloading SHA256SUMS",
+  "έλεγχος υπογραφής ✔": "signature verified ✔",
+  "έλεγχος SHA-256 ✔": "SHA-256 verified ✔",
+  "έλεγχος app ✔": "app checked ✔"
  },
  "patterns": [
   [
@@ -3062,6 +3092,26 @@ I18N.add({
   [
    "^- \\*\\*Χαμηλό\\*\\* — `(.+?)` — (.+?)$",
    "- **Low** — `$1` — $2"
+  ],
+  [
+   "^Δεν μπόρεσα να ρωτήσω το GitHub: (.+)$",
+   "Could not reach GitHub: $1"
+  ],
+  [
+   "^Η υπογραφή της ενημέρωσης ΔΕΝ είναι έγκυρη — δεν εγκαταστάθηκε τίποτα\\. ?(.*)$",
+   "The update signature is NOT valid — nothing was installed. $1"
+  ],
+  [
+   "^Εγκαταστάθηκε η (\\S+)\\. Το παλιό κρατήθηκε ως (\\S+)\\. Κάνε επανεκκίνηση του NetWatch\\.$",
+   "Installed $1. The old one was kept as $2. Restart NetWatch."
+  ],
+  [
+   "^Η έκδοση μέσα στο zip \\((.+)\\) δεν ταιριάζει με το tag \\((.+)\\)\\.$",
+   "The version inside the zip ($1) does not match the tag ($2)."
+  ],
+  [
+   "^git pull απέτυχε: (.+)$",
+   "git pull failed: $1"
   ]
  ]
 });

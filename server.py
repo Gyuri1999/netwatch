@@ -260,6 +260,13 @@ def make_handler(state):
                     if not wi:
                         return self._json({"error": "Η αναζήτηση θύρας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."}, 400)
                     return self._json(wi.refresh())
+                if u.path in ("/api/update/check", "/api/update/install", "/api/update/restart"):  # 🔄 ενημερώσεις από GitHub
+                    up = getattr(state, "updater", None)
+                    if not up:
+                        return self._json({"error": "Οι ενημερώσεις δεν είναι διαθέσιμες σε αυτή τη λειτουργία."}, 400)
+                    act = u.path.rsplit("/", 1)[1]
+                    r = up.check(force=True) if act == "check" else up.install() if act == "install" else up.restart()
+                    return self._json(r, 400 if "error" in r and act != "check" else 200)
                 if u.path == "/api/names":  # 🏷 όνομα/τύπος συσκευής (ένα ή πολλά: {"items": [...]})
                     dn = getattr(state, "devnames", None)
                     if not dn:
@@ -682,7 +689,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/names.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/names.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -726,6 +733,9 @@ def make_handler(state):
                 if len(qq) > 64:
                     return self._json({"error": "Πολύ μεγάλο ερώτημα (έως 64 χαρακτήρες)."}, 400)
                 return self._json(wi.lookup(qq) if wi else {"query": qq, "found": False, "location": None, "off": True})
+            if u.path == "/api/update":  # 🔄 κατάσταση ενημέρωσης
+                up = getattr(state, "updater", None)
+                return self._json(up.view() if up else {"off": True})
             if u.path == "/api/names":  # 🏷 ονόματα συσκευών
                 dn = getattr(state, "devnames", None)
                 return self._json(dn.view() if dn else {"devices": {}, "types": [], "off": True})

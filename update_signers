@@ -1,0 +1,5 @@
+# 🔄 Δημόσια κλειδιά που επιτρέπεται να υπογράφουν ενημερώσεις του NetWatch (μορφή allowed_signers του ssh-keygen).
+# Γραμμή: netwatch-release namespaces="netwatch-update" ssh-ed25519 AAAA...
+# Φτιάξε το κλειδί σου με:  ./tools/release_key.sh   (το ΙΔΙΩΤΙΚΟ μένει στο Mac σου και στα GitHub Secrets — ποτέ στο repo)
+# Χωρίς κλειδί εδώ, το NetWatch δείχνει ότι υπάρχει νέα έκδοση αλλά ΔΕΝ την εγκαθιστά αυτόματα.
+netwatch-release namespaces="netwatch-update" ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIDVE6NfWWHXfiLkBcbMmZRdxejhCa0lBDBzgSC98CMgF

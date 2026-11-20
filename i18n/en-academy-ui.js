@@ -142,7 +142,15 @@ I18N.add({
   "Κατέβασε το NetWatch": "Download NetWatch",
   "📱 Ακαδημία στο κινητό": "📱 Academy on your phone",
   "Η Ακαδημία ως εφαρμογή (PWA) για κινητό, και offline": "The Academy as a phone app (PWA), offline too",
-  "Κλείσιμο": "Close"
+  "Κλείσιμο": "Close",
+  "εντολή… (? = βοήθεια, Tab = συμπλήρωση, ↑ = ιστορικό)": "command… (? = help, Tab = complete, ↑ = history)",
+  "💡 Αυτή θέλει privileged mode — γράψε πρώτα «enable».": "💡 This needs privileged mode — type “enable” first.",
+  "💡 Αυτή είναι εντολή ρύθμισης — μπες πρώτα με «conf t».": "💡 This is a configuration command — enter “conf t” first.",
+  "(💡 για τη σωστή εντολή του βήματος, ? για τις διαθέσιμες)": "(💡 for the step's command, ? for available commands)",
+  "✓ Σωστή εντολή IOS.": "✓ Valid IOS command.",
+  "ℹ️ Σωστή εντολή IOS — αλλά το βήμα ζητάει κάτι άλλο. 💡 για βοήθεια.": "ℹ️ Valid IOS command — but the step asks for something else. 💡 for help.",
+  "ℹ️ Σωστή εντολή IOS (ο προσομοιωτής του μαθήματος δεν έχει έξοδο γι’ αυτήν — δοκίμασέ την ελεύθερα στο 🖧 Cisco Lab) — αλλά το βήμα ζητάει κάτι άλλο. 💡 για βοήθεια.": "ℹ️ Valid IOS command (the lesson simulator has no output for it — try it freely in 🖧 Cisco Lab) — but the step asks for something else. 💡 for help.",
+  "Όχι αυτή — δοκίμασε ξανά (💡 για βοήθεια)": "Not that one — try again (💡 for help)"
  },
  "patterns": [
   [
@@ -336,6 +344,18 @@ I18N.add({
   [
    "^Απάντησες: (.*)$",
    "You answered: $1"
+  ],
+  [
+   "^✓ Σωστό — έτσι βλέπεις όλα μαζί\\. Με «(.+)» βλέπεις μόνο αυτό που ζητάει το βήμα\\.$",
+   "✓ Correct — this shows everything at once. With “$1” you see only what the step asks for."
+  ],
+  [
+   "^💡 Είσαι σε configuration mode — οι εντολές του privileged mode θέλουν «do» μπροστά: (.+)$",
+   "💡 You're in configuration mode — privileged commands need “do” in front: $1"
+  ],
+  [
+   "^💡 Το βήμα ζητάει: (.+)$",
+   "💡 The step asks for: $1"
   ]
  ]
 });
