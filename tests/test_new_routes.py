@@ -74,3 +74,19 @@ def test_snapshot_reports_host_for_golive_hint():
     h = detect.host_info()
     assert h["os"] and isinstance(h["docker"], bool)
     assert ("npcap" in h) == (h["os"] == "win32")
+
+
+def test_app_mode_route_only_with_windows_launcher(api, tmp_path):
+    st, base = api
+    st.app_ctl = None
+    code, r = _req(base + "/api/app/mode", {"mode": "live"})
+    assert code == 400
+    st.app_ctl = str(tmp_path)
+    code, r = _req(base + "/api/app/mode", {"mode": "rm -rf"})
+    assert code == 400
+    code, r = _req(base + "/api/app/mode", {"mode": "live"}, headers={"Content-Type": "text/plain"})
+    assert code == 403
+    code, r = _req(base + "/api/app/mode", {"mode": "live-admin"})
+    assert code == 200 and r["ok"]
+    with open(tmp_path / "mode-request.json", encoding="utf-8") as f:
+        assert json.load(f)["mode"] == "live-admin"

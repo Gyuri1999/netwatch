@@ -233,6 +233,12 @@ body.v-map aside,body.v-lan aside{width:400px}
   #toasts .toast:not(:first-child){display:none}.toast{padding:6px 9px;font-size:11px}.toast .sm{display:none}
   #zc{flex-direction:row;bottom:8px;right:8px}#zl{bottom:44px;right:8px}#legend{transform:scale(.85);transform-origin:top right}
 }
+/* μπάρα: σε στενότερα παράθυρα (π.χ. Windows με μεγέθυνση 125–150%) κρύβω πρώτα τα λιγότερο σημαντικά */
+#status{min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
+@media (max-width:1500px){#spark{display:none}}
+@media (max-width:1350px){header .chip:has(#pps),header .chip:has(#bps){display:none}#mode-btn .ml{display:none}}
+@media (max-width:1150px){header .chip:has(#nh){display:none}#cmdk-btn .kh{display:none}header{gap:10px}}
+@media (max-width:1000px){header .chip:has(#iface){display:none}}
 @media (max-width:600px){
   header{gap:8px;padding:0 10px}.chip,#spark,#legend,#zl{display:none}
   .logo{letter-spacing:1px;font-size:12px}#status{font-size:11px;padding:3px 7px}

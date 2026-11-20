@@ -37,6 +37,7 @@ APPDIR = os.path.join(SUPPORT, "app")
 LOG = os.path.join(SUPPORT, "netwatch.log")
 PORTFILE = os.path.join(SUPPORT, "port")
 SETTINGS = os.path.join(SUPPORT, "settings.json")
+MODE_REQ = os.path.join(SUPPORT, "mode-request.json")  # ο πίνακας ζητά Live/Demo (POST /api/app/mode)
 KEEP = {"data", "config.yaml", os.path.join("rules", "local.yaml")}  # δικά σου — δεν τα πειράζει η αναβάθμιση
 NPCAP_URL = "https://npcap.com/#download"
 CREATE_NO_WINDOW = 0x08000000
@@ -235,7 +236,7 @@ def open_window(url):
     if edge:
         prof = os.path.join(SUPPORT, "window")
         subprocess.Popen([edge, f"--app={url}", f"--user-data-dir={prof}", "--no-first-run",
-                          "--no-default-browser-check", "--window-size=1440,920"], creationflags=CREATE_NO_WINDOW)
+                          "--no-default-browser-check", "--start-maximized"], creationflags=CREATE_NO_WINDOW)
     else:
         webbrowser.open(url)
 
@@ -371,9 +372,29 @@ class App:
 
     def poller(self):
         while True:
-            time.sleep(3)
+            time.sleep(2)
+            self.check_mode_request()
             if self.backend.port:
                 self.poll()
+
+    def check_mode_request(self):
+        """Ο πίνακας (κουμπί «Πέρασε σε Live») γράφει mode-request.json· εμείς κάνουμε την αλλαγή, όπως από το μενού."""
+        try:
+            with open(MODE_REQ, encoding="utf-8") as f:
+                req = json.load(f)
+        except (OSError, ValueError):
+            return
+        try:
+            os.remove(MODE_REQ)
+        except OSError:
+            pass
+        if time.time() - float(req.get("t") or 0) > 60:  # παλιό αίτημα (π.χ. από προηγούμενη εκτέλεση)
+            return
+        m = req.get("mode")
+        if m == "live-admin":
+            self.launch("live", admin=True)
+        elif m in ("live", "demo"):
+            self.launch(m, admin=False)
 
     # --- tray ---
     def refresh_icon(self):
@@ -458,8 +479,20 @@ class App:
                 message(f"Δεν μπόρεσα να ετοιμάσω τον φάκελο {APPDIR}:\n{e}")
                 icon.stop()
                 return
+            try:
+                os.remove(MODE_REQ)
+            except OSError:
+                pass
             self.launch()
             threading.Thread(target=self.poller, daemon=True).start()
+            # 1η φορά: τα Windows 11 κρύβουν τα νέα εικονίδια στο «^» — λέμε πού είναι η ασπίδα
+            if not load_settings().get("tray_hint"):
+                save_settings(tray_hint=True)
+                try:
+                    icon.notify("Το NetWatch τρέχει στην ασπίδα 🛡 κάτω δεξιά (αν δεν φαίνεται, πάτα το βελάκι ^ δίπλα στο ρολόι). "
+                                "Live/Demo αλλάζεις και από τον ίδιο τον πίνακα: πάτα το σήμα DEMO/LIVE πάνω αριστερά.", "NetWatch")
+                except Exception:
+                    pass
         self.icon.run(setup)
 
 
