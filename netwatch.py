@@ -501,6 +501,8 @@ def main():
         with open(args.port_file, "w") as f:
             f.write(str(port))
         chown_to_user(args.port_file)
+    # Windows: ο launcher (ασπίδα) διαβάζει από τον ίδιο φάκελο αιτήματα αλλαγής Live/Demo από τον πίνακα
+    state.app_ctl = os.path.dirname(os.path.abspath(args.port_file)) if args.port_file and sys.platform == "win32" else None
     import signal
     signal.signal(signal.SIGTERM, lambda *_: quit_now())
     if args.parent_pid:

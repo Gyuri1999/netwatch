@@ -86,3 +86,30 @@ def test_shield_icon():
         assert im.size == (64, 64) and im.mode == "RGBA"
         assert im.getpixel((32, 30))[3] == 255  # η ασπίδα είναι γεμάτη στο κέντρο
         assert im.getpixel((1, 62))[3] == 0  # διάφανη γωνία
+
+
+def test_mode_request_from_dashboard(tmp_path, monkeypatch):
+    """Ο πίνακας γράφει mode-request.json → ο launcher αλλάζει λειτουργία μία φορά· παλιά αιτήματα αγνοούνται."""
+    import json
+    import time
+    req = str(tmp_path / "mode-request.json")
+    monkeypatch.setattr(launcher, "MODE_REQ", req)
+    app = launcher.App.__new__(launcher.App)
+    calls = []
+    app.launch = lambda mode=None, pcap=None, admin=None, open_after=True: calls.append((mode, admin))
+    app.check_mode_request()
+    assert calls == []
+    _w(req, json.dumps({"mode": "live-admin", "t": time.time()}))
+    app.check_mode_request()
+    assert calls == [("live", True)] and not os.path.exists(req)
+    _w(req, json.dumps({"mode": "demo", "t": time.time() - 3600}))
+    app.check_mode_request()
+    assert calls == [("live", True)] and not os.path.exists(req)
+    _w(req, json.dumps({"mode": "live", "t": time.time()}))
+    app.check_mode_request()
+    assert calls[-1] == ("live", False)
+
+
+def test_window_opens_maximized_not_fixed_size():
+    src = _r(os.path.join(HERE, "winapp", "launcher.py"))
+    assert "--start-maximized" in src and "--window-size" not in src

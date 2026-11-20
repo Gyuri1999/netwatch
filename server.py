@@ -260,6 +260,16 @@ def make_handler(state):
                     if not wi:
                         return self._json({"error": "Η αναζήτηση θύρας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."}, 400)
                     return self._json(wi.refresh())
+                if u.path == "/api/app/mode":  # 🟢 αλλαγή Live/Demo από τον πίνακα (μόνο με τον launcher των Windows)
+                    d = getattr(state, "app_ctl", None)
+                    m = str(body.get("mode") or "")
+                    if not d:
+                        return self._json({"error": "Η αλλαγή λειτουργίας από εδώ γίνεται μόνο στην εφαρμογή των Windows."}, 400)
+                    if m not in ("live", "live-admin", "demo"):
+                        return self._json({"error": "Άγνωστη λειτουργία."}, 400)
+                    with open(os.path.join(d, "mode-request.json"), "w", encoding="utf-8") as f:
+                        json.dump({"mode": m, "t": time.time()}, f)
+                    return self._json({"ok": True, "mode": m})
                 if u.path == "/api/l2guard/run":  # 🛡 rogue DHCP / ARP spoofing με ένα κουμπί (μόνο τοπικό LAN)
                     lg = getattr(state, "l2guard", None)
                     if not lg:
