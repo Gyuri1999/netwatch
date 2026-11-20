@@ -172,7 +172,7 @@ run.bat -Shortcut                         :: put a NetWatch shortcut on the desk
 
 The first run creates `.venv` and installs the dependencies, then the dashboard opens in your default browser. In Edge, *⋯ → Apps → Install this site as an app* gives it its own window and a Start menu entry. The network details come from PowerShell (`Get-NetRoute`, `Get-NetIPAddress`, `Get-NetAdapter`) and `arp -a`, ping goes through the Windows `ping`, Wi‑Fi Guard reads `netsh wlan show interfaces`, alerts show as Windows notifications, and **Block** adds `NetWatch block <ip>` rules to Windows Firewall (they're removed on quit, and any leftovers are cleaned up the next time it starts). The parsers work with localized Windows output, Greek included.
 
-Not yet on Windows: the Wi‑Fi survey (nearby networks and channels) and the Academy terminal's Unix-only tools (`dig`, `traceroute`; `nmap` works once it is installed). The Windows support is tested in CI on `windows-latest` but has had little real-world use, so please report what breaks.
+Not yet on Windows: the Wi‑Fi survey (nearby networks and channels) and the Academy terminal's Unix-only tools (`dig`, `traceroute`; `nmap` works once it is installed). The Windows support is tested in CI on `windows-latest` but has had little real-world use, so please report what breaks; [docs/windows-testing.md](docs/windows-testing.md) is a checklist for trying it on a real PC.
 
 ## Architecture
 
