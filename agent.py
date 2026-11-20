@@ -39,14 +39,52 @@ def load_token(data_dir, cfg_token=None):
     return tok
 
 
+def _write_private(path, data):
+    """Το κλειδί γράφεται κατευθείαν με 0600 (σε Windows το mode αγνοείται· ο φάκελος δεδομένων είναι του χρήστη)."""
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | getattr(os, "O_BINARY", 0), 0o600)
+    with os.fdopen(fd, "wb") as f:
+        f.write(data)
+
+
+def make_cert(crt, key, cn="netwatch-agent", days=825):
+    """Self-signed πιστοποιητικό. Με τη βιβλιοθήκη cryptography αν υπάρχει (έρχεται μέσα στο NetWatch.exe — τα
+    Windows 10/11 δεν έχουν openssl), αλλιώς με την εντολή openssl (macOS, Linux)."""
+    try:
+        import datetime
+
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+    except ImportError:
+        try:
+            subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
+                            "-days", str(days), "-subj", f"/CN={cn}", "-keyout", key, "-out", crt],
+                           check=True, capture_output=True, timeout=30)
+        except FileNotFoundError:
+            raise RuntimeError("Για το agent mode χρειάζεται το openssl ή το πακέτο Python «cryptography» "
+                               "(pip install cryptography)") from None
+        os.chmod(key, 0o600)
+        return
+    k = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(k.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(minutes=5)).not_valid_after(now + datetime.timedelta(days=days))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .sign(k, hashes.SHA256()))
+    _write_private(key, k.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL,
+                                        serialization.NoEncryption()))
+    with open(crt, "wb") as f:
+        f.write(cert.public_bytes(serialization.Encoding.PEM))
+
+
 def ensure_cert(data_dir, cn="netwatch-agent"):
     crt, key = os.path.join(data_dir, "agent.crt"), os.path.join(data_dir, "agent.key")
     if not (os.path.exists(crt) and os.path.exists(key)):
         os.makedirs(data_dir, exist_ok=True)
-        subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048", "-nodes",
-                        "-days", "825", "-subj", f"/CN={cn}", "-keyout", key, "-out", crt],
-                       check=True, capture_output=True, timeout=30)
-        os.chmod(key, 0o600)
+        make_cert(crt, key, cn)
     with open(crt) as f:
         der = ssl.PEM_cert_to_DER_cert(f.read())
     fp = hashlib.sha256(der).hexdigest().upper()
