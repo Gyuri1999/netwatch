@@ -260,6 +260,11 @@ def make_handler(state):
                     if not wi:
                         return self._json({"error": "Η αναζήτηση θύρας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."}, 400)
                     return self._json(wi.refresh())
+                if u.path == "/api/l2guard/run":  # 🛡 rogue DHCP / ARP spoofing με ένα κουμπί (μόνο τοπικό LAN)
+                    lg = getattr(state, "l2guard", None)
+                    if not lg:
+                        return self._json({"error": "Ο έλεγχος L2 δεν είναι διαθέσιμος σε αυτή τη λειτουργία (χρειάζεται live ή demo)."}, 400)
+                    return self._json(lg.run())
                 if u.path in ("/api/update/check", "/api/update/install", "/api/update/restart"):  # 🔄 ενημερώσεις από GitHub
                     up = getattr(state, "updater", None)
                     if not up:
@@ -689,7 +694,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/names.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/acl.js", "/names.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -733,6 +738,19 @@ def make_handler(state):
                 if len(qq) > 64:
                     return self._json({"error": "Πολύ μεγάλο ερώτημα (έως 64 χαρακτήρες)."}, 400)
                 return self._json(wi.lookup(qq) if wi else {"query": qq, "found": False, "location": None, "off": True})
+            if u.path == "/api/presence":  # 📈 διαθεσιμότητα ανά συσκευή
+                pr = getattr(state, "presence", None)
+                if not pr:
+                    return self._json({"devices": [], "off": True})
+                pq = parse_qs(u.query)
+                try:
+                    days = int(pq.get("days", ["7"])[0])
+                except ValueError:
+                    days = 7
+                return self._json(pr.view(days, key=pq.get("key", [""])[0][:64] or None))
+            if u.path == "/api/l2guard":  # 🛡 τελευταίος έλεγχος rogue DHCP / ARP
+                lg = getattr(state, "l2guard", None)
+                return self._json(lg.view() if lg else {"never": True, "off": True})
             if u.path == "/api/update":  # 🔄 κατάσταση ενημέρωσης
                 up = getattr(state, "updater", None)
                 return self._json(up.view() if up else {"off": True})

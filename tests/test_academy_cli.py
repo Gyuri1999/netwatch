@@ -19,3 +19,9 @@ def test_every_lab_step_accepts_answer_and_abbreviations():
 def test_vlsm_planner_math():
     p = subprocess.run(["node", os.path.join(HERE, "js", "vlsm_check.js")], capture_output=True, text=True, timeout=60)
     assert p.returncode == 0, p.stdout + p.stderr
+
+
+@pytest.mark.skipif(not shutil.which("node"), reason="χρειάζεται node")
+def test_acl_tester_logic():
+    p = subprocess.run(["node", os.path.join(HERE, "js", "acl_check.js")], capture_output=True, text=True, timeout=60)
+    assert p.returncode == 0, p.stdout + p.stderr

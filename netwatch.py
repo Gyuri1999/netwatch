@@ -273,6 +273,13 @@ def main():
     state.devnames = devnames.DevNames(None if mode == "demo" else os.path.join(DATA, "devnames.json"),
                                        on_save=chown_to_user if mode != "demo" else None)
     demo, live = mode == "demo", mode == "live"
+    import presence  # 📈 ιστορικό διαθεσιμότητας ανά συσκευή (κάθε 5′, data/presence.sqlite, 30 μέρες)
+    state.presence = None if mode == "pcap" else presence.Presence(state, sim=demo, path=os.path.join(DATA, "presence.sqlite") if live else None,
+                                                                   on_save=chown_to_user if live else None)
+    if live:
+        threading.Thread(target=state.presence.run_forever, daemon=True).start()
+    import l2guard  # 🛡 rogue DHCP / ARP spoofing με ένα κουμπί (DHCPDISCOVER + ARP μόνο στο τοπικό LAN)
+    state.l2guard = l2guard.L2Guard(state, sim=demo) if mode != "pcap" else None
     import updater  # 🔄 ενημερώσεις από GitHub (αυτόματα μόνο έλεγχος· εγκατάσταση με κλικ και έλεγχο υπογραφής)
     state.updater = updater.Updater(state, sim=demo, cfg=cfg.get("updates"))
     if live:
