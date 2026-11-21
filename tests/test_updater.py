@@ -206,9 +206,8 @@ def test_view_reports_sim_and_windows_hint(monkeypatch):
 def test_windows_app_install_stages_signed_update(tmp_path, monkeypatch):
     """Windows app: υπογεγραμμένο SHA256SUMS-windows → κατέβασμα/έλεγχος/αποσυμπίεση στο …/NetWatch/update + ready.json·
     η αλλαγή φακέλων γίνεται από το launcher στην επανεκκίνηση."""
-    kg = shutil.which("ssh-keygen")  # πριν το «win32»: μετά το shutil.which ψάχνει .exe
-    monkeypatch.setattr(updater.sys, "platform", "win32")
-    monkeypatch.setattr(updater, "ssh_keygen", lambda: kg)
+    # «Windows» μόνο για τον εντοπισμό εγκατάστασης — όχι sys.platform (θα χαλούσε το subprocess σε Linux/Mac)
+    monkeypatch.setattr(updater, "detect_kind", lambda here: "winapp" if updater.win_bundle(here) else "files")
     key = tmp_path / "k"
     subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)], check=True)
     pub = " ".join(open(str(key) + ".pub").read().split()[:2])
@@ -272,7 +271,7 @@ def test_windows_app_install_stages_signed_update(tmp_path, monkeypatch):
 
 
 def test_windows_app_without_signed_package_is_manual(tmp_path, monkeypatch):
-    monkeypatch.setattr(updater.sys, "platform", "win32")
+    monkeypatch.setattr(updater, "detect_kind", lambda here: "winapp" if updater.win_bundle(here) else "files")
     sup = tmp_path / "NetWatch"
     (sup / "app").mkdir(parents=True)
     b = tmp_path / "B"
