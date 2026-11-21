@@ -284,6 +284,8 @@ def main():
     import alerthyg  # 🔕 σίγαση ειδοποιήσεων με λήξη + 🧐 «γιατί χτύπησε;» (data/mutes.json· στο demo μόνο μνήμη)
     state.hygiene = alerthyg.AlertHygiene(state, path=os.path.join(DATA, "mutes.json") if live else None,
                                           on_save=chown_to_user if live else None)
+    import assess
+    state.assess = assess.Assess(state)  # 📋 αναφορά «νέο δίκτυο»
     import l2guard  # 🛡 rogue DHCP / ARP spoofing με ένα κουμπί (DHCPDISCOVER + ARP μόνο στο τοπικό LAN)
     state.l2guard = l2guard.L2Guard(state, sim=demo) if mode != "pcap" else None
     import updater  # 🔄 ενημερώσεις από GitHub (αυτόματα μόνο έλεγχος· εγκατάσταση με κλικ και έλεγχο υπογραφής)
