@@ -43,21 +43,60 @@ jobs:
           $d = Join-Path $env:RUNNER_TEMP 'agentcert'
           & dist\NetWatch\python\python.exe -c "import sys; sys.path.insert(0, r'dist\NetWatch\app'); import agent; c, k, fp = agent.ensure_cert(sys.argv[1]); agent.tls_context(c, k); print('cert OK', fp)" $d
           if ($LASTEXITCODE) { exit 1 }
+      - name: Self-update folder swap (apply script on a copy of the app)
+        shell: pwsh
+        run: |
+          $t = Join-Path $env:RUNNER_TEMP 'upd'
+          New-Item -ItemType Directory -Force "$t\new" | Out-Null
+          Copy-Item -Recurse dist\NetWatch "$t\NetWatch"
+          Copy-Item -Recurse dist\NetWatch "$t\new\NetWatch"
+          Set-Content "$t\new\NetWatch\marker.txt" 'new'
+          $ps1 = Join-Path $t 'apply.ps1'
+          python -c "import sys; sys.path.insert(0, 'winapp'); import launcher; open(sys.argv[1], 'w', encoding='utf-8-sig').write(launcher.APPLY_PS1)" $ps1
+          powershell -NoProfile -ExecutionPolicy Bypass -File $ps1 -WaitPid 0 -Bundle "$t\NetWatch" -New "$t\new\NetWatch" -Log "$t\log.txt" -NoStart
+          Get-Content "$t\log.txt"
+          if (-not (Test-Path "$t\NetWatch\marker.txt") -or -not (Test-Path "$t\NetWatch.previous\NetWatch.exe")) { Write-Error 'swap failed'; exit 1 }
       - uses: actions/upload-artifact@v4
         with:
           name: NetWatch-windows-x64
           path: dist/NetWatch-windows-x64.zip
+
+  release:
+    # Σε tag: SHA-256 του zip, υπογραφή με το ίδιο κλειδί με το Mac (ο updater των Windows το ελέγχει
+    # με το update_signers που έχει ήδη μέσα του) και επισύναψη στο GitHub Release.
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: NetWatch-windows-x64
+          path: dist
+      - name: Checksum and sign
+        env:
+          KEY: ${{ secrets.NETWATCH_RELEASE_KEY }}
+        run: |
+          cd dist
+          sha256sum NetWatch-windows-x64.zip > SHA256SUMS-windows
+          cat SHA256SUMS-windows
+          if [ -n "$KEY" ]; then
+            umask 077; printf '%s\n' "$KEY" > "$RUNNER_TEMP/k"
+            ssh-keygen -Y sign -f "$RUNNER_TEMP/k" -n netwatch-update SHA256SUMS-windows
+            rm -f "$RUNNER_TEMP/k"
+            ssh-keygen -Y verify -f ../update_signers -I netwatch-release -n netwatch-update -s SHA256SUMS-windows.sig < SHA256SUMS-windows
+          else
+            echo "::warning::NETWATCH_RELEASE_KEY not set — Windows release is unsigned, the app will not self-update"
+          fi
       - name: Attach to release
-        if: startsWith(github.ref, 'refs/tags/v')
-        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
         # Το release το δημιουργεί το release.yml (macOS): περίμενε έως 15′ να υπάρξει, αντί να αποτύχεις
         run: |
-          for ($i = 0; $i -lt 60; $i++) {
-            gh release view "$env:GITHUB_REF_NAME" *> $null
-            if ($LASTEXITCODE -eq 0) { break }
-            Write-Host "release $env:GITHUB_REF_NAME not created yet - waiting..."; Start-Sleep -Seconds 15
-          }
-          gh release upload "$env:GITHUB_REF_NAME" dist/NetWatch-windows-x64.zip --clobber
-          if ($LASTEXITCODE) { exit 1 }
+          for i in $(seq 1 60); do
+            gh release view "$GITHUB_REF_NAME" > /dev/null 2>&1 && break
+            echo "release $GITHUB_REF_NAME not created yet - waiting..."; sleep 15
+          done
+          cd dist
+          FILES="NetWatch-windows-x64.zip SHA256SUMS-windows"; [ -f SHA256SUMS-windows.sig ] && FILES="$FILES SHA256SUMS-windows.sig"
+          gh release upload "$GITHUB_REF_NAME" $FILES --clobber

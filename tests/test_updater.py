@@ -200,3 +200,86 @@ def test_view_reports_sim_and_windows_hint(monkeypatch):
     w.check(force=True)
     v = w.view()
     assert v["sim"] is False and v["available"] and not v["can_install"] and "NetWatch-windows-x64.zip" in v["why_not"]
+
+
+@pytest.mark.skipif(not HAS_SIG, reason="χρειάζεται ssh-keygen -Y")
+def test_windows_app_install_stages_signed_update(tmp_path, monkeypatch):
+    """Windows app: υπογεγραμμένο SHA256SUMS-windows → κατέβασμα/έλεγχος/αποσυμπίεση στο …/NetWatch/update + ready.json·
+    η αλλαγή φακέλων γίνεται από το launcher στην επανεκκίνηση."""
+    kg = shutil.which("ssh-keygen")  # πριν το «win32»: μετά το shutil.which ψάχνει .exe
+    monkeypatch.setattr(updater.sys, "platform", "win32")
+    monkeypatch.setattr(updater, "ssh_keygen", lambda: kg)
+    key = tmp_path / "k"
+    subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)], check=True)
+    pub = " ".join(open(str(key) + ".pub").read().split()[:2])
+    sup = tmp_path / "LocalAppData" / "NetWatch"
+    here = sup / "app"
+    here.mkdir(parents=True)
+    (here / "VERSION").write_text("1.2.6")
+    (here / "update_signers").write_text(f'netwatch-release namespaces="netwatch-update" {pub}\n')
+    bundle = tmp_path / "Downloads" / "NetWatch"
+    bundle.mkdir(parents=True)
+    (bundle / "NetWatch.exe").write_text("old")
+    (sup / "bundle.json").write_text(json.dumps({"bundle": str(bundle)}))
+
+    zbuf = io.BytesIO()
+    with zipfile.ZipFile(zbuf, "w") as z:
+        z.writestr("NetWatch/NetWatch.exe", "new")
+        z.writestr("NetWatch/python/python.exe", "py")
+        z.writestr("NetWatch/app/VERSION", "1.3.0")
+    zdata = zbuf.getvalue()
+    sums = f"{hashlib.sha256(zdata).hexdigest()}  NetWatch-windows-x64.zip\n".encode()
+    (tmp_path / "SUMS").write_bytes(sums)
+    subprocess.run(["ssh-keygen", "-Y", "sign", "-f", str(key), "-n", "netwatch-update", str(tmp_path / "SUMS")], check=True, capture_output=True)
+    names = ("NetWatch-windows-x64.zip", "SHA256SUMS-windows", "SHA256SUMS-windows.sig", "NetWatch.zip", "SHA256SUMS", "SHA256SUMS.sig")
+    files = {"https://github.com/dl/NetWatch-windows-x64.zip": zdata, "https://github.com/dl/SHA256SUMS-windows": sums,
+             "https://github.com/dl/SHA256SUMS-windows.sig": (tmp_path / "SUMS.sig").read_bytes()}
+    rel = {"tag_name": "v1.3.0", "assets": [{"name": n, "browser_download_url": "https://github.com/dl/" + n} for n in names]}
+
+    def fetch(url, limit=0, dest=None, progress=None):
+        if url == updater.API:
+            return json.dumps(rel).encode()
+        data = files[url]
+        if dest:
+            open(dest, "wb").write(data)
+            return hashlib.sha256(data).hexdigest()
+        return data
+
+    def go():
+        u = updater.Updater(here=str(here), fetch=fetch)
+        assert u.kind == "winapp" and u.bundle == str(bundle)
+        v = u.check(force=True)
+        assert v["can_install"], v["why_not"]
+        assert u.install()["ok"]
+        for _ in range(200):
+            if u.job["state"] != "running":
+                break
+            time.sleep(0.05)
+        return u
+
+    files["https://github.com/dl/NetWatch-windows-x64.zip"] = zdata + b"x"  # πειραγμένο
+    u = go()
+    assert u.job["state"] == "error" and "SHA-256" in u.job["step"] and not (sup / "update" / "ready.json").exists()
+    assert u.restart()["error"]
+    files["https://github.com/dl/NetWatch-windows-x64.zip"] = zdata
+    u = go()
+    assert u.job["state"] == "done", u.job
+    ready = json.loads((sup / "update" / "ready.json").read_text())
+    assert ready["version"] == "1.3.0" and open(os.path.join(ready["dir"], "NetWatch.exe")).read() == "new"
+    assert (bundle / "NetWatch.exe").read_text() == "old"  # ο φάκελος της εφαρμογής δεν αγγίζεται ακόμα
+    r = u.restart()
+    assert r["ok"] and r["closing"] and json.loads((sup / "update-request.json").read_text())["action"] == "apply"
+
+
+def test_windows_app_without_signed_package_is_manual(tmp_path, monkeypatch):
+    monkeypatch.setattr(updater.sys, "platform", "win32")
+    sup = tmp_path / "NetWatch"
+    (sup / "app").mkdir(parents=True)
+    b = tmp_path / "B"
+    b.mkdir()
+    (b / "NetWatch.exe").write_text("x")
+    (sup / "bundle.json").write_text(json.dumps({"bundle": str(b)}))
+    rel = {"tag_name": "v9.0.0", "assets": [{"name": "NetWatch-windows-x64.zip", "browser_download_url": "https://github.com/x"}]}
+    u = updater.Updater(here=str(sup / "app"), fetch=lambda *a, **k: json.dumps(rel).encode())
+    v = u.check(force=True)
+    assert v["kind"] == "winapp" and v["available"] and not v["can_install"] and "GitHub" in v["why_not"]

@@ -113,3 +113,29 @@ def test_mode_request_from_dashboard(tmp_path, monkeypatch):
 def test_window_opens_maximized_not_fixed_size():
     src = _r(os.path.join(HERE, "winapp", "launcher.py"))
     assert "--start-maximized" in src and "--window-size" not in src
+
+
+def test_update_handoff_only_moves_a_checked_folder(tmp_path, monkeypatch):
+    """«Επανεκκίνηση» μετά από ενημέρωση: μόνο φάκελος μέσα στο update/ με NetWatch.exe, μόνο πρόσφατο αίτημα."""
+    import json
+    import time
+    bundle, upd, req = tmp_path / "Apps" / "NetWatch", tmp_path / "update", tmp_path / "update-request.json"
+    _w(str(bundle / "NetWatch.exe"), "old")
+    new = upd / "x" / "NetWatch"
+    _w(str(new / "NetWatch.exe"), "new")
+    assert launcher.write_bundle_info(str(bundle), str(tmp_path / "bundle.json"))
+    assert json.loads(_r(str(tmp_path / "bundle.json")))["bundle"] == str(bundle)
+
+    def ask(d, t=None):
+        _w(str(upd / "ready.json"), json.dumps({"dir": d}))
+        _w(str(req), json.dumps({"t": t or time.time(), "action": "apply"}))
+        return launcher.pending_update(str(bundle), str(upd), str(req))
+
+    assert launcher.pending_update(str(bundle), str(upd), str(req)) is None   # κανένα αίτημα
+    assert ask(str(new)) == os.path.abspath(str(new)) and not req.exists()     # το αίτημα «καταναλώνεται»
+    assert ask(str(new), t=time.time() - 3600) is None                       # παλιό αίτημα
+    assert ask(str(bundle)) is None                                            # έξω από το update/ → όχι
+    assert ask(str(upd / "x" / ".." / ".." / "Apps" / "NetWatch")) is None    # ούτε με «..»
+    cmd = launcher.apply_cmd(str(new), str(bundle), pid=1234, upd=str(upd))
+    assert "-WaitPid" in cmd and "1234" in cmd and cmd[cmd.index("-New") + 1] == str(new)
+    assert "Move-Item" in launcher.APPLY_PS1 and ".previous" in launcher.APPLY_PS1

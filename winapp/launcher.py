@@ -38,6 +38,9 @@ LOG = os.path.join(SUPPORT, "netwatch.log")
 PORTFILE = os.path.join(SUPPORT, "port")
 SETTINGS = os.path.join(SUPPORT, "settings.json")
 MODE_REQ = os.path.join(SUPPORT, "mode-request.json")  # ο πίνακας ζητά Live/Demo (POST /api/app/mode)
+BUNDLE_INFO = os.path.join(SUPPORT, "bundle.json")  # πού είναι το NetWatch.exe — για τον updater του backend
+UPDATE_DIR = os.path.join(SUPPORT, "update")
+UPDATE_REQ = os.path.join(SUPPORT, "update-request.json")  # «Επανεκκίνηση τώρα» μετά από ενημέρωση
 KEEP = {"data", "config.yaml", os.path.join("rules", "local.yaml")}  # δικά σου — δεν τα πειράζει η αναβάθμιση
 NPCAP_URL = "https://npcap.com/#download"
 CREATE_NO_WINDOW = 0x08000000
@@ -111,6 +114,81 @@ def sync_app(src=SRC, dst=APPDIR):
                 except OSError:
                     pass
     return True
+
+
+# ---------------- αυτόματη ενημέρωση ----------------
+# Ο backend (updater.py) κατεβάζει, ελέγχει υπογραφή/SHA-256 και αποσυμπιέζει στο UPDATE_DIR. Τα αρχεία του
+# φακέλου της εφαρμογής είναι κλειδωμένα όσο τρέχει, οπότε την αλλαγή την κάνει αυτό το script αφού κλείσουμε.
+APPLY_PS1 = r"""param([int]$WaitPid, [string]$Bundle, [string]$New, [string]$Log, [switch]$NoStart)
+$ErrorActionPreference = 'Stop'
+function Say($m) { Add-Content -LiteralPath $Log -Value ("[update] " + (Get-Date -Format s) + " " + $m) }
+try { Wait-Process -Id $WaitPid -Timeout 60 -ErrorAction SilentlyContinue } catch {}
+Start-Sleep -Seconds 2
+$prev = "$Bundle.previous"
+$moved = $false
+for ($i = 0; $i -lt 30 -and -not $moved; $i++) {
+  try {
+    if (Test-Path -LiteralPath $prev) { Remove-Item -LiteralPath $prev -Recurse -Force }
+    Move-Item -LiteralPath $Bundle -Destination $prev
+    $moved = $true
+  } catch { Start-Sleep -Seconds 1 }
+}
+if (-not $moved) { Say "the app folder is still in use - update not applied"; if (-not $NoStart) { Start-Process -FilePath (Join-Path $Bundle 'NetWatch.exe') }; exit 1 }
+try {
+  Move-Item -LiteralPath $New -Destination $Bundle
+  Say "updated $Bundle (old version kept as $prev)"
+} catch {
+  Say ("could not move the new version: " + $_)
+  Move-Item -LiteralPath $prev -Destination $Bundle
+}
+if (-not $NoStart) { Start-Process -FilePath (Join-Path $Bundle 'NetWatch.exe') }
+"""
+
+
+def write_bundle_info(bundle=BUNDLE, path=BUNDLE_INFO):
+    """Λέει στον backend πού είναι το NetWatch.exe (ο backend τρέχει από αντίγραφο στο %LOCALAPPDATA%)."""
+    if not os.path.isfile(os.path.join(bundle, "NetWatch.exe")):
+        return False
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump({"bundle": os.path.abspath(bundle)}, f)
+    return True
+
+
+def pending_update(bundle=BUNDLE, upd=UPDATE_DIR, req=UPDATE_REQ, now=None):
+    """Αν ο πίνακας ζήτησε «Επανεκκίνηση» και υπάρχει ελεγμένη νέα έκδοση → ο φάκελός της, αλλιώς None."""
+    try:
+        with open(req, encoding="utf-8") as f:
+            r = json.load(f)
+        os.remove(req)
+    except (OSError, ValueError):
+        return None
+    if (now or time.time()) - float(r.get("t") or 0) > 120:
+        return None
+    try:
+        with open(os.path.join(upd, "ready.json"), encoding="utf-8") as f:
+            new = json.load(f).get("dir") or ""
+    except (OSError, ValueError):
+        return None
+    new = os.path.abspath(new)
+    # μόνο φάκελος μέσα στο UPDATE_DIR, με NetWatch.exe — τίποτα άλλο δεν μετακινείται
+    if os.path.commonpath([new, os.path.abspath(upd)]) != os.path.abspath(upd) or not os.path.isfile(os.path.join(new, "NetWatch.exe")):
+        return None
+    parent = os.path.dirname(os.path.abspath(bundle))
+    try:  # μπορούμε να γράψουμε δίπλα στον φάκελο της εφαρμογής; (όχι π.χ. στο Program Files)
+        probe = os.path.join(parent, ".nw-write-test")
+        open(probe, "w").close()
+        os.remove(probe)
+    except OSError:
+        return None
+    return new
+
+
+def apply_cmd(new, bundle=BUNDLE, pid=None, upd=UPDATE_DIR):
+    ps1 = os.path.join(upd, "apply.ps1")
+    with open(ps1, "w", encoding="utf-8-sig") as f:
+        f.write(APPLY_PS1)
+    return ["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-WindowStyle", "Hidden",
+            "-File", ps1, "-WaitPid", str(pid or os.getpid()), "-Bundle", os.path.abspath(bundle), "-New", new, "-Log", LOG]
 
 
 # ---------------- backend ----------------
@@ -374,8 +452,19 @@ class App:
         while True:
             time.sleep(2)
             self.check_mode_request()
+            self.check_update_request()
             if self.backend.port:
                 self.poll()
+
+    def check_update_request(self):
+        new = pending_update()
+        if not new:
+            return
+        self.msg = "Ενημέρωση…"
+        self.refresh_icon()
+        subprocess.Popen(apply_cmd(new), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                         cwd=SUPPORT, creationflags=0x00000008 | 0x00000200 if IS_WIN else 0)  # DETACHED | NEW_GROUP: ζει μετά από εμάς
+        self.quit()
 
     def check_mode_request(self):
         """Ο πίνακας (κουμπί «Πέρασε σε Live») γράφει mode-request.json· εμείς κάνουμε την αλλαγή, όπως από το μενού."""
@@ -552,6 +641,16 @@ def main():
     os.makedirs(SUPPORT, exist_ok=True)
     if not single_instance():
         return
+    try:
+        write_bundle_info()
+        if os.path.isdir(UPDATE_DIR) and not os.path.exists(os.path.join(UPDATE_DIR, "ready.json")):
+            shutil.rmtree(UPDATE_DIR, ignore_errors=True)
+        elif os.path.isdir(UPDATE_DIR):  # η ενημέρωση εφαρμόστηκε (ο φάκελος «x/NetWatch» μετακινήθηκε) → καθάρισμα
+            with open(os.path.join(UPDATE_DIR, "ready.json"), encoding="utf-8") as f:
+                if not os.path.isdir(json.load(f).get("dir") or ""):
+                    shutil.rmtree(UPDATE_DIR, ignore_errors=True)
+    except (OSError, ValueError):
+        pass
     App().run()
 
 
