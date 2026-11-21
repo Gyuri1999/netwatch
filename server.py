@@ -269,15 +269,26 @@ def make_handler(state):
                     else:
                         r = hy.mute(body.get("type"), body.get("actor"), body.get("minutes", 1440), body.get("note"))
                     return self._json(r, 400 if r.get("error") else 200)
-                if u.path == "/api/app/mode":  # 🟢 αλλαγή Live/Demo από τον πίνακα (μόνο με τον launcher των Windows)
+                if u.path == "/api/npcap/install":  # ⬇ Npcap (Windows): κατέβασμα από npcap.com + έλεγχος υπογραφής + installer
+                    ng = getattr(state, "npcap", None)
+                    if not ng:
+                        return self._json({"error": "Διαθέσιμο μόνο στην εφαρμογή των Windows."}, 400)
+                    r = ng.start()
+                    return self._json(r, 400 if "error" in r else 200)
+                if u.path == "/api/app/mode":  # 🟢 αλλαγή Live/Demo από τον πίνακα (εφαρμογή Windows ή Mac)
                     d = getattr(state, "app_ctl", None)
                     m = str(body.get("mode") or "")
                     if not d:
-                        return self._json({"error": "Η αλλαγή λειτουργίας από εδώ γίνεται μόνο στην εφαρμογή των Windows."}, 400)
+                        return self._json({"error": "Η αλλαγή λειτουργίας από εδώ γίνεται μόνο στην εφαρμογή (Windows ή Mac)."}, 400)
                     if m not in ("live", "live-admin", "demo"):
                         return self._json({"error": "Άγνωστη λειτουργία."}, 400)
-                    with open(os.path.join(d, "mode-request.json"), "w", encoding="utf-8") as f:
+                    rq = os.path.join(d, "mode-request.json")
+                    with open(rq, "w", encoding="utf-8") as f:
                         json.dump({"mode": m, "t": time.time()}, f)
+                    try:  # Mac σε Live τρέχει ως root· το app (χρήστης) πρέπει να μπορεί να το διαβάσει/σβήσει
+                        os.chmod(rq, 0o644)
+                    except OSError:
+                        pass
                     return self._json({"ok": True, "mode": m})
                 if u.path == "/api/l2guard/run":  # 🛡 rogue DHCP / ARP spoofing με ένα κουμπί (μόνο τοπικό LAN)
                     lg = getattr(state, "l2guard", None)
@@ -802,6 +813,9 @@ def make_handler(state):
             if u.path == "/api/l2guard":  # 🛡 τελευταίος έλεγχος rogue DHCP / ARP
                 lg = getattr(state, "l2guard", None)
                 return self._json(lg.view() if lg else {"never": True, "off": True})
+            if u.path == "/api/npcap":
+                ng = getattr(state, "npcap", None)
+                return self._json(ng.view() if ng else {"available": False})
             if u.path == "/api/update":  # 🔄 κατάσταση ενημέρωσης
                 up = getattr(state, "updater", None)
                 return self._json(up.view() if up else {"off": True})

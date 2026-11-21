@@ -512,8 +512,11 @@ def main():
         with open(args.port_file, "w") as f:
             f.write(str(port))
         chown_to_user(args.port_file)
-    # Windows: ο launcher (ασπίδα) διαβάζει από τον ίδιο φάκελο αιτήματα αλλαγής Live/Demo από τον πίνακα
-    state.app_ctl = os.path.dirname(os.path.abspath(args.port_file)) if args.port_file and sys.platform == "win32" else None
+    # Windows (ασπίδα) και Mac app (γραμμή μενού): διαβάζουν από τον ίδιο φάκελο αιτήματα αλλαγής Live/Demo από τον πίνακα
+    state.app_ctl = os.path.dirname(os.path.abspath(args.port_file)) if args.port_file and sys.platform in ("win32", "darwin") else None
+    if state.app_ctl and sys.platform == "win32":  # ⬇ Npcap με ένα κλικ από το npcap.com (με έλεγχο υπογραφής)
+        import npcapget
+        state.npcap = npcapget.NpcapGet(os.path.join(state.app_ctl, "npcap"))
     import signal
     signal.signal(signal.SIGTERM, lambda *_: quit_now())
     if args.parent_pid:
