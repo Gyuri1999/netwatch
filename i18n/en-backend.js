@@ -2,6 +2,29 @@
 // health, playbooks, API errors, weekly report, CTF). Generated; see i18n/README.md for the format.
 I18N.add({
  "exact": {
+  "Άνοιξε θύρα στο router (UPnP)": "Router port opened (UPnP)",
+  "Κάμερα ανοιχτή προς το Internet — οι κάμερες είναι ο πρώτος στόχος των botnets (Mirai).": "Camera open to the Internet — cameras are the first target of botnets (Mirai).",
+  "Έξυπνη συσκευή (IoT) ανοιχτή προς το Internet — σπάνια χρειάζεται· οι εφαρμογές τους δουλεύουν και χωρίς.": "Smart (IoT) device open to the Internet — rarely needed; their apps work without it.",
+  "Η IP δεν είναι συσκευή που έχω δει στο δίκτυο — έλεγξε ποια είναι.": "That IP is not a device I have seen on the network — check what it is.",
+  "Κονσόλα: ανοίγει θύρες για online παιχνίδι — συνήθως εντάξει.": "Console: opens ports for online gaming — usually fine.",
+  "Συνήθως παιχνίδια, torrent ή κλήσεις βίντεο. Εντάξει αν ξέρεις ποιο πρόγραμμα το ζήτησε.": "Usually games, torrents or video calls. Fine if you know which program asked for it.",
+  "πολύ μεγάλο XML": "XML too large",
+  "XML με DOCTYPE — δεν το διαβάζω": "XML with DOCTYPE — not reading it",
+  "μόνο http σε ιδιωτική IP": "only http to a private IP",
+  "SMB (κοινόχρηστοι φάκελοι)": "SMB (file sharing)",
+  "RTSP (βίντεο κάμερας)": "RTSP (camera video)",
+  "MQTT χωρίς TLS": "MQTT without TLS",
+  "Απομακρυσμένη επιφάνεια εργασίας (RDP)": "Remote Desktop (RDP)",
+  "κάμερα / DVR (Hikvision)": "camera / DVR (Hikvision)",
+  "κάμερα / DVR (Dahua)": "camera / DVR (Dahua)",
+  "Telnet (εναλλακτική)": "Telnet (alternate)",
+  "TR-069 (διαχείριση router)": "TR-069 (router management)",
+  "σελίδα διαχείρισης (HTTP)": "admin page (HTTP)",
+  "σελίδα διαχείρισης (HTTPS)": "admin page (HTTPS)",
+  "υπηρεσία web": "web service",
+  "NAS / UPnP": "NAS / UPnP",
+  "NAS (HTTPS)": "NAS (HTTPS)",
+  "DVR (XMEye)": "DVR (XMEye)",
   "Ψάχνω την τελευταία έκδοση στο npcap.com…": "Looking for the latest version on npcap.com…",
   "Ελέγχω την ψηφιακή υπογραφή…": "Checking the digital signature…",
   "Ανοίγω την εγκατάσταση…": "Opening the installer…",
@@ -1200,6 +1223,26 @@ I18N.add({
   [
    "^Η ψηφιακή υπογραφή του installer δεν είναι έγκυρη \\((.*)\\) — δεν τον ανοίγω\\.$",
    "The installer's digital signature is not valid ($1) — I won't open it."
+  ],
+  [
+   "^Θύρα (.+?) — δεν πρέπει ποτέ να είναι ανοιχτή προς το Internet\\.$",
+   "Port $1 — should never be open to the Internet."
+  ],
+  [
+   "^Θύρα διαχείρισης \\((.+?)\\) ανοιχτή προς το Internet\\.$",
+   "Management port ($1) open to the Internet."
+  ],
+  [
+   "^Η συσκευή (.+?) ζήτησε από το router να ανοίξει τη θύρα (\\S+) (\\d+) προς το Internet( \\(«.*?»\\))?\\. (.*)$",
+   "Device $1 asked the router to open port $2 $3 to the Internet$4. $5"
+  ],
+  [
+   "^Βρήκα UPnP router αλλά δεν μπόρεσα να διαβάσω τον πίνακα: (.*)$",
+   "Found a UPnP router but could not read its table: $1"
+  ],
+  [
+   "^Ο έλεγχος UPnP απέτυχε: (.*)$",
+   "The UPnP check failed: $1"
   ],
   [
    "^Δεν μπόρεσα να κατεβάσω τη λίστα της CISA: (.*)$",
