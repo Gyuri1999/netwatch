@@ -4,6 +4,7 @@
 Ιδιωτικότητα: κρατάμε μόνο τα πρώτα 128 bytes (ουσιαστικά τις κεφαλίδες) στη μνήμη, ποτέ στον δίσκο,
 και από το payload δείχνουμε μόνο το μήκος του — ποτέ περιεχόμενο (θα μπορούσε να είναι κωδικός ή cookie).
 """
+import re
 import threading
 import time
 
@@ -20,7 +21,7 @@ def remember(P, raw=None):
         return
     key = (P["src"], P["dst"])
     item = {"t": P.get("t") or time.time(), "P": {k: v for k, v in P.items() if k not in ("cred", "raw")},
-            "raw": bytes(raw[:KEEP_BYTES]) if raw else None}
+            "raw": bytes(raw[:KEEP_BYTES]) if raw else None, "id": P.get("_id")}
     with _lock:
         lst = _pairs.pop(key, [])  # pop+insert → τα πιο πρόσφατα στο τέλος (LRU)
         lst.append(item)
@@ -51,10 +52,45 @@ def flows(ip, limit=15):
     return out
 
 
-def get(src, dst, idx=-1):
+def get(src, dst, idx=-1, pid=None):
+    """Το πακέτο με αυτό το id (από τη λίστα 📦 Πακέτα) ή, αν έχει «φύγει», το πιο πρόσφατο του ζεύγους."""
     with _lock:
         lst = _pairs.get((src, dst)) or []
+        if pid is not None:
+            for it in reversed(lst):
+                if it.get("id") == pid:
+                    return dict(it)
+            return {**lst[-1], "approx": True} if lst else None
         return dict(lst[idx]) if lst and -len(lst) <= idx < len(lst) else None
+
+
+def conversation(recent, a, b, proto=None, pa=None, pb=None, limit=60):
+    """🔁 Τα πακέτα μιας σύνδεσης (και προς τις δύο κατευθύνσεις) για το διάγραμμα «σκάλα».
+    a:pa ↔ b:pb· για ARP/ICMP χωρίς θύρες. Μόνο κεφαλίδες (σημαίες, μέγεθος, χρόνος) — ποτέ περιεχόμενο."""
+    out = []
+    for P in list(recent):
+        s, d = P.get("src"), P.get("dst")
+        if {s, d} != {a, b} or s == d:
+            continue
+        pr = P.get("proto")
+        if proto and pr != proto:
+            continue
+        if pr in ("TCP", "UDP") and pa is not None and pb is not None:
+            sp, dp = P.get("sp"), P.get("dp")
+            if not ((s == a and sp == pa and dp == pb) or (s == b and sp == pb and dp == pa)):
+                continue
+        it = {"t": round(P.get("t") or 0, 4), "dir": "ab" if s == a else "ba", "p": pr, "l": P.get("len"),
+              "f": P.get("flags") or {1: "who-has", 2: "is-at"}.get((P.get("arp") or {}).get("op"), "")}
+        if P.get("icmp_type") is not None:
+            it["ic"] = P["icmp_type"]
+        if P.get("dns_q"):
+            it["n"] = str(P["dns_q"][0])[:80]
+        elif P.get("dns_resp"):
+            it["n"] = "↩"
+        elif P.get("sni"):
+            it["n"] = str(P["sni"])[:80]
+        out.append(it)
+    return out[-limit:]
 
 
 def synth(P):
@@ -141,6 +177,10 @@ FIELD_INFO = {
     ("DNS", "rcode"): ("0 = OK, 3 = NXDOMAIN (δεν υπάρχει το όνομα).", "ccna-4-4"),
 }
 SKIP_LAYERS = ("Raw", "Padding")
+# 🔒 hex μόνο για κεφαλίδες χωρίς μυστικά· πεδία που μοιάζουν με κωδικό/κλειδί δεν δείχνονται ποτέ (π.χ. SNMP community)
+HEX_OK = ("Ethernet", "802.1Q", "ARP", "IP", "IPv6", "TCP", "UDP", "ICMP", "DNS", "BOOTP")
+SECRET_RE = re.compile(r"community|auth|pass|secret|token|cookie|key|cred|digest|chap|psk", re.I)
+SECRET_LAYERS = ("SNMP", "Radius", "TACACS", "HTTPRequest", "HTTPResponse", "HTTP")
 WELL_KNOWN = {20: "FTP-data", 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 53: "DNS", 67: "DHCP server", 68: "DHCP client",
               69: "TFTP", 80: "HTTP", 110: "POP3", 123: "NTP", 143: "IMAP", 161: "SNMP", 443: "HTTPS/QUIC", 445: "SMB",
               514: "Syslog", 1883: "MQTT", 5353: "mDNS", 8883: "MQTT/TLS", 3389: "RDP"}
@@ -158,6 +198,8 @@ def decode(item):
     except Exception:
         pkt, real = Ether(bytes(synth(P))), False
     layers, payload = [], 0
+    wire = bytes(pkt)
+    off = 0
     cur = pkt
     while cur is not None and cur.__class__.__name__ != "NoPayload" and len(layers) < 7:
         if cur.__class__.__name__ in SKIP_LAYERS:
@@ -181,10 +223,15 @@ def decode(item):
                                   f"{' → ' + str(r.rdata) if hasattr(r, 'rdata') else ''}" for r in recs[:4]) or "—"
             if f.name in ("sport", "dport") and isinstance(v, int) and v in WELL_KNOWN:
                 shown = f"{v} ({WELL_KNOWN[v]})"
+            if SECRET_RE.search(f.name) or (name in SECRET_LAYERS and f.name not in ("version", "PDU")):
+                shown = "••• (κρυμμένο)"
             fi, fl = FIELD_INFO.get((name, f.name), (None, None))
             fields.append({"name": f.name, "value": str(shown)[:120], "info": fi, "lesson": fl})
+        nb = len(bytes(cur)) - len(bytes(cur.payload))
+        # 🔢 hex μόνο των κεφαλίδων (μέχρι 64 B ανά επίπεδο)· τα δεδομένα εφαρμογής δεν τα δείχνουμε ποτέ
         layers.append({"name": name, "osi": OSI.get(name, 7), "info": info, "lesson": lesson, "fields": fields,
-                       "bytes": len(bytes(cur)) - len(bytes(cur.payload))})
+                       "bytes": nb, "off": off, "hex": wire[off:off + min(nb, 64)].hex() if name in HEX_OK else ""})
+        off += nb
         cur = cur.payload
     total = P.get("len") or len(bytes(pkt))
     hdr = sum(x["bytes"] for x in layers)

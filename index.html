@@ -1330,7 +1330,9 @@ function renderFeed(){if($('fpause').checked&&S.feedEx==null)return;
   if(F.ok&&F.fn){const n=list.length;list=list.filter(F.fn);$('fflt-st').textContent=`🦈 ${list.length} από ${n} πακέτα ταιριάζουν`}
   else $('fflt-st').innerHTML=F.ok?'':`<span style="color:${F.ws?'#ffd23f':'#ff8da0'}">${esc(F.err)}</span>`;
   $('fb').innerHTML=list.slice(0,200).map((p,i)=>`<tr class="r" data-i="${i}" style="color:${p.x?'#ff3b5c':COLORS[p.a]||COLORS[p.p]||'#cfe0f5'}"><td>${fmtT(p.t)}</td><td>${esc(p.a)}${p.f?' ['+esc(p.f)+']':''}</td><td>${esc(p.s)}${p.sp!=null?':'+p.sp:''} → ${esc(p.d)}${p.dp!=null?':'+p.dp:''}</td><td>${p.l}</td></tr>`+
-    (S.feedEx===p?`<tr class="ex"><td colspan="4">${explainPacket(p)}</td></tr>`:'')).join('');
+    (S.feedEx===p?`<tr class="ex"><td colspan="4">${explainPacket(p)}${p.i?`<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="b" data-pk="${p.i}">🔬 ${TT('Άνοιγμα σε επίπεδα + hex','Open as layers + hex')}</button>${p.p!=='UDP'||p.a==='DNS'||p.dp!=null?`<button class="b" data-cv="${p.i}">🔁 ${TT('Διάγραμμα σύνδεσης','Connection diagram')}</button>`:''}</div>`:''}</td></tr>`:'')).join('');
+  $('fb').querySelectorAll('[data-pk]').forEach(b=>b.onclick=e=>{e.stopPropagation();const p=S.feedEx;if(p)pktShow(null,p.s,p.d,p.i)});
+  $('fb').querySelectorAll('[data-cv]').forEach(b=>b.onclick=e=>{e.stopPropagation();const p=S.feedEx;if(p)convOpen(p)});
   $('fb').querySelectorAll('tr.r').forEach(tr=>tr.onclick=()=>{const p=list[+tr.dataset.i];S.feedEx=S.feedEx===p?null:p;$('fpause').checked=!!S.feedEx;renderFeed()})}
 $('fpause').onchange=()=>{if(!$('fpause').checked)S.feedEx=null;renderFeed()};
 try{$('fflt').value=localStorage.getItem('nw-wsf')||''}catch(e){}
@@ -1422,7 +1424,17 @@ function pktOpen(ip){const o=pktBox();o.innerHTML='<div class="card" style="max-
     <div class="sm" style="margin:4px 0 8px">Διάλεξε μια σύνδεση για να δεις ένα πακέτο της «ανοιγμένο» σε επίπεδα OSI. Από τα δεδομένα δείχνω μόνο το μέγεθος, ποτέ το περιεχόμενο.</div>
     ${f.length?f.map(x=>`<div class="r" style="cursor:pointer" data-f="${esc(x.src)}|${esc(x.dst)}">${esc(who(x.src))} → ${esc(who(x.dst))} <span class="tag">${esc(x.proto||'?')}${x.dp?' :'+x.dp:''}</span>${x.flags?` <span class="sm">${esc(x.flags)}</span>`:''} <span class="sm">${x.len||''} B${x.real?'':' · ανακατασκευή'}</span></div>`).join(''):'<div class="empty">Δεν έχω δει ακόμα πακέτα της.</div>'}</div>`;
     o.querySelectorAll('[data-f]').forEach(d=>d.onclick=()=>{const [a,b]=d.dataset.f.split('|');pktShow(ip,a,b)})})}
-function pktShow(ip,a,b){const o=pktBox();fetch(`/api/packet?src=${encodeURIComponent(a)}&dst=${encodeURIComponent(b)}`).then(r=>r.json()).then(d=>{
+const TT=(g,e)=>window.I18N&&I18N.lang==='en'?e:g;
+// 🔢 hex των κεφαλίδων, με το χρώμα του επιπέδου (το payload δεν το δείχνουμε ποτέ)
+function hexHTML(d){const by=[];for(const l of d.layers){const h=l.hex||'';for(let i=0;i<h.length;i+=2)by.push([h.slice(i,i+2),OSI_C[l.osi]||'#cfe0f5',l.name]);
+    if(!h&&l.bytes)for(let i=0;i<Math.min(l.bytes,64);i++)by.push(['••','#6d7f99',l.name])}
+  if(!by.length)return'';const rows=[];for(let i=0;i<by.length;i+=16){const r=by.slice(i,i+16);
+    rows.push(`<div><span style="color:var(--dim)">${i.toString(16).padStart(4,'0')}</span>  ${r.map(([x,c,n])=>`<span style="color:${c}" title="${esc(n)}">${x}</span>`).join(' ')}</div>`)}
+  return `<div style="margin-top:10px"><b>🔢 ${TT('Τα bytes των κεφαλίδων (hex)','Header bytes (hex)')}</b> <span class="sm">${TT('κάθε χρώμα = ένα επίπεδο, όπως στο Wireshark','each colour = one layer, as in Wireshark')} · ${d.layers.map(l=>`<span style="color:${OSI_C[l.osi]||'#cfe0f5'}">■ ${esc(l.name)}</span>`).join(' ')}</span>
+    <div style="font:12px ui-monospace,Menlo,Consolas,monospace;background:var(--panel3);border-radius:6px;padding:8px 10px;margin-top:4px;overflow-x:auto;white-space:pre;line-height:1.6">${rows.join('')}</div>
+    ${d.payload?`<div class="sm" style="margin-top:3px">+ ${d.payload} bytes ${TT('δεδομένων εφαρμογής — κρυμμένα (μπορεί να έχουν κωδικούς).','of application data — hidden (they may contain passwords).')}</div>`:''}
+    ${by.some(x=>x[0]==='••')?`<div class="sm">•• = ${TT('κρυμμένο: αυτό το επίπεδο μπορεί να έχει μυστικά (π.χ. SNMP community).','hidden: this layer may contain secrets (e.g. SNMP community).')}</div>`:''}</div>`}
+function pktShow(ip,a,b,id){const o=pktBox();fetch(`/api/packet?src=${encodeURIComponent(a)}&dst=${encodeURIComponent(b)}${id?'&id='+id:''}`).then(r=>r.json()).then(d=>{
   if(d.error){alert(d.error);return}
   const lay=d.layers.slice().reverse();
   o.innerHTML=`<div class="card" style="max-width:820px;width:100%;white-space:normal"><div class="brow"><b style="color:var(--hi)">🔬 ${esc(d.summary)}</b><span><button class="b" id="pkt-back">← πίσω</button> <button class="b" onclick="$('pkt-ov').remove()">✕</button></span></div>
@@ -1432,8 +1444,40 @@ function pktShow(ip,a,b){const o=pktBox();fetch(`/api/packet?src=${encodeURIComp
      <div class="brow"><b style="color:${OSI_C[l.osi]||'#fff'}">${esc(l.name)}</b><span class="sm">${OSI_N[l.osi]||''} · κεφαλίδα ${l.bytes} B</span></div>
      ${l.info?`<div style="color:var(--mid);margin:2px 0 4px">${esc(l.info)}${l.lesson?` <a href="#" data-lesson="${esc(l.lesson)}">📖</a>`:''}</div>`:''}
      <table style="width:100%;border-collapse:collapse">${l.fields.map(f=>`<tr style="border-top:1px solid var(--panel3)"><td style="padding:2px 6px;white-space:nowrap;color:var(--txt);vertical-align:top"><code>${esc(f.name)}</code></td><td style="padding:2px 6px;white-space:normal;word-break:break-all;color:var(--hi);vertical-align:top">${esc(f.value)}</td><td style="padding:2px 6px;white-space:normal;color:var(--mid);font-size:12px">${f.info?esc(f.info):''}${f.lesson?` <a href="#" data-lesson="${esc(f.lesson)}">📖</a>`:''}</td></tr>`).join('')}</table></div>`).join('')}</div>`;
-  $('pkt-back').onclick=()=>pktOpen(ip);
+  o.querySelector('.card').insertAdjacentHTML('beforeend',hexHTML(d));
+  if(d.approx)o.querySelector('.card .sm').insertAdjacentHTML('afterbegin',`⏱ ${TT('Αυτό το πακέτο δεν το κρατάω πια· δείχνω το πιο πρόσφατο της ίδιας σύνδεσης.','I no longer keep that exact packet; showing the latest one of the same connection.')} `);
+  if(ip)$('pkt-back').onclick=()=>pktOpen(ip);else $('pkt-back').remove();
   o.querySelectorAll('[data-lesson]').forEach(x=>x.onclick=e=>{e.preventDefault();o.remove();ACADEMY.openLesson('ccna',x.dataset.lesson)})})}
+// ---- 🔁 Διάγραμμα σύνδεσης («σκάλα»): τα πακέτα μιας σύνδεσης ανάμεσα σε δύο συσκευές, με τη σειρά ----
+function convStep(x,i,all){const f=x.f||'';
+  if(x.p==='ARP')return f==='who-has'?[TT('ARP: «Ποιος έχει αυτή την IP;» (broadcast)','ARP: “Who has this IP?” (broadcast)'),'#ffd23f']:[TT('ARP: «Εγώ — να η MAC μου»','ARP: “Me — here is my MAC”'),'#3ddc97'];
+  if(x.p==='ICMP')return x.ic===8?['ICMP echo request (ping)','#7fd1ff']:x.ic===0?['ICMP echo reply','#3ddc97']:x.ic===11?['ICMP time exceeded (traceroute)','#ffd23f']:x.ic===3?['ICMP unreachable','#ff9f43']:['ICMP','#7fd1ff'];
+  if(x.p==='UDP')return x.n==='↩'?[TT('DNS απάντηση','DNS reply'),'#3ddc97']:x.n?[(TT('DNS ερώτηση: ','DNS query: '))+x.n,'#7fd1ff']:['UDP '+x.l+' B','#b388ff'];
+  if(f.includes('R'))return[TT('RST — απότομο κλείσιμο / «δεν ακούω εδώ»','RST — abrupt close / “nothing listening here”'),'#ff5576'];
+  if(f.includes('S')&&f.includes('A'))return[TT('SYN-ACK — βήμα 2/3 της χειραψίας','SYN-ACK — step 2/3 of the handshake'),'#ffd23f'];
+  if(f.includes('S'))return[TT('SYN — βήμα 1/3: «θέλω να συνδεθώ»','SYN — step 1/3: “I want to connect”'),'#ffd23f'];
+  if(f.includes('F'))return[TT('FIN — «τελείωσα», κλείσιμο','FIN — “I am done”, closing'),'#ff9f43'];
+  if(f.includes('P'))return[(TT('Δεδομένα','Data'))+` (${x.l} B)`+(x.n?' · '+x.n:''),'#3ddc97'];
+  const prev=all[i-1];if(f==='A'&&prev&&prev.f&&prev.f.includes('S')&&prev.f.includes('A'))return[TT('ACK — βήμα 3/3: η σύνδεση άνοιξε ✔','ACK — step 3/3: connection open ✔'),'#ffd23f'];
+  return[TT('ACK — «τα πήρα»','ACK — “got it”'),'#6d7f99']}
+function convOpen(p){const o=pktBox();o.innerHTML=`<div class="card" style="max-width:820px;width:100%;white-space:normal">${TT('φόρτωση…','loading…')}</div>`;
+  const q=new URLSearchParams({a:p.s,b:p.d});if(p.p==='TCP'||p.p==='UDP'||p.p==='ARP'||p.p==='ICMP')q.set('p',p.p);if(p.sp!=null&&p.dp!=null){q.set('pa',p.sp);q.set('pb',p.dp)}
+  fetch('/api/conv?'+q).then(r=>r.json()).then(j=>{const it=j.items||[],W=760,L=150,R=W-150,top=56,rh=34,H=top+Math.max(1,it.length)*rh+20,t0=it.length?it[0].t:0;
+    const A=who(p.s)+(p.sp!=null?':'+p.sp:''),B=who(p.d)+(p.dp!=null?':'+p.dp:'');
+    const svg=`<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" role="img" aria-label="${esc(TT('Διάγραμμα σύνδεσης','Connection diagram'))}">
+      <defs><marker id="cvh" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker></defs>
+      <text x="${L}" y="20" text-anchor="middle" fill="var(--hi)" font-size="13" font-weight="700">${esc(A)}</text><text x="${R}" y="20" text-anchor="middle" fill="var(--hi)" font-size="13" font-weight="700">${esc(B)}</text>
+      <line x1="${L}" y1="30" x2="${L}" y2="${H-8}" stroke="var(--line,#24324a)" stroke-width="2"/><line x1="${R}" y1="30" x2="${R}" y2="${H-8}" stroke="var(--line,#24324a)" stroke-width="2"/>
+      ${it.map((x,i)=>{const y=top+i*rh,[lab,c]=convStep(x,i,it),ab=x.dir==='ab',x1=ab?L:R,x2=ab?R:L,y2=y+16;
+        return `<g><line x1="${x1}" y1="${y+4}" x2="${x2}" y2="${y2}" stroke="${c}" stroke-width="2" marker-end="url(#cvh)"><title>${esc(x.f||x.p)} · ${x.l} B</title></line>
+          <text x="${W/2}" y="${y-2}" text-anchor="middle" fill="${c}" font-size="12">${esc(lab)}</text>
+          <text x="${ab?L-8:R+8}" y="${y+4}" text-anchor="${ab?'end':'start'}" fill="var(--dim)" font-size="11" font-family="ui-monospace,Menlo,monospace">+${((x.t-t0)*1000).toFixed(1)} ms</text></g>`}).join('')}</svg>`;
+    o.innerHTML=`<div class="card" style="max-width:820px;width:100%;white-space:normal"><div class="brow"><b style="color:var(--hi)">🔁 ${TT('Διάγραμμα σύνδεσης','Connection diagram')} · ${esc(p.p)}</b><button class="b" onclick="$('pkt-ov').remove()">✕</button></div>
+      <div class="sm" style="margin:4px 0 8px">${TT('Τα πακέτα αυτής της σύνδεσης με τη σειρά που τα είδα — αριστερά ποιος στέλνει, δεξιά ποιος λαμβάνει. Στο TCP ψάξε τη <b>χειραψία 3 βημάτων</b>: SYN → SYN-ACK → ACK. Μόνο κεφαλίδες· το περιεχόμενο δεν το δείχνω ποτέ.','The packets of this connection in the order I saw them — who sends on the left, who receives on the right. In TCP look for the <b>3-way handshake</b>: SYN → SYN-ACK → ACK. Headers only; content is never shown.')} <a href="#" data-lesson="ccna-1-2">📖</a></div>
+      ${it.length?svg:`<div class="empty">${TT('Δεν κράτησα άλλα πακέτα αυτής της σύνδεσης.','I have no other packets of this connection.')}</div>`}
+      ${it.length===1?`<div class="sm">${TT('Μόνο ένα πακέτο: η σύνδεση άνοιξε πριν ξεκινήσει η καταγραφή ή κράτησε πολύ λίγο.','Only one packet: the connection started before capture began or was very short.')}</div>`:''}
+      <div class="sm" style="margin-top:6px">${it.length} ${TT('πακέτα','packets')}${it.length>=60?' · '+TT('δείχνω τα τελευταία 60','showing the last 60'):''}</div></div>`;
+    o.querySelectorAll('[data-lesson]').forEach(x=>x.onclick=e=>{e.preventDefault();o.remove();ACADEMY.openLesson('ccna',x.dataset.lesson)})})}
 let histHours=24,histData=null,histQ='',histBusy=false;
 function loadHist(){if(histBusy)return;histBusy=true;fetch('/api/history?hours='+histHours).then(r=>r.json()).then(j=>{histData=j;histBusy=false;if(tab==='hist')drawHist()}).catch(()=>{histBusy=false})}
 function renderHist(){loadHist();if(histData)drawHist();else $('t-hist').innerHTML='<div class="empty">φόρτωση…</div>'}

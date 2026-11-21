@@ -406,6 +406,8 @@ class NetState:
 
     # ---------- main pipeline ----------
     def process(self, P):
+        self.pkt_seq = getattr(self, "pkt_seq", 0) + 1
+        P["_id"] = self.pkt_seq  # για να ανοίγει το ίδιο πακέτο από τη λίστα 📦 Πακέτα
         packets.remember(P, P.pop("_raw", None))
         t, L = P["t"], P["len"]
         src, dst, proto = P["src"], P["dst"], P["proto"]
@@ -504,7 +506,7 @@ class NetState:
             x = 1 if (hs and hs["threat"] >= 2 and not hs["me"]) else 0
             if len(self.pending) < 4000:
                 self.pending.append({"s": src, "d": dst, "p": proto, "a": label, "l": L,
-                                     "sp": sp, "dp": dp, "x": x,
+                                     "sp": sp, "dp": dp, "x": x, "i": P["_id"],
                                      "f": P.get("flags") or {1: "who-has", 2: "is-at"}.get((P.get("arp") or {}).get("op"), ""),
                                      "t": round(t, 3)})
                 if P.get("icmp_type") is not None:  # 8 echo, 0 reply, 11 time exceeded (traceroute), 3 unreachable
