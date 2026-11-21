@@ -137,6 +137,13 @@ INFO = {
 }
 # τύποι χωρίς ανιχνευτή στο core.MITRE (άλλα modules) → εξήγηση με βάση την αρχή του ονόματος
 PREFIX_INFO = [
+    ("Άνοιξε θύρα στο router (UPnP)", "upnp",
+     "Κάθε 15 λεπτά το NetWatch διαβάζει (μόνο ανάγνωση) τον πίνακα UPnP του router σου. Εμφανίστηκε νέα γραμμή: μια συσκευή "
+     "ζήτησε να ανοίξει θύρα προς το Internet. Κόκκινο = κάμερα ή επικίνδυνη θύρα (Telnet, RTSP, RDP, SMB…).",
+     "Every 15 minutes NetWatch reads (read-only) your router's UPnP table. A new row appeared: a device asked for a port "
+     "to be opened to the Internet. Red = a camera or a dangerous port (Telnet, RTSP, RDP, SMB…).",
+     "Κονσόλες (PS5/Xbox/Switch), torrent, Skype/Teams, εφαρμογές NAS και καμερών με «απομακρυσμένη πρόσβαση».",
+     "Consoles (PS5/Xbox/Switch), torrents, Skype/Teams, NAS and camera apps with “remote access”."),
     ("Συσκευή παρακάμπτει το DNS", "encdns",
      "Η συσκευή ρωτά DNS ΑΠΕΥΘΕΙΑΣ σε εξωτερικό server (π.χ. 8.8.8.8) ή μέσω κρυπτογραφημένου DNS (DoH/DoT/DoQ), "
      "αντί για τον router/Pi-hole σου — άρα δεν περνά από τα φίλτρα σου και δεν βλέπεις τι ονόματα ψάχνει.",

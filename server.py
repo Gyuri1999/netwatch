@@ -275,6 +275,12 @@ def make_handler(state):
                         return self._json({"error": "off"}, 400)
                     threading.Thread(target=vw.refresh, args=(True,), daemon=True).start()
                     return self._json({**vw.view(), "busy": True})
+                if u.path == "/api/upnp/refresh":  # 🔓 ξαναδιάβασε τον πίνακα UPnP του router (μόνο ανάγνωση)
+                    uw = getattr(state, "upnp", None)
+                    if not uw:
+                        return self._json({"error": "off"}, 400)
+                    threading.Thread(target=uw.refresh, daemon=True).start()
+                    return self._json({**uw.view(), "busy": True})
                 if u.path == "/api/npcap/install":  # ⬇ Npcap (Windows): κατέβασμα από npcap.com + έλεγχος υπογραφής + installer
                     ng = getattr(state, "npcap", None)
                     if not ng:
@@ -743,7 +749,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/assessui.js", "/vulnui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/assessui.js", "/vulnui.js", "/upnpui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -822,6 +828,9 @@ def make_handler(state):
             if u.path == "/api/vulns":  # 🛡 ευπάθειες για τις συσκευές σου (CISA KEV)
                 vw = getattr(state, "vulns", None)
                 return self._json(vw.view() if vw else {"error": "off"})
+            if u.path == "/api/upnp":  # 🔓 θύρες που άνοιξαν μόνες τους στο router (UPnP)
+                uw = getattr(state, "upnp", None)
+                return self._json(uw.view() if uw else {"error": "off"})
             if u.path == "/api/npcap":
                 ng = getattr(state, "npcap", None)
                 return self._json(ng.view() if ng else {"available": False})

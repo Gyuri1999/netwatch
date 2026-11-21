@@ -290,6 +290,12 @@ def main():
     state.vulns = vulnwatch.VulnWatch(state, DATA if live else None, demo=demo)
     if live:
         threading.Thread(target=state.vulns.run_forever, daemon=True).start()
+    import upnpwatch  # 🔓 θύρες που άνοιξαν μόνες τους στο router (UPnP) — μόνο ανάγνωση, κάθε 15'
+    state.upnp = upnpwatch.UpnpWatch(state, DATA if live else None, demo=demo) if mode != "pcap" else None
+    if demo:
+        state.upnp.refresh()
+    elif live and state.upnp:
+        threading.Thread(target=state.upnp.run_forever, daemon=True).start()
     import l2guard  # 🛡 rogue DHCP / ARP spoofing με ένα κουμπί (DHCPDISCOVER + ARP μόνο στο τοπικό LAN)
     state.l2guard = l2guard.L2Guard(state, sim=demo) if mode != "pcap" else None
     import updater  # 🔄 ενημερώσεις από GitHub (υπογεγραμμένες· στα apps μπαίνουν και μόνες τους)
