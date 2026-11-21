@@ -10,9 +10,15 @@ OUT=dist/NetWatch.app
 BUILD=build/macapp
 rm -rf "$OUT" && mkdir -p "$OUT/Contents/MacOS" "$OUT/Contents/Resources/netwatch" "$BUILD"
 
-echo "▸ μεταγλώττιση (swiftc)"
-swiftc -O -swift-version 5 -target "$(uname -m)-apple-macos12.0" \
-  -framework AppKit -framework WebKit -framework SwiftUI -framework ServiceManagement macapp/NetWatch.swift -o "$OUT/Contents/MacOS/NetWatch"
+echo "▸ μεταγλώττιση (swiftc) — universal: Apple Silicon (arm64) + Intel (x86_64)"
+# Intel από macOS 13: τα νέα Command Line Tools δεν έχουν πια τις βιβλιοθήκες συμβατότητας x86_64 για macOS 12
+for T in arm64-apple-macos12.0 x86_64-apple-macos13.0; do
+  A=${T%%-*}
+  swiftc -O -swift-version 5 -target "$T" \
+    -framework AppKit -framework WebKit -framework SwiftUI -framework ServiceManagement macapp/NetWatch.swift -o "$BUILD/NetWatch-$A"
+done
+lipo -create "$BUILD/NetWatch-arm64" "$BUILD/NetWatch-x86_64" -output "$OUT/Contents/MacOS/NetWatch"
+lipo -info "$OUT/Contents/MacOS/NetWatch"
 
 echo "▸ εικονίδιο"
 swiftc -swift-version 5 macapp/make_icon.swift -o "$BUILD/make_icon"
