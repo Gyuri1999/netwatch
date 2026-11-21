@@ -903,6 +903,7 @@ I18N.add({
   "Κατέβασε τη νέα έκδοση από τη σελίδα του GitHub.": "Download the new version from the GitHub page.",
   "Δεν υπάρχει νεότερη έκδοση.": "There is no newer version.",
   "Η ενημέρωση τρέχει ήδη.": "The update is already running.",
+  "Η νέα έκδοση είναι ήδη έτοιμη — πάτα «Επανεκκίνηση τώρα».": "The new version is already ready — press “Restart now”.",
   "Δεν υπάρχει κλειδί υπογραφής στο app (update_signers) — δεν γίνεται ασφαλής αυτόματη εγκατάσταση.": "There is no signing key in the app (update_signers) — a safe automatic install is not possible.",
   "Το SHA-256 του NetWatch.zip δεν ταιριάζει — δεν εγκαταστάθηκε τίποτα.": "The SHA-256 of NetWatch.zip does not match — nothing was installed.",
   "Το SHA256SUMS δεν περιέχει το NetWatch.zip.": "SHA256SUMS does not list NetWatch.zip.",
@@ -3161,6 +3162,10 @@ I18N.add({
   [
    "^Η (\\S+) κατέβηκε και ελέγχθηκε\\. Πάτα «Επανεκκίνηση τώρα»: το NetWatch θα κλείσει και θα ανοίξει ξανά στη νέα έκδοση \\(το παλιό μένει ως \\.previous\\)\\.$",
    "$1 was downloaded and verified. Press “Restart now”: NetWatch will close and reopen on the new version (the old one is kept as .previous)."
+  ],
+  [
+   "^Δεν αποθηκεύτηκε η ρύθμιση: (.*)$",
+   "The setting was not saved: $1"
   ],
   [
    "^Εγκαταστάθηκε η (\\S+)\\. Το παλιό κρατήθηκε ως (\\S+)\\. Κάνε επανεκκίνηση του NetWatch\\.$",

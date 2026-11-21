@@ -5,7 +5,7 @@
   const EN = () => !!(window.I18N && I18N.lang === 'en');
   const T = (el, en) => EN() ? en : el;
   const tr = x => (EN() && window.I18N && I18N.t ? I18N.t(String(x || '')) : String(x || ''));
-  const post = u => fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }).then(r => r.json());
+  const post = (u, b) => fetch(u, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(b || {}) }).then(r => r.json());
   const box = () => document.getElementById('t-upd');
   let V = null, poll = null, busy = false;
 
@@ -25,6 +25,8 @@
 #t-upd .up-go{border-color:var(--green)!important;color:var(--green)!important;font-weight:600}
 #t-upd .up-warn{color:var(--orange);font-size:13px;margin-top:8px}
 #t-upd .up-err{color:var(--red);font-size:13px;margin-top:8px}
+#t-upd .up-auto{display:flex;gap:10px;align-items:flex-start;margin-top:12px;font-size:13px;cursor:pointer}
+#t-upd .up-auto input{margin-top:3px}
 #t-upd code{background:rgb(var(--w,255 255 255) / 8%);padding:0 4px;border-radius:4px}
 `;
   document.head.appendChild(css);
@@ -44,13 +46,21 @@
     if (!p) {
       const ref = document.getElementById('mode-btn'); if (!ref) return;
       p = document.createElement('button'); p.id = 'upd-pill'; p.className = 'b hbtn'; p.setAttribute('data-noi18n', '');
-      p.onclick = () => window.showTab && showTab('upd');
+      p.onclick = () => {
+        if (ready()) return restart();
+        if (window.showTab) showTab('upd');
+      };
       ref.parentNode.insertBefore(p, ref);
     }
-    const on = V && V.available;
+    const j = (V && V.job) || {}, tag = j.tag || (V && V.latest && V.latest.tag) || '';
+    const on = V && (V.available || ready() || j.state === 'running');
     p.classList.toggle('on', !!on);
-    if (on) { p.textContent = '🆕 ' + (V.latest ? V.latest.tag : T('ενημέρωση', 'update')); p.title = T('Βγήκε νέα έκδοση του NetWatch', 'A new NetWatch version is out'); }
+    if (!on) return;
+    if (ready()) { p.textContent = '✔ ' + tag + ' · ↻'; p.title = T('Η νέα έκδοση κατέβηκε και ελέγχθηκε — κλικ για επανεκκίνηση τώρα (αλλιώς μπαίνει μόνη της στο επόμενο άνοιγμα ή τη νύχτα)', 'The new version is downloaded and verified — click to restart now (otherwise it goes in on the next start or at night)'); }
+    else if (j.state === 'running') { p.textContent = '⬇ ' + tag + ' ' + Math.round((j.pct || 0) * 100) + '%'; p.title = T('Κατεβαίνει η νέα έκδοση', 'Downloading the new version'); }
+    else { p.textContent = '🆕 ' + (tag || T('ενημέρωση', 'update')); p.title = T('Βγήκε νέα έκδοση του NetWatch', 'A new NetWatch version is out'); }
   }
+  const ready = () => !!(V && V.job && V.job.state === 'done' && V.job.restart && V.kind !== 'git' && !V.sim);
 
   function draw() {
     const b = box(); if (!b || !V) return;
@@ -67,7 +77,7 @@
     if (V.kind === 'git' && g && !g.error) h += `<div class="dim" style="font-size:12.5px;margin-top:8px">🌿 ${E(g.branch)} → ${E(g.upstream)} · ${g.behind ? T(`${g.behind} νέα commits`, `${g.behind} new commits`) : T('ενημερωμένο', 'up to date')}${g.dirty ? ' · ⚠ ' + T('τοπικές αλλαγές', 'local changes') : ''}</div>`
       + (g.commits && g.commits.length ? `<div class="up-notes">${g.commits.map(c => `<div><code>${E(c.slice(0, 7))}</code> ${E(c.slice(8))}</div>`).join('')}</div>` : '');
     if (L && V.available && V.kind !== 'git') h += `<div class="up-notes"><b>${E(L.name || L.tag)}</b>${L.date ? ` <span class="dim">· ${E(L.date.slice(0, 10))}</span>` : ''}${md(L.notes || '') || `<div class="dim">${T('(χωρίς σημειώσεις)', '(no release notes)')}</div>`}</div>`;
-    if (V.available) {
+    if (V.available || j.state === 'done' || j.state === 'running') {
       if (j.state === 'running') h += `<div style="margin-top:12px"><b>⏳ ${E(tr(j.step || ''))}</b><div class="up-bar"><i style="width:${Math.round((j.pct || 0) * 100)}%"></i></div></div>`;
       else if (j.state === 'done') h += `<div style="margin-top:12px;color:var(--green)"><b>✔ ${E(tr(j.step))}</b></div><div style="margin-top:8px"><button class="b up-go" data-up="restart">↻ ${T('Επανεκκίνηση τώρα', 'Restart now')}</button></div>`;
       else {
@@ -76,9 +86,10 @@
           : `<div class="up-warn">ℹ️ ${E(tr(V.why_not))}</div><div style="margin-top:8px"><a class="b" href="${E(L && L.url || V.page)}" target="_blank" rel="noopener">⬇ ${T('Άνοιγμα στο GitHub', 'Open on GitHub')} ↗</a></div>`;
       }
     }
+    if (V.auto_ok) h += `<label class="up-auto"><input type="checkbox" data-auto${V.auto_install ? ' checked' : ''}><span><b>${T('Αυτόματη ενημέρωση', 'Automatic updates')}</b><br><span class="dim">${T('Κάθε 6 ώρες ελέγχω το GitHub· νέα έκδοση → την κατεβάζω και ελέγχω υπογραφή + SHA-256 στο παρασκήνιο. Μπαίνει στο επόμενο άνοιγμα του NetWatch ή μόνη της τη νύχτα (03:00–05:00). Πάνω δεξιά βγαίνει «✔ vX · ↻» για να την περάσεις αμέσως.', 'Every 6 hours I check GitHub; a new version is downloaded and its signature + SHA-256 checked in the background. It goes in the next time NetWatch starts, or by itself at night (03:00–05:00). A “✔ vX · ↻” button appears at the top so you can apply it right away.')}</span></span></label>`;
     h += `</div>`;
     h += `<div class="card"><b>🔐 ${T('Πώς προστατεύεσαι', 'How you are protected')}</b><div class="up-steps">
-      <div>1️⃣ <span>${T('Ρωτάω μόνο το <code>api.github.com</code> για το repo του NetWatch — δεν στέλνω τίποτα για εσένα ή το δίκτυό σου. Αυτόματα μόνο <b>ενημερώνω</b>· ποτέ δεν εγκαθιστώ μόνο μου.', 'I only ask <code>api.github.com</code> about the NetWatch repo — nothing about you or your network is sent. Automatically I only <b>notify</b>; I never install by myself.')}</span></div>
+      <div>1️⃣ <span>${T('Ρωτάω μόνο το <code>api.github.com</code> για το repo του NetWatch — δεν στέλνω τίποτα για εσένα ή το δίκτυό σου.', 'I only ask <code>api.github.com</code> about the NetWatch repo — nothing about you or your network is sent.')} ${V.auto_ok && V.auto_install ? T('Στο app η ενημέρωση <b>μπαίνει μόνη της</b> — αλλά μόνο αν περάσει όλους τους ελέγχους από κάτω.', 'In the app updates <b>install by themselves</b> — but only if they pass every check below.') : T('Αυτόματα μόνο <b>ενημερώνω</b>· εγκατάσταση μόνο με κλικ.', 'Automatically I only <b>notify</b>; installing takes a click.')}</span></div>
       <div>2️⃣ <span>${T('Ελέγχω την <b>ψηφιακή υπογραφή</b> του <code>SHA256SUMS</code> με το κλειδί που είναι ήδη μέσα στο app σου (<code>ssh-keygen -Y verify</code>). Λάθος ή καθόλου υπογραφή → δεν αλλάζει τίποτα.', 'I verify the <b>digital signature</b> of <code>SHA256SUMS</code> against the key already inside your app (<code>ssh-keygen -Y verify</code>). Wrong or missing signature → nothing changes.')}</span></div>
       ${V.kind === 'app' ? `<div>3️⃣ <span>${T('Ελέγχω το <b>SHA-256</b> του αρχείου, το bundle id, την έκδοση και το <code>codesign</code>.', 'I check the file’s <b>SHA-256</b>, the bundle id, the version and <code>codesign</code>.')}</span></div>
       <div>4️⃣ <span>${T('Κρατάω την παλιά έκδοση ως <code>NetWatch.app.previous</code> — αν κάτι πάει στραβά, γυρνάω πίσω.', 'I keep the old version as <code>NetWatch.app.previous</code> — if anything goes wrong, I roll back.')}</span></div>`
@@ -87,7 +98,7 @@
       : V.os === 'win32' ? `<div>3️⃣ <span>${T('Στα Windows <b>δεν</b> εγκαθιστώ μόνο μου: κατεβάζεις το <code>NetWatch-windows-x64.zip</code> από το GitHub (και αν θες ελέγχεις το SHA-256 με <code>Get-FileHash</code> απέναντι στο <code>SHA256SUMS</code>).', 'On Windows I do <b>not</b> install by myself: you download <code>NetWatch-windows-x64.zip</code> from GitHub (optionally check its SHA-256 with <code>Get-FileHash</code> against <code>SHA256SUMS</code>).')}</span></div>
       <div>4️⃣ <span>${T('Κλείσε το NetWatch (ασπίδα δίπλα στο ρολόι → Έξοδος), αντικατέστησε τον φάκελο και άνοιξέ το ξανά. Οι ρυθμίσεις και τα δεδομένα σου είναι στο %LOCALAPPDATA% και μένουν.', 'Quit NetWatch (shield next to the clock → Έξοδος / Exit), replace the folder and start it again. Your settings and data live in %LOCALAPPDATA% and are kept.')}</span></div>`
       : `<div>3️⃣ <span>${T('Ελέγχω το <b>SHA-256</b> κάθε αρχείου πριν το χρησιμοποιήσω.', 'I check every file’s <b>SHA-256</b> before using it.')}</span></div>`}</div>
-      <div class="dim" style="font-size:12px;margin-top:10px">${V.auto ? T('Αυτόματος έλεγχος: μία φορά τη μέρα (κλείνει με <code>updates: {auto_check: false}</code> στο config.yaml).', 'Automatic check: once a day (turn off with <code>updates: {auto_check: false}</code> in config.yaml).') : T('Αυτόματος έλεγχος: κλειστός.', 'Automatic check: off.')}</div></div>`;
+      <div class="dim" style="font-size:12px;margin-top:10px">${V.auto ? T('Αυτόματος έλεγχος: κάθε 6 ώρες (κλείνει με <code>updates: {auto_check: false}</code> στο config.yaml).', 'Automatic check: every 6 hours (turn off with <code>updates: {auto_check: false}</code> in config.yaml).') : T('Αυτόματος έλεγχος: κλειστός.', 'Automatic check: off.')}</div></div>`;
     b.innerHTML = h;
   }
 
@@ -97,6 +108,18 @@
     if (running && !poll) poll = setInterval(load, 1000);
     if (!running && poll) { clearInterval(poll); poll = null; }
   }
+  function restart() {
+    if (!confirm(T('Να κλείσει και να ξανανοίξει το NetWatch στη νέα έκδοση;', 'Close and reopen NetWatch on the new version?'))) return;
+    post('/api/update/restart').then(j => {
+      if (j.error) return alert(tr(j.error));
+      const p = document.getElementById('upd-pill'); if (p) p.textContent = '↻ …';
+      if (j.closing) setTimeout(() => { try { window.close(); } catch (e) { /* */ } }, 6000);
+    }).catch(() => {});
+  }
+  document.addEventListener('change', e => {
+    const c = e.target.closest('#t-upd [data-auto]'); if (!c) return;
+    post('/api/update/auto', { on: c.checked }).then(j => { if (j.error) alert(tr(j.error)); else { V = j; pill(); draw(); } }).catch(() => {});
+  });
   document.addEventListener('click', e => {
     const b = e.target.closest('#t-upd [data-up]'); if (!b) return;
     const a = b.dataset.up;
@@ -113,6 +136,6 @@
   });
 
   window.renderUpd = () => load();
-  const init = () => { load(); setInterval(() => { if (!poll) load(); }, 30 * 60 * 1000); };
+  const init = () => { load(); setInterval(() => { if (!poll) load(); }, 5 * 60 * 1000); };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init); else init();
 })();

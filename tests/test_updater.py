@@ -207,7 +207,7 @@ def test_windows_app_install_stages_signed_update(tmp_path, monkeypatch):
     """Windows app: υπογεγραμμένο SHA256SUMS-windows → κατέβασμα/έλεγχος/αποσυμπίεση στο …/NetWatch/update + ready.json·
     η αλλαγή φακέλων γίνεται από το launcher στην επανεκκίνηση."""
     # «Windows» μόνο για τον εντοπισμό εγκατάστασης — όχι sys.platform (θα χαλούσε το subprocess σε Linux/Mac)
-    monkeypatch.setattr(updater, "detect_kind", lambda here: "winapp" if updater.win_bundle(here) else "files")
+    monkeypatch.setattr(updater, "detect_kind", lambda here, ppid=None: "winapp" if updater.win_bundle(here) else "files")
     key = tmp_path / "k"
     subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", str(key)], check=True)
     pub = " ".join(open(str(key) + ".pub").read().split()[:2])
@@ -271,7 +271,7 @@ def test_windows_app_install_stages_signed_update(tmp_path, monkeypatch):
 
 
 def test_windows_app_without_signed_package_is_manual(tmp_path, monkeypatch):
-    monkeypatch.setattr(updater, "detect_kind", lambda here: "winapp" if updater.win_bundle(here) else "files")
+    monkeypatch.setattr(updater, "detect_kind", lambda here, ppid=None: "winapp" if updater.win_bundle(here) else "files")
     sup = tmp_path / "NetWatch"
     (sup / "app").mkdir(parents=True)
     b = tmp_path / "B"
@@ -282,3 +282,83 @@ def test_windows_app_without_signed_package_is_manual(tmp_path, monkeypatch):
     u = updater.Updater(here=str(sup / "app"), fetch=lambda *a, **k: json.dumps(rel).encode())
     v = u.check(force=True)
     assert v["kind"] == "winapp" and v["available"] and not v["can_install"] and "GitHub" in v["why_not"]
+
+
+def _auto_updater(tmp_path, hour=12):
+    rel = {"tag_name": "v9.0.0", "assets": []}
+    u = updater.Updater(here=str(tmp_path), fetch=lambda *a, **k: json.dumps(rel).encode(), hour=lambda: hour_box[0])
+    hour_box[0] = hour
+    u.kind, u.bundle = "winapp", str(tmp_path)
+    u._can_install = lambda: (u.available(), "")
+    calls = []
+    u._install_win = lambda: calls.append("install") or "έτοιμη"
+    u.restart = lambda: calls.append("restart") or {"ok": True}
+    return u, calls
+
+
+hour_box = [12]
+
+
+def test_auto_install_downloads_then_applies_only_at_night(tmp_path, monkeypatch):
+    monkeypatch.setattr(updater.Updater, "auto_ok", lambda self: True)
+    u, calls = _auto_updater(tmp_path)
+    assert u.view()["auto_install"] is True
+    assert u.tick() == "install" and calls == ["install"]
+    assert u.job["state"] == "done" and u.job["auto"] and u.job["tag"] == "v9.0.0"
+    assert u.tick() is None and calls == ["install"]  # μεσημέρι: δεν κλείνει την εφαρμογή, ούτε ξανακατεβάζει
+    hour_box[0] = 3
+    assert u.tick() == "restart" and calls == ["install", "restart"]
+
+
+def test_auto_install_off_and_failures_are_not_retried(tmp_path, monkeypatch):
+    monkeypatch.setattr(updater.Updater, "auto_ok", lambda self: True)
+    u, calls = _auto_updater(tmp_path)
+    assert u.set_auto(False)["auto_install"] is False
+    assert u.tick() is None and calls == [] and u.view()["available"]  # μόνο ειδοποίηση
+    u2, calls2 = _auto_updater(tmp_path)
+    assert u2.auto_install is False  # η επιλογή μένει (data/update.json)
+    u2.set_auto(True)
+
+    def boom():
+        raise RuntimeError("υπογραφή ✖")
+    u2._install_win = boom
+    assert u2.tick() is None and u2.job["state"] == "error" and u2.auto_failed == "v9.0.0"
+    u2._install_win = lambda: calls2.append("install") or "ok"
+    assert u2.tick() is None and calls2 == []  # ίδια έκδοση: όχι ξανά αυτόματα
+    assert u2.install()["ok"]  # με κλικ όμως ναι
+    for _ in range(100):
+        if u2.job["state"] != "running":
+            break
+        time.sleep(0.02)
+    assert calls2 == ["install"]
+
+
+def test_auto_install_skips_version_launcher_could_not_apply(tmp_path, monkeypatch):
+    monkeypatch.setattr(updater.Updater, "auto_ok", lambda self: True)
+    here = tmp_path / "NetWatch" / "app"
+    here.mkdir(parents=True)
+    (tmp_path / "NetWatch" / "update-failed.json").write_text(json.dumps({"version": "9.0.0"}))
+    u, calls = _auto_updater(here)
+    assert u.tick() is None and calls == []
+
+
+def test_auto_never_for_git_docker_files_or_demo(tmp_path):
+    rel = {"tag_name": "v9.0.0", "assets": []}
+    for kind in ("git", "docker", "files"):
+        u = updater.Updater(here=str(tmp_path), fetch=lambda *a, **k: json.dumps(rel).encode())
+        u.kind = kind
+        assert not u.auto_ok()
+    assert not updater.Updater(here=str(tmp_path), sim=True).auto_ok()
+
+
+def test_mac_bundle_from_parent_process(tmp_path, monkeypatch):
+    monkeypatch.setattr(updater.sys, "platform", "darwin")
+    app = tmp_path / "Applications" / "NetWatch.app"
+    (app / "Contents" / "Resources" / "netwatch").mkdir(parents=True)
+    here = tmp_path / "Library" / "Application Support" / "NetWatch" / "app"
+    exe = str(app / "Contents" / "MacOS" / "NetWatch")
+    run = lambda argv, timeout=0: (0, exe + "\n", "")
+    assert updater.mac_bundle(str(here), 123, run) == str(app)
+    assert updater.mac_bundle(str(here), None, run) is None
+    assert updater.mac_bundle(str(tmp_path / "other"), 123, run) is None
+    assert updater.mac_bundle(str(here), 123, lambda argv, timeout=0: (0, "/usr/bin/python3\n", "")) is None

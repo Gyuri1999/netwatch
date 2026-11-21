@@ -154,20 +154,12 @@ def write_bundle_info(bundle=BUNDLE, path=BUNDLE_INFO):
     return True
 
 
-def pending_update(bundle=BUNDLE, upd=UPDATE_DIR, req=UPDATE_REQ, now=None):
-    """Αν ο πίνακας ζήτησε «Επανεκκίνηση» και υπάρχει ελεγμένη νέα έκδοση → ο φάκελός της, αλλιώς None."""
-    try:
-        with open(req, encoding="utf-8") as f:
-            r = json.load(f)
-        os.remove(req)
-    except (OSError, ValueError):
-        return None
-    if (now or time.time()) - float(r.get("t") or 0) > 120:
-        return None
+def ready_dir(bundle=BUNDLE, upd=UPDATE_DIR):
+    """Ο φάκελος της ελεγμένης νέας έκδοσης (από το ready.json του backend) ή None."""
     try:
         with open(os.path.join(upd, "ready.json"), encoding="utf-8") as f:
             new = json.load(f).get("dir") or ""
-    except (OSError, ValueError):
+    except (OSError, ValueError, AttributeError):
         return None
     new = os.path.abspath(new)
     # μόνο φάκελος μέσα στο UPDATE_DIR, με NetWatch.exe — τίποτα άλλο δεν μετακινείται
@@ -181,6 +173,44 @@ def pending_update(bundle=BUNDLE, upd=UPDATE_DIR, req=UPDATE_REQ, now=None):
     except OSError:
         return None
     return new
+
+
+def pending_update(bundle=BUNDLE, upd=UPDATE_DIR, req=UPDATE_REQ, now=None):
+    """Αν ο πίνακας ζήτησε «Επανεκκίνηση» και υπάρχει ελεγμένη νέα έκδοση → ο φάκελός της, αλλιώς None."""
+    try:
+        with open(req, encoding="utf-8") as f:
+            r = json.load(f)
+        os.remove(req)
+    except (OSError, ValueError):
+        return None
+    if (now or time.time()) - float(r.get("t") or 0) > 120:
+        return None
+    return ready_dir(bundle, upd)
+
+
+def startup_update(bundle=BUNDLE, upd=UPDATE_DIR):
+    """Στην εκκίνηση: έτοιμη ενημέρωση → εφαρμόζεται τώρα (μία προσπάθεια· αν απέτυχε, τη σβήνουμε)."""
+    try:
+        if not os.path.isdir(upd):
+            return None
+        mark = os.path.join(upd, "attempted")
+        new = ready_dir(bundle, upd)
+        if new and os.path.exists(mark):  # προσπαθήσαμε και ο φάκελος είναι ακόμα εδώ → απέτυχε· ο backend δεν την ξανακατεβάζει μόνος του
+            try:
+                with open(os.path.join(upd, "ready.json"), encoding="utf-8") as f:
+                    ver = json.load(f).get("version")
+                with open(os.path.join(os.path.dirname(os.path.abspath(upd)), "update-failed.json"), "w", encoding="utf-8") as f:
+                    json.dump({"version": ver, "t": time.time()}, f)
+            except (OSError, ValueError, AttributeError):
+                pass
+        if not new or os.path.exists(mark):
+            # τίποτα έτοιμο, ήδη εφαρμοσμένη (ο x/NetWatch μετακινήθηκε) ή αποτυχημένη προσπάθεια → καθάρισμα
+            shutil.rmtree(upd, ignore_errors=True)
+            return None
+        open(mark, "w").close()
+        return new
+    except OSError:
+        return None
 
 
 def apply_cmd(new, bundle=BUNDLE, pid=None, upd=UPDATE_DIR):
@@ -460,6 +490,10 @@ class App:
         new = pending_update()
         if not new:
             return
+        try:
+            open(os.path.join(UPDATE_DIR, "attempted"), "w").close()
+        except OSError:
+            pass
         self.msg = "Ενημέρωση…"
         self.refresh_icon()
         subprocess.Popen(apply_cmd(new), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
@@ -643,14 +677,16 @@ def main():
         return
     try:
         write_bundle_info()
-        if os.path.isdir(UPDATE_DIR) and not os.path.exists(os.path.join(UPDATE_DIR, "ready.json")):
-            shutil.rmtree(UPDATE_DIR, ignore_errors=True)
-        elif os.path.isdir(UPDATE_DIR):  # η ενημέρωση εφαρμόστηκε (ο φάκελος «x/NetWatch» μετακινήθηκε) → καθάρισμα
-            with open(os.path.join(UPDATE_DIR, "ready.json"), encoding="utf-8") as f:
-                if not os.path.isdir(json.load(f).get("dir") or ""):
-                    shutil.rmtree(UPDATE_DIR, ignore_errors=True)
-    except (OSError, ValueError):
+    except OSError:
         pass
+    new = startup_update()
+    if new:  # 🔄 κατεβασμένη + ελεγμένη νέα έκδοση: αλλάζει ο φάκελος και ανοίγει η νέα (το apply.ps1 περιμένει να κλείσουμε)
+        try:
+            subprocess.Popen(apply_cmd(new), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                             cwd=SUPPORT, creationflags=0x00000008 | 0x00000200 if IS_WIN else 0)
+            return
+        except OSError:
+            pass
     App().run()
 
 

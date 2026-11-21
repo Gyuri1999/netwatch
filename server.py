@@ -284,6 +284,12 @@ def make_handler(state):
                     if not lg:
                         return self._json({"error": "Ο έλεγχος L2 δεν είναι διαθέσιμος σε αυτή τη λειτουργία (χρειάζεται live ή demo)."}, 400)
                     return self._json(lg.run())
+                if u.path == "/api/update/auto":  # 🔄 αυτόματη εγκατάσταση on/off
+                    up = getattr(state, "updater", None)
+                    if not up:
+                        return self._json({"error": "Οι ενημερώσεις δεν είναι διαθέσιμες σε αυτή τη λειτουργία."}, 400)
+                    r = up.set_auto(body.get("on") is True)
+                    return self._json(r, 400 if "error" in r else 200)
                 if u.path in ("/api/update/check", "/api/update/install", "/api/update/restart"):  # 🔄 ενημερώσεις από GitHub
                     up = getattr(state, "updater", None)
                     if not up:
