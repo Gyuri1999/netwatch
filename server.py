@@ -383,6 +383,13 @@ def make_handler(state):
                             raise ValueError("Η σημείωση πρέπει να είναι κείμενο έως 1000 χαρακτήρες.")
                         r = ho.add_note(txt)
                     return self._json(r, 400 if "error" in r else 200)
+                if u.path == "/api/assess/run":  # 📋 τρέξε τους ελέγχους της αναφοράς (l2guard, triage, κάμερες)
+                    asr = getattr(state, "assess", None)
+                    if not asr:
+                        return self._json({"error": "off"}, 400)
+                    lang = body.get("lang") if body.get("lang") in ("el", "en") else "el"
+                    r = asr.run(lang)
+                    return self._json(r, 409 if r.get("error") else 200)
                 if u.path == "/api/triage/run":  # 🩺 «Φταίει το δίκτυο;»
                     tr = getattr(state, "triage", None)
                     if not tr:
@@ -713,7 +720,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/assessui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -864,6 +871,30 @@ def make_handler(state):
                     return self._json({"off": True, "sections": [], "stats": {}, "notes": [], "text": "",
                                        "error": "Η παράδοση βάρδιας δεν είναι διαθέσιμη σε αυτή τη λειτουργία."})
                 return self._json(ho.summary(hours, lang))
+            if u.path in ("/api/assess", "/assess/report.html", "/assess/inventory.csv", "/assess/findings.csv",
+                          "/assess/netbox-ip-addresses.csv", "/assess/report.json"):  # 📋 αναφορά «νέο δίκτυο»
+                import assess
+                lang = parse_qs(u.query).get("lang", ["el"])[0]
+                if lang not in assess.LANGS:
+                    return self._json({"error": "Γλώσσα: el ή en."}, 400)
+                doc = assess.build(state, lang)
+                if u.path == "/api/assess":
+                    asr = getattr(state, "assess", None)
+                    return self._json({**doc, "job": asr.view() if asr else {"state": "off"}})
+                if u.path == "/assess/report.html":
+                    return self._send(200, assess.to_html(doc).encode(), "text/html; charset=utf-8")
+                kind = {"inventory.csv": "inventory", "findings.csv": "findings", "netbox-ip-addresses.csv": "netbox", "report.json": "json"}[u.path.rsplit("/", 1)[1]]
+                body = (assess.to_inventory_csv(doc) if kind == "inventory" else assess.to_findings_csv(doc) if kind == "findings"
+                        else assess.to_netbox_ips_csv(doc) if kind == "netbox" else json.dumps(doc, ensure_ascii=False, indent=1)).encode("utf-8")
+                self.send_response(200)
+                self.send_header("Content-Type", "application/json; charset=utf-8" if kind == "json" else "text/csv; charset=utf-8")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Content-Disposition", f'attachment; filename="{assess.filename(kind, doc["generated"])}"')
+                self.send_header("Cache-Control", "no-store")
+                self.send_header("X-Content-Type-Options", "nosniff")
+                self.end_headers()
+                self.wfile.write(body)
+                return
             if u.path in ("/api/docs", "/docs/network.md", "/docs/network.html", "/docs/network.drawio"):  # 📘 τεκμηρίωση δικτύου
                 import netdocs
                 lang = parse_qs(u.query).get("lang", ["el"])[0]
