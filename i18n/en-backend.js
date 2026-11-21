@@ -1176,6 +1176,14 @@ I18N.add({
    "First time on the network: $1 with MAC $2. Do you recognise it?"
   ],
   [
+   "^🖨 Εκτυπωτής( «.+?»)?: οι εκτυπωτές και τα προγράμματά τους \\(π\\.χ\\. HP Smart\\) ψάχνουν έτσι συσκευές στο δίκτυο\\. Αναμενόμενο\\.$",
+   "🖨 Printer$1: printers and their software (e.g. HP Smart) look for devices on the network this way. Expected."
+  ],
+  [
+   "^🏷 Συσκευή που αναγνώρισες( \\(«.+?»\\))?: σαρώσεις από δικές σου συσκευές \\(εφαρμογές τύπου Fing, εκτυπωτές, «Ανακάλυψη δικτύου» των Windows\\) είναι συνήθως αθώες\\.$",
+   "🏷 A device you recognised$1: sweeps from your own devices (Fing-type apps, printers, Windows “Network discovery”) are usually harmless."
+  ],
+  [
    "^ARP ερωτήσεις για (-?\\d+) IP σε ([\\d.,]+)s — κάποιος σκανάρει το LAN$",
    "ARP requests for $1 IPs in $2s — someone is scanning the LAN"
   ],

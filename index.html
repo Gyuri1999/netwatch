@@ -1509,8 +1509,8 @@ function toastInfo(msg){const t=document.createElement('div');t.className='toast
 function addAlert(a,quiet){S.alerts.unshift(a);if(quiet)return;
   if(a.sev==='high'&&!a.lab&&!a.benign){shocks.push({ip:a.actor,t0:performance.now()});alertTint=performance.now()}
   if(tab!=='alerts')setAC(S.unread+1);
-  if(a.sev!=='low'){const g=S.hosts.get(a.actor)?.geo,e=eduFor(a.type);const t=document.createElement('div');t.className='toast';
-    t.innerHTML=`<b style="color:var(--redt)"><span>${a.lab?'🧪 LAB · ':a.selftest?'🧪 Δοκιμή σου · ':'⚠ '}</span>${esc(a.type)}</b> — ${flag(g?.countryCode)} ${esc(a.actor)} → ${esc(a.target)}<div style="color:var(--txt);margin-top:3px">${esc(a.detail)}</div>${e?`<div class="sm" style="margin-top:3px">${esc(e.what)}</div>`:''}${window.ALANIM?ALANIM(a.type):''}`;
+  if(a.sev!=='low'&&!a.benign){const g=S.hosts.get(a.actor)?.geo,e=eduFor(a.type);const t=document.createElement('div');t.className='toast';
+    t.innerHTML=`<b style="color:var(--redt)"><span>${a.lab?'🧪 LAB · ':a.selftest?'🧪 Δοκιμή σου · ':'⚠ '}</span>${esc(a.type)}</b> — ${flag(g?.countryCode)} ${esc(a.actor)} → ${esc(a.target)}<div style="color:var(--txt);margin-top:3px">${esc(a.detail)}</div>${e?`<div class="sm" style="margin-top:3px">${esc(e.what)}</div>`:''}${window.ALANIM?ALANIM(a.type):''}${/^Network sweep/.test(a.type)?`<div class="sm" style="margin-top:6px">🏷 ${window.I18N&&I18N.lang==='en'?'Your own device (printer, PC)? Give it a name and its sweeps will show grey, as expected.':'Δική σου συσκευή (εκτυπωτής, υπολογιστής); Δώσ\' της όνομα και οι σαρώσεις της θα φαίνονται γκρι, ως αναμενόμενες.'}</div>`:''}`;
     const life=window.ALANIM&&ALANIM(a.type)?13000:8000;  // 🎬 με κινούμενη εξήγηση μένει λίγο παραπάνω
     t.onclick=()=>{select(a.actor);t.remove()};t.style.setProperty('--life',life/1000+'s');$('toasts').prepend(t);setTimeout(()=>{t.classList.add('out');setTimeout(()=>t.remove(),260)},life);
     while($('toasts').children.length>3)$('toasts').lastChild.remove();
