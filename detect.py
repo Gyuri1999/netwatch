@@ -28,6 +28,9 @@ def host_info():
     return out
 
 
+SWEEPS = ("Network sweep (ARP)", "Network sweep (ping)")
+SWEEP_SUSPECT = ("camera", "iot", "esp", "tv", "speaker", "console")  # αυτές δεν έχουν λόγο να σαρώνουν το LAN
+
 class NetState:
     def __init__(self, mode, iface, me_ips, gateway, geo=True, rdns=True, cfg=None, history=None, intel=None):
         self.lock = threading.RLock()
@@ -203,6 +206,27 @@ class NetState:
             **self._dtype(h),
         }
 
+    def _expected_sweep(self, ip):
+        """Οι εκτυπωτές (και τα προγράμματά τους, π.χ. HP Smart) και οι εφαρμογές τύπου Fing ψάχνουν συσκευές με
+        σαρώσεις ARP/ping. Αν η πηγή είναι εκτυπωτής ή συσκευή που ονόμασες εσύ → αθώα εξήγηση, αλλιώς None.
+        Δεν ισχύει για κάμερες/IoT: μια έξυπνη πρίζα που σαρώνει το LAN είναι ύποπτη ακόμα κι αν την ξέρεις."""
+        h = self.hosts.get(ip)
+        if not h or h.get("kind") != "local" or h.get("gw"):
+            return None
+        d = self._dtype(h)
+        dn = getattr(self, "devnames", None)
+        u = dn.get(h.get("mac"), ip) if dn else None
+        t = d.get("dtype")
+        if t in SWEEP_SUSPECT:
+            return None
+        if t == "printer":
+            return ("🖨 Εκτυπωτής" + (f" «{d['alias']}»" if d.get("alias") else "") + ": οι εκτυπωτές και τα προγράμματά τους "
+                    "(π.χ. HP Smart) ψάχνουν έτσι συσκευές στο δίκτυο. Αναμενόμενο.")
+        if u and (u.get("name") or u.get("type")):
+            return (f"🏷 Συσκευή που αναγνώρισες" + (f" («{u['name']}»)" if u.get("name") else "") + ": σαρώσεις από δικές σου "
+                    "συσκευές (εφαρμογές τύπου Fing, εκτυπωτές, «Ανακάλυψη δικτύου» των Windows) είναι συνήθως αθώες.")
+        return None
+
     def _dtype(self, h):
         """Τύπος/κατασκευαστής για τις τοπικές συσκευές (εικονίδιο και όνομα στον χάρτη του LAN)."""
         if h["kind"] != "local":
@@ -320,6 +344,11 @@ class NetState:
                 benign = cs.suppressed(typ, actor, t) or None
             except Exception as e:
                 log("cases:", e)
+        if benign is None and typ in SWEEPS:  # 🖨 σάρωση από εκτυπωτή / συσκευή που αναγνώρισες → αναμενόμενη (γκρι)
+            try:
+                benign = self._expected_sweep(actor)
+            except Exception as e:
+                log("expected sweep:", e)
         self.alert_seq += 1
         lab = actor in self.lab_ips
         a = dict(id=self.alert_seq, t=t, type=typ, sev=sev, actor=actor,

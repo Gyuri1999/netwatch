@@ -799,3 +799,38 @@ def test_someone_else_is_not_your_test(state):
     a = _scan(state, Clock(), EVIL, ME)
     assert "selftest" not in a
     assert state.status()["alerts"] == 1
+
+
+def _sweep(state, src, mac):
+    c = Clock()
+    for n in range(2, 60):
+        feed(state, c, src=src, dst=f"192.168.1.{n}", proto="ARP",
+             arp=dict(op=1, psrc=src, pdst=f"192.168.1.{n}", hwsrc=mac))
+    return [a for a in state.alerts if a["type"] == "Network sweep (ARP)"]
+
+
+def test_sweep_from_printer_is_expected_not_red(state, tmp_path):
+    """Οι εκτυπωτές (και το HP Smart) σαρώνουν το LAN· φαίνεται, αλλά γκρι, χωρίς να «κοκκινίζει» τη συσκευή."""
+    import devnames
+    state.devnames = devnames.DevNames(path=str(tmp_path / "n.json"))
+    state.devnames.set({"mac": "de:ad:be:ef:00:66", "type": "printer"})
+    al = _sweep(state, EVIL, "de:ad:be:ef:00:66")
+    assert al and "Εκτυπωτής" in al[0]["benign"]
+    assert state.hosts[EVIL]["threat"] < 2  # τα πακέτα του δεν βγαίνουν κόκκινα
+
+
+def test_sweep_from_named_device_is_expected_but_not_from_iot(state, tmp_path):
+    import devnames
+    state.devnames = devnames.DevNames(path=str(tmp_path / "n.json"))
+    state.devnames.set({"mac": "de:ad:be:ef:00:66", "name": "Γραφείο"})
+    al = _sweep(state, EVIL, "de:ad:be:ef:00:66")
+    assert al and "Γραφείο" in al[0]["benign"]
+    other = "192.168.1.67"
+    state.devnames.set({"mac": "de:ad:be:ef:00:67", "name": "Κάμερα αυλής", "type": "camera"})
+    al = [a for a in _sweep(state, other, "de:ad:be:ef:00:67") if a["actor"] == other]
+    assert al and not al[0].get("benign")  # κάμερα που σαρώνει → ύποπτο ακόμα κι αν την ξέρεις
+
+
+def test_sweep_from_unknown_device_still_alerts(state):
+    al = _sweep(state, EVIL, "de:ad:be:ef:00:66")
+    assert al and not al[0].get("benign")
