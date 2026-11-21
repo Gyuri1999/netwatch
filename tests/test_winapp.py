@@ -139,3 +139,22 @@ def test_update_handoff_only_moves_a_checked_folder(tmp_path, monkeypatch):
     cmd = launcher.apply_cmd(str(new), str(bundle), pid=1234, upd=str(upd))
     assert "-WaitPid" in cmd and "1234" in cmd and cmd[cmd.index("-New") + 1] == str(new)
     assert "Move-Item" in launcher.APPLY_PS1 and ".previous" in launcher.APPLY_PS1
+
+
+def test_ready_update_is_applied_at_startup_once(tmp_path):
+    """Κατεβασμένη+ελεγμένη ενημέρωση → εφαρμόζεται στην επόμενη εκκίνηση· αν αποτύχει, δεν ξαναδοκιμάζεται σε βρόχο."""
+    import json
+    bundle, upd = tmp_path / "Apps" / "NetWatch", tmp_path / "update"
+    _w(str(bundle / "NetWatch.exe"), "old")
+    assert launcher.startup_update(str(bundle), str(upd)) is None  # τίποτα έτοιμο
+    new = upd / "x" / "NetWatch"
+    _w(str(new / "NetWatch.exe"), "new")
+    _w(str(upd / "ready.json"), json.dumps({"dir": str(new), "version": "9.0.0"}))
+    assert launcher.startup_update(str(bundle), str(upd)) == os.path.abspath(str(new))
+    assert (upd / "attempted").exists()
+    # ο φάκελος δεν μετακινήθηκε (π.χ. σε χρήση) → την επόμενη φορά καθάρισμα + σημείωση για τον backend
+    assert launcher.startup_update(str(bundle), str(upd)) is None and not upd.exists()
+    assert json.loads(_r(str(tmp_path / "update-failed.json")))["version"] == "9.0.0"
+    # ψεύτικο ready.json που δείχνει έξω από το update/ → αγνοείται και σβήνεται
+    _w(str(upd / "ready.json"), json.dumps({"dir": str(bundle)}))
+    assert launcher.startup_update(str(bundle), str(upd)) is None and not upd.exists()

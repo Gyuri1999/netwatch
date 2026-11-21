@@ -44,6 +44,8 @@ ZIP, SUMS, SIG = "NetWatch.zip", "SHA256SUMS", "SHA256SUMS.sig"
 WINZIP, WSUMS, WSIG = "NetWatch-windows-x64.zip", "SHA256SUMS-windows", "SHA256SUMS-windows.sig"
 MAX_ZIP = 400 * 1024 * 1024
 DAY = 86400
+CHECK_EVERY = 6 * 3600  # αυτόματος έλεγχος
+NIGHT = (3, 5)  # τοπική ώρα: εφαρμογή έτοιμης ενημέρωσης όταν δεν τη χρησιμοποιείς
 VER_RE = re.compile(r"^v?(\d+)\.(\d+)(?:\.(\d+))?$")
 ASSET_HOSTS = ("https://github.com/", "https://objects.githubusercontent.com/", "https://release-assets.githubusercontent.com/")
 
@@ -102,8 +104,24 @@ def ssh_keygen():
     return shutil.which("ssh-keygen")
 
 
-def detect_kind(here):
-    if bundle_of(here):
+def mac_bundle(here, ppid, runner=None):
+    """Το Mac app τρέχει τον backend από ~/Library/Application Support/NetWatch/app (αντίγραφο)·
+    το ίδιο το NetWatch.app το βρίσκουμε από τη διεργασία-γονέα (--parent-pid)."""
+    if sys.platform != "darwin" or not ppid:
+        return None
+    p = os.path.normpath(here).split(os.sep)
+    if p[-3:] != ["Application Support", "NetWatch", "app"]:
+        return None
+    rc, out, _ = (runner or _run)(["/bin/ps", "-o", "comm=", "-p", str(int(ppid))], timeout=5)
+    exe = out.strip().split(os.sep) if not rc else []
+    if len(exe) < 4 or exe[-2:-1] != ["MacOS"] or exe[-3] != "Contents" or not exe[-4].endswith(".app"):
+        return None
+    b = os.sep.join(exe[:-3])
+    return b if os.path.isdir(os.path.join(b, "Contents", "Resources", "netwatch")) else None
+
+
+def detect_kind(here, ppid=None):
+    if bundle_of(here) or mac_bundle(here, ppid):
         return "app"
     if sys.platform == "win32" and win_bundle(here):
         return "winapp"
@@ -199,14 +217,20 @@ def safe_extract(zpath, dest):
 
 
 class Updater:
-    def __init__(self, state=None, sim=False, here=HERE, cfg=None, fetch=None, runner=None, clock=time.time):
+    def __init__(self, state=None, sim=False, here=HERE, cfg=None, fetch=None, runner=None, clock=time.time, ppid=None, hour=None):
         cfg = cfg if isinstance(cfg, dict) else {}
         self.state, self.sim, self.here, self.clock = state, sim, here, clock
         self.fetch, self.runner = fetch or _fetch, runner or _run
-        self.kind = "app" if sim else detect_kind(here)
-        self.bundle = bundle_of(here) or (win_bundle(here) if self.kind == "winapp" else None)
+        self.hour = hour or (lambda: time.localtime(self.clock()).tm_hour)
+        self.kind = "app" if sim else detect_kind(here, ppid)
+        self.bundle = (bundle_of(here) or mac_bundle(here, ppid, self.runner)) if self.kind == "app" and not sim else \
+            (win_bundle(here) if self.kind == "winapp" else None)
         self.version = read_version(here)
         self.auto = bool(cfg.get("auto_check", True))
+        # αυτόματη εγκατάσταση: μόνο στα apps (Mac/Windows) με υπογραφή· η επιλογή μένει στο data/ (δεν σβήνεται στην αναβάθμιση)
+        self.prefs_path = os.path.join(here, "data", "update.json")
+        self.auto_install = bool(self._prefs().get("auto_install", cfg.get("auto_install", True)))
+        self.auto_failed = None  # tag που απέτυχε αυτόματα — δεν ξαναδοκιμάζουμε στην ίδια εκτέλεση
         self.signers = os.path.join(here, "update_signers")
         self.lock = threading.Lock()
         self.latest, self.err, self.checked = None, None, 0
@@ -262,6 +286,7 @@ class Updater:
         lt = {k: v for k, v in (self.latest or {}).items() if not k.startswith("_")} or None
         return {"version": self.version, "kind": self.kind, "latest": lt, "available": self.available(), "error": self.err,
                 "checked": self.checked, "auto": self.auto, "git": self.git, "job": dict(self.job), "page": PAGE,
+                "auto_install": self.auto_install, "auto_ok": self.auto_ok(),
                 "sim": bool(self.sim), "os": sys.platform,
                 "signed": bool(lt and SIG in (lt.get("assets") or [])), "can_install": self._can_install()[0], "why_not": self._can_install()[1]}
 
@@ -292,38 +317,100 @@ class Updater:
             return False, "Στα Windows: κατέβασε το NetWatch-windows-x64.zip από το GitHub, κλείσε το NetWatch (εικονίδιο ασπίδας → Έξοδος) και αντικατέστησε τον παλιό φάκελο. Οι ρυθμίσεις σου μένουν."
         return False, "Κατέβασε τη νέα έκδοση από τη σελίδα του GitHub."
 
+    # ── αυτόματα ──
+    def _prefs(self):
+        try:
+            with open(self.prefs_path, encoding="utf-8") as f:
+                j = json.load(f)
+            return j if isinstance(j, dict) else {}
+        except (OSError, ValueError):
+            return {}
+
+    def set_auto(self, on):
+        self.auto_install = bool(on)
+        try:
+            os.makedirs(os.path.dirname(self.prefs_path), exist_ok=True)
+            with open(self.prefs_path, "w", encoding="utf-8") as f:
+                json.dump({**self._prefs(), "auto_install": self.auto_install}, f)
+        except OSError as e:
+            return {"error": "Δεν αποθηκεύτηκε η ρύθμιση: " + str(e)[:160]}
+        return self.view()
+
+    def auto_ok(self):
+        """Μπορεί αυτή η εγκατάσταση να ενημερώνεται μόνη της; (μόνο υπογεγραμμένα apps, όχι git/docker/αρχεία/demo)"""
+        if self.sim or self.kind not in ("app", "winapp") or not self.bundle:
+            return False
+        # Mac σε live με κωδικό διαχειριστή (root χωρίς SUDO_UID): το νέο app θα γινόταν του root → μόνο με κλικ
+        if hasattr(os, "geteuid") and os.geteuid() == 0 and not os.environ.get("SUDO_UID"):
+            return False
+        return True
+
+    def tick(self):
+        """Ένας γύρος του αυτόματου: έλεγχος κάθε 6 ώρες → κατέβασμα + έλεγχος υπογραφής → εφαρμογή τη νύχτα."""
+        if self.auto and (not self.checked or self.clock() - self.checked > CHECK_EVERY):
+            self.check(force=True)
+        if not (self.auto_install and self.auto_ok()):
+            return None
+        tag = (self.latest or {}).get("tag")
+        st = self.job.get("state")
+        if st in ("idle", "error") and tag and tag != self.auto_failed and not self._win_failed(tag) and self._can_install()[0]:
+            self.install(auto=True)  # τρέχει εδώ (σύγχρονα)· αποτυχία → δεν ξαναδοκιμάζεται αυτόματα
+            return "install" if self.job.get("state") == "done" else None
+        if st == "done" and self.job.get("auto") and NIGHT[0] <= self.hour() < NIGHT[1]:
+            r = self.restart()
+            return "restart" if r.get("ok") else None
+        return None
+
+    def _win_failed(self, tag):
+        """Το launcher δεν μπόρεσε να εφαρμόσει αυτή την έκδοση (π.χ. φάκελος σε χρήση) → όχι ξανά αυτόματα."""
+        if self.kind != "winapp":
+            return False
+        try:
+            with open(os.path.join(win_support(self.here), "update-failed.json"), encoding="utf-8") as f:
+                v = json.load(f).get("version")
+        except (OSError, ValueError, AttributeError):
+            return False
+        return bool(v) and vtuple(v) == vtuple(tag)
+
     def run_forever(self):
-        time.sleep(90)  # άσε την εκκίνηση να τελειώσει
+        time.sleep(30)  # άσε την εκκίνηση να τελειώσει
         while True:
-            if self.auto and (not self.checked or self.clock() - self.checked > DAY):
-                try:
-                    self.check(force=True)
-                except Exception:  # noqa: BLE001
-                    pass
-            time.sleep(3600)
+            try:
+                self.tick()
+            except Exception:  # noqa: BLE001
+                pass
+            time.sleep(600)
 
     # ── εγκατάσταση ──
-    def install(self):
+    def install(self, auto=False, wait=False):
         ok, why = self._can_install()
         if not ok:
             return {"error": why or "Δεν υπάρχει νεότερη έκδοση."}
         with self.lock:
             if self.job.get("state") == "running":
                 return {"error": "Η ενημέρωση τρέχει ήδη."}
-            self.job = {"state": "running", "step": "ξεκινάω…", "pct": 0}
-        threading.Thread(target=self._install_bg, daemon=True).start()
+            if self.job.get("state") == "done":
+                return {"error": "Η νέα έκδοση είναι ήδη έτοιμη — πάτα «Επανεκκίνηση τώρα»."}
+            self.job = {"state": "running", "step": "ξεκινάω…", "pct": 0, "auto": auto}
+        if auto or wait:  # ο αυτόματος γύρος τρέχει ήδη σε δικό του thread
+            self._install_bg(auto)
+        else:
+            threading.Thread(target=self._install_bg, daemon=True).start()
         return {"ok": True}
 
     def _step(self, s, pct=None):
         self.job.update({"step": s, **({"pct": round(pct, 3)} if pct is not None else {})})
 
-    def _install_bg(self):
+    def _install_bg(self, auto=False):
+        tag = (self.latest or {}).get("tag")
         try:
             msg = (self._install_sim() if self.sim else self._install_git() if self.kind == "git"
                    else self._install_win() if self.kind == "winapp" else self._install_app())
-            self.job = {"state": "done", "step": msg, "pct": 1, "restart": True}
+            self.job = {"state": "done", "step": msg, "pct": 1, "restart": True, "auto": auto, "tag": tag}
         except Exception as e:  # noqa: BLE001
-            self.job = {"state": "error", "step": str(e)[:400]}
+            if auto:
+                self.auto_failed = tag
+            self.job = {"state": "error", "step": str(e)[:400], "auto": auto}
 
     def _install_sim(self):
         for i, s in enumerate(["κατέβασμα SHA256SUMS", "έλεγχος υπογραφής ✔", "κατέβασμα NetWatch.zip", "έλεγχος SHA-256 ✔", "έλεγχος app ✔", "αντικατάσταση"]):

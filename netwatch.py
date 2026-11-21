@@ -288,14 +288,15 @@ def main():
     state.assess = assess.Assess(state)  # 📋 αναφορά «νέο δίκτυο»
     import l2guard  # 🛡 rogue DHCP / ARP spoofing με ένα κουμπί (DHCPDISCOVER + ARP μόνο στο τοπικό LAN)
     state.l2guard = l2guard.L2Guard(state, sim=demo) if mode != "pcap" else None
-    import updater  # 🔄 ενημερώσεις από GitHub (αυτόματα μόνο έλεγχος· εγκατάσταση με κλικ και έλεγχο υπογραφής)
+    import updater  # 🔄 ενημερώσεις από GitHub (υπογεγραμμένες· στα apps μπαίνουν και μόνες τους)
     # Προσομοίωση μόνο στο dev demo (git checkout)· σε εγκατεστημένο app (Mac/Windows/Docker) το demo
     # κάνει κανονικό (read-only) έλεγχο στο GitHub — αλλιώς έδειχνε ψεύτικη «v1.1.0».
-    state.updater = updater.Updater(state, sim=demo and updater.detect_kind(updater.HERE) == "git", cfg=cfg.get("updates"))
-    if live:
+    state.updater = updater.Updater(state, sim=demo and updater.detect_kind(updater.HERE) == "git", cfg=cfg.get("updates"),
+                                    ppid=args.parent_pid)
+    if state.updater.sim:
+        state.updater.check(force=True)  # dev demo: ψεύτικη νέα έκδοση, χωρίς δίκτυο
+    elif live or demo:  # έλεγχος κάθε 6 ώρες· στα apps και κατέβασμα/εφαρμογή μόνο του (με υπογραφή)
         threading.Thread(target=state.updater.run_forever, daemon=True).start()
-    elif demo:
-        state.updater.check(force=True)  # στο demo: ψεύτικη νέα έκδοση, χωρίς δίκτυο
 
     def bg(obj):
         if obj is not None and hasattr(obj, "run_forever"):
