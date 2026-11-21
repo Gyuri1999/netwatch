@@ -1202,6 +1202,10 @@ I18N.add({
    "The installer's digital signature is not valid ($1) — I won't open it."
   ],
   [
+   "^Δεν μπόρεσα να κατεβάσω τη λίστα της CISA: (.*)$",
+   "Could not download the CISA list: $1"
+  ],
+  [
    "^ARP ερωτήσεις για (-?\\d+) IP σε ([\\d.,]+)s — κάποιος σκανάρει το LAN$",
    "ARP requests for $1 IPs in $2s — someone is scanning the LAN"
   ],
