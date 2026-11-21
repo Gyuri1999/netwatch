@@ -401,7 +401,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     @objc func openLog() { NSWorkspace.shared.open(logFile) }
     @objc func quit() { NSApp.terminate(nil) }
 
+    /// Ο πίνακας (κουμπί «🟢 Πέρασε σε Live τώρα») γράφει mode-request.json — για όταν το εικονίδιο
+    /// της γραμμής μενού κρύβεται (π.χ. πίσω από την εγκοπή της οθόνης).
+    func checkModeRequest() {
+        let f = support.appendingPathComponent("mode-request.json")
+        guard let d = try? Data(contentsOf: f) else { return }
+        try? FileManager.default.removeItem(at: f)
+        guard let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any],
+              let m = j["mode"] as? String, let t = j["t"] as? Double,
+              Date().timeIntervalSince1970 - t < 60 else { return }
+        if m.hasPrefix("live"), backend.mode != .live { switchMode(.live) }
+        else if m == "demo", backend.mode != .demo { switchMode(.demo) }
+    }
+
     func poll() {
+        checkModeRequest()
         guard let b = backend.base else { return }
         URLSession.shared.dataTask(with: b.appendingPathComponent("api/status")) { d, _, _ in
             guard let d = d, let j = try? JSONSerialization.jsonObject(with: d) as? [String: Any] else { return }

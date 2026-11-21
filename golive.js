@@ -40,7 +40,10 @@ html.light #gl-box{background:#fff}
     const os = (h && h.os) || '';
     if (os === 'win32') {
       const s = [];
-      if (!h.npcap) s.push(T(`Κατέβασε και εγκατάστησε το δωρεάν <b>Npcap</b> από ${NPCAP}. Στην εγκατάσταση τσέκαρε το <b>«Install Npcap in WinPcap API-compatible Mode»</b>. Χωρίς αυτό τα Windows δεν αφήνουν κανένα πρόγραμμα να «ακούει» το δίκτυο.`,
+      if (!h.npcap && h.npcap_get) s.push(T('Χρειάζεται το δωρεάν <b>Npcap</b> (χωρίς αυτό τα Windows δεν αφήνουν κανένα πρόγραμμα να «ακούει» το δίκτυο). Πάτα το κουμπί: το κατεβάζω από το επίσημο npcap.com, ελέγχω την ψηφιακή του υπογραφή και ανοίγω την εγκατάσταση. Εκεί πάτα «Ναι», τσέκαρε <b>«WinPcap API-compatible Mode»</b> και «Install».',
+        'You need the free <b>Npcap</b> (without it Windows lets no program listen to the network). Click the button: I download it from the official npcap.com, check its digital signature and open the installer. There click “Yes”, tick <b>“WinPcap API-compatible Mode”</b> and “Install”.') +
+        `<div class="gl-sw"><button class="b gl-go" data-npcap>⬇ ${T('Κατέβασε & εγκατάστησε το Npcap', 'Download & install Npcap')}</button></div><div class="gl-msg" id="gl-np"></div>`);
+      else if (!h.npcap) s.push(T(`Κατέβασε και εγκατάστησε το δωρεάν <b>Npcap</b> από ${NPCAP}. Στην εγκατάσταση τσέκαρε το <b>«Install Npcap in WinPcap API-compatible Mode»</b>. Χωρίς αυτό τα Windows δεν αφήνουν κανένα πρόγραμμα να «ακούει» το δίκτυο.`,
         `Download and install the free <b>Npcap</b> from ${NPCAP}. During setup tick <b>“Install Npcap in WinPcap API-compatible Mode”</b>. Without it, Windows lets no program listen to the network.`));
       else s.push(T('✅ Το Npcap είναι ήδη εγκατεστημένο.', '✅ Npcap is already installed.'));
       if (h.app_switch) {
@@ -55,6 +58,11 @@ html.light #gl-box{background:#fff}
         'If it stays in Demo after installing, quit NetWatch (right-click the shield → Exit) and open it again.'));
       return s;
     }
+    if (os === 'darwin' && h.app_switch) return [
+      T('Πάτα <b>«🟢 Πέρασε σε Live τώρα»</b> εδώ κάτω (ή το εικονίδιο του NetWatch στη γραμμή μενού → «Live»).', 'Click <b>“🟢 Switch to Live now”</b> below (or the NetWatch icon in the menu bar → “Live”).'),
+      T('Βάλε τον κωδικό του Mac όταν σου τον ζητήσει το macOS. Τον ζητά το ίδιο το σύστημα, γιατί η καταγραφή πακέτων θέλει δικαιώματα διαχειριστή. Το NetWatch δεν βλέπει και δεν αποθηκεύει τον κωδικό.',
+        'Enter your Mac password when macOS asks. The system itself asks, because packet capture needs admin rights. NetWatch never sees or stores the password.'),
+    ];
     if (os === 'darwin') return [
       T('Πάτα το εικονίδιο του NetWatch στη <b>γραμμή μενού</b> πάνω δεξιά.', 'Click the NetWatch icon in the <b>menu bar</b> at the top right.'),
       T('Διάλεξε <b>«Live — πραγματική κίνηση»</b>.', 'Choose <b>“Live — πραγματική κίνηση”</b> (Live — real traffic).'),
@@ -81,6 +89,7 @@ html.light #gl-box{background:#fff}
     fetch('/api/app/mode', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode }) })
       .then(r => r.json()).then(j => {
         if (j.error) throw new Error(j.error);
+        if (msg && host && host.os === 'darwin') { msg.innerHTML = '⏳ ' + (mode === 'demo' ? T('Ξεκινά το Demo…', 'Starting Demo…') : T('Ξεκινά το Live — <b>βάλε τον κωδικό του Mac</b> όταν τον ζητήσει το macOS.', 'Starting Live — <b>enter your Mac password</b> when macOS asks.')); return; }
         if (msg) msg.innerHTML = '⏳ ' + (mode === 'demo' ? T('Ξεκινά το Demo…', 'Starting Demo…') : mode === 'live-admin'
           ? T('Ξεκινά το Live. <b>Πάτα «Ναι»</b> όταν τα Windows ζητήσουν άδεια διαχειριστή.', 'Starting Live. <b>Click “Yes”</b> when Windows asks for administrator permission.')
           : T('Ξεκινά το Live…', 'Starting Live…')) + ' ' + T('Θα ανοίξει νέο παράθυρο και αυτό θα κλείσει.', 'A new window will open and this one will close.');
@@ -99,14 +108,30 @@ html.light #gl-box{background:#fff}
     d.innerHTML = `<div id="gl-box" role="dialog" aria-modal="true" aria-labelledby="gl-t" style="max-width:440px">
       <h3 id="gl-t">● ${T('Λειτουργία NetWatch', 'NetWatch mode')}</h3>
       <div class="gl-sub">${T('Τώρα βλέπεις την <b>πραγματική</b> κίνηση του δικτύου σου.', 'You are now watching your <b>real</b> network traffic.')}</div>
-      <div class="gl-sw"><button class="b" data-glmode="demo">🎭 ${T('Πέρασε σε Demo', 'Switch to Demo')}</button><button class="b" data-glmode="live-admin">🛡 ${T('Live ως διαχειριστής', 'Live as administrator')}</button><button class="b" data-glmode="live">🟢 ${T('Live (κανονικό)', 'Live (normal)')}</button></div>
-      <div class="gl-msg dim" id="gl-msg">${T('Το «ως διαχειριστής» χρειάζεται για μπλοκάρισμα IP και τον έλεγχο Rogue DHCP/ARP.', '“As administrator” is needed for IP blocking and the Rogue DHCP/ARP check.')}</div>
+      <div class="gl-sw"><button class="b" data-glmode="demo">🎭 ${T('Πέρασε σε Demo', 'Switch to Demo')}</button>${host && host.os === 'darwin' ? '' : `<button class="b" data-glmode="live-admin">🛡 ${T('Live ως διαχειριστής', 'Live as administrator')}</button><button class="b" data-glmode="live">🟢 ${T('Live (κανονικό)', 'Live (normal)')}</button>`}</div>
+      <div class="gl-msg dim" id="gl-msg">${host && host.os === 'darwin' ? '' : T('Το «ως διαχειριστής» χρειάζεται για μπλοκάρισμα IP και τον έλεγχο Rogue DHCP/ARP.', '“As administrator” is needed for IP blocking and the Rogue DHCP/ARP check.')}</div>
       <div class="gl-foot"><span></span><button class="b" id="gl-ok">${T('Κλείσιμο', 'Close')}</button></div></div>`;
     document.body.appendChild(d);
     d.addEventListener('click', e => {
       if (e.target === d || e.target.id === 'gl-ok') return close();
       const sw = e.target.closest('[data-glmode]'); if (sw) switchTo(sw.dataset.glmode);
     });
+  }
+
+  // ⬇ Npcap (Windows): το backend το κατεβάζει από npcap.com, ελέγχει υπογραφή και ανοίγει τον installer
+  function npcap(btn) {
+    const m = document.getElementById('gl-np');
+    btn.disabled = true;
+    const tr = x => (EN() && window.I18N && I18N.t ? I18N.t(String(x || '')) : String(x || ''));
+    const show = j => { if (m) m.innerHTML = (j.state === 'error' ? '✖ ' : j.state === 'done' ? '✅ ' : '⏳ ') + tr(j.step || '') + (j.state === 'running' && j.pct ? ` ${Math.round(j.pct * 100)}%` : ''); };
+    const poll = () => fetch('/api/npcap').then(r => r.json()).then(v => {
+      const j = v.job || {}; show(j);
+      if (j.state === 'running') setTimeout(poll, 800);
+      else btn.disabled = j.state === 'done';
+    }).catch(() => { btn.disabled = false; });
+    fetch('/api/npcap/install', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then(r => r.json()).then(j => { if (j.error) { show({ state: 'error', step: j.error }); btn.disabled = false; } else poll(); })
+      .catch(() => { btn.disabled = false; });
   }
 
   function close() { const b = document.getElementById('gl-back'); if (b) b.remove(); }
@@ -121,7 +146,8 @@ html.light #gl-box{background:#fff}
       <div class="gl-sub">${T('Ό,τι βλέπεις τώρα είναι <b>προσομοίωση</b>: ψεύτικες συσκευές και επιθέσεις για να γνωρίσεις την εφαρμογή. Για να δεις το <b>δικό σου</b> δίκτυο, πέρασε σε <b>Live</b>:',
         'Everything you see now is a <b>simulation</b>: fake devices and attacks to get to know the app. To see <b>your own</b> network, switch to <b>Live</b>:')}</div>
       <ol>${steps(h).map(s => `<li>${s}</li>`).join('')}</ol>
-      ${h.app_switch ? `<div class="gl-sw"><button class="b gl-go" data-glmode="live">🟢 ${T('Πέρασε σε Live τώρα', 'Switch to Live now')}</button><button class="b" data-glmode="live-admin">🛡 ${T('Live ως διαχειριστής', 'Live as administrator')}</button></div><div class="gl-msg dim" id="gl-msg">${T('Το ίδιο κάνεις και από την ασπίδα 🛡 κάτω δεξιά (δεξί κλικ· αν δεν φαίνεται, πάτα το βελάκι ^ δίπλα στο ρολόι).', 'You can also do it from the 🛡 shield at the bottom right (right-click; if hidden, click the ^ arrow next to the clock).')}</div>` : ''}
+      ${h.app_switch && h.os === 'darwin' ? `<div class="gl-sw"><button class="b gl-go" data-glmode="live">🟢 ${T('Πέρασε σε Live τώρα', 'Switch to Live now')}</button></div><div class="gl-msg dim" id="gl-msg"></div>` : ''}
+      ${h.app_switch && h.os !== 'darwin' ? `<div class="gl-sw"><button class="b gl-go" data-glmode="live">🟢 ${T('Πέρασε σε Live τώρα', 'Switch to Live now')}</button><button class="b" data-glmode="live-admin">🛡 ${T('Live ως διαχειριστής', 'Live as administrator')}</button></div><div class="gl-msg dim" id="gl-msg">${T('Το ίδιο κάνεις και από την ασπίδα 🛡 κάτω δεξιά (δεξί κλικ· αν δεν φαίνεται, πάτα το βελάκι ^ δίπλα στο ρολόι).', 'You can also do it from the 🛡 shield at the bottom right (right-click; if hidden, click the ^ arrow next to the clock).')}</div>` : ''}
       <div class="gl-ok">${T('Πώς καταλαβαίνω ότι πέτυχε; Πάνω αριστερά το σήμα γίνεται <b>● LIVE</b> και στο «interface» βλέπεις την πραγματική σου κάρτα δικτύου και IP.',
         'How do I know it worked? At the top left the badge turns <b>● LIVE</b> and “interface” shows your real network card and IP.')}<br>
         🔒 ${T('Το NetWatch μόνο παρακολουθεί. Τίποτα δεν φεύγει από τον υπολογιστή σου.', 'NetWatch only watches. Nothing leaves your computer.')}</div>
@@ -130,6 +156,7 @@ html.light #gl-box{background:#fff}
     document.body.appendChild(d);
     d.addEventListener('click', e => {
       if (e.target === d || e.target.id === 'gl-ok') return close();
+      if (e.target.closest('[data-npcap]')) return npcap(e.target.closest('[data-npcap]'));
       const sw = e.target.closest('[data-glmode]'); if (sw) switchTo(sw.dataset.glmode);
     });
     d.querySelector('#gl-hide').addEventListener('change', e => set(KEY, e.target.checked ? '1' : ''));

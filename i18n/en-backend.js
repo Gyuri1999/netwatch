@@ -2,6 +2,16 @@
 // health, playbooks, API errors, weekly report, CTF). Generated; see i18n/README.md for the format.
 I18N.add({
  "exact": {
+  "Ψάχνω την τελευταία έκδοση στο npcap.com…": "Looking for the latest version on npcap.com…",
+  "Ελέγχω την ψηφιακή υπογραφή…": "Checking the digital signature…",
+  "Ανοίγω την εγκατάσταση…": "Opening the installer…",
+  "Άνοιξε η εγκατάσταση του Npcap. Πάτα «Ναι» στα Windows, τσέκαρε «WinPcap API-compatible Mode» και «Install». Μετά πάτα «🟢 Πέρασε σε Live τώρα».": "The Npcap installer is open. Click “Yes” in Windows, tick “WinPcap API-compatible Mode” and “Install”. Then click “🟢 Switch to Live now”.",
+  "Δεν βρήκα τον installer στη σελίδα του npcap.com — κατέβασέ τον από εκεί με το χέρι.": "I couldn't find the installer on npcap.com — download it from there by hand.",
+  "Ο installer είναι υπογεγραμμένος από άλλον (όχι από τους δημιουργούς του Npcap) — δεν τον ανοίγω.": "The installer is signed by someone else (not the Npcap makers) — I won't open it.",
+  "Κατεβάζω μόνο από το npcap.com.": "I only download from npcap.com.",
+  "Το npcap.com με έστειλε αλλού — σταματάω.": "npcap.com redirected me elsewhere — stopping.",
+  "Διαθέσιμο μόνο στην εφαρμογή των Windows.": "Only available in the Windows app.",
+  "Η αλλαγή λειτουργίας από εδώ γίνεται μόνο στην εφαρμογή (Windows ή Mac).": "Switching mode from here only works in the app (Windows or Mac).",
   "DNS amplification (ανοιχτός resolver)": "DNS amplification (open resolver)",
   "DNSSEC bypass στο Wi‑Fi": "DNSSEC bypass on the Wi‑Fi",
   "Αποσυνδέσου ή άνοιξε VPN· βάλε κρυπτογραφημένο DNS (DoH).": "Disconnect or turn on a VPN; use encrypted DNS (DoH).",
@@ -1182,6 +1192,14 @@ I18N.add({
   [
    "^🏷 Συσκευή που αναγνώρισες( \\(«.+?»\\))?: σαρώσεις από δικές σου συσκευές \\(εφαρμογές τύπου Fing, εκτυπωτές, «Ανακάλυψη δικτύου» των Windows\\) είναι συνήθως αθώες\\.$",
    "🏷 A device you recognised$1: sweeps from your own devices (Fing-type apps, printers, Windows “Network discovery”) are usually harmless."
+  ],
+  [
+   "^Κατεβάζω (\\S+)$",
+   "Downloading $1"
+  ],
+  [
+   "^Η ψηφιακή υπογραφή του installer δεν είναι έγκυρη \\((.*)\\) — δεν τον ανοίγω\\.$",
+   "The installer's digital signature is not valid ($1) — I won't open it."
   ],
   [
    "^ARP ερωτήσεις για (-?\\d+) IP σε ([\\d.,]+)s — κάποιος σκανάρει το LAN$",
