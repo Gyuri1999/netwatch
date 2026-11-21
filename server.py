@@ -1069,9 +1069,20 @@ def make_handler(state):
                 q = parse_qs(u.query)
                 ip, src, dst = q.get("ip", [""])[0], q.get("src", [""])[0], q.get("dst", [""])[0]
                 if src and dst:
-                    it = packets.get(src, dst)
-                    return self._json(packets.decode(it) if it else {"error": "Δεν έχω πακέτο για αυτή τη σύνδεση."})
+                    pid = q.get("id", [""])[0]
+                    it = packets.get(src, dst, pid=int(pid) if pid.isdigit() else None)
+                    if not it:
+                        return self._json({"error": "Δεν έχω πακέτο για αυτή τη σύνδεση."})
+                    return self._json({**packets.decode(it), "approx": bool(it.get("approx"))})
                 return self._json({"flows": packets.flows(ip)})
+            if u.path == "/api/conv":  # 🔁 διάγραμμα σύνδεσης (σκάλα SYN → SYN-ACK → ACK …) από τα πρόσφατα πακέτα
+                import packets
+                q = parse_qs(u.query)
+                g = lambda k: q.get(k, [""])[0][:64]  # noqa: E731
+                port = lambda k: int(g(k)) if g(k).isdigit() else None  # noqa: E731
+                if not (g("a") and g("b")):
+                    return self._json({"error": "a/b"}, 400)
+                return self._json({"items": packets.conversation(state.recent, g("a"), g("b"), g("p") or None, port("pa"), port("pb"))})
             if u.path == "/report":  # 📄 εβδομαδιαία αναφορά (HTML → εκτύπωση σε PDF)
                 import report
                 try:

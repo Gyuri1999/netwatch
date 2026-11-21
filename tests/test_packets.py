@@ -34,3 +34,41 @@ def test_dns_and_synthetic_and_flows_lru():
         packets.remember({"src": f"10.0.{i // 250}.{i % 250}", "dst": "10.9.9.9", "proto": "UDP", "t": i})
     assert len(packets._pairs) == packets.MAX_PAIRS and packets.get("192.168.1.49", "1.1.1.1") is None
     assert packets.flows("10.9.9.9", limit=3)[0]["src"] == f"10.0.{(packets.MAX_PAIRS + 4) // 250}.{(packets.MAX_PAIRS + 4) % 250}"
+
+
+def test_hex_only_for_headers_and_secrets_masked():
+    from scapy.layers.snmp import SNMP
+    raw = bytes(Ether(src="24:ec:4a:cb:05:d8", dst="bc:24:11:2b:f6:bd") / IP(src="192.168.1.2", dst="192.168.1.4") /
+                UDP(sport=5000, dport=161) / SNMP(community="PRIVCOMM"))
+    packets.remember({"src": "192.168.1.2", "dst": "192.168.1.4", "proto": "UDP", "len": len(raw), "t": 1, "_id": 7}, raw)
+    d = packets.decode(packets.get("192.168.1.2", "192.168.1.4", pid=7))
+    eth, ip, udp, snmp = d["layers"]
+    assert eth["hex"].startswith("bc24112bf6bd24ec4acb05d8") and eth["off"] == 0 and ip["off"] == 14 and udp["off"] == 34
+    assert snmp["hex"] == "" and "PRIVCOMM" not in repr(d) and "505249564" not in repr(d).upper()
+    assert any(f["value"].startswith("•••") for f in snmp["fields"] if f["name"] == "community")
+
+
+def test_get_by_id_falls_back_to_latest():
+    for i in (1, 2, 3):
+        packets.remember({"src": "10.0.0.1", "dst": "10.0.0.2", "proto": "UDP", "t": i, "_id": i})
+    assert packets.get("10.0.0.1", "10.0.0.2", pid=2)["id"] == 2
+    old = packets.get("10.0.0.1", "10.0.0.2", pid=99)
+    assert old["id"] == 3 and old["approx"]
+
+
+def test_conversation_ladder_both_directions_only_that_flow():
+    A, B = "192.168.1.5", "93.184.216.34"
+    rec = [
+        {"src": A, "dst": B, "proto": "TCP", "sp": 50000, "dp": 443, "flags": "S", "len": 74, "t": 1.0},
+        {"src": B, "dst": A, "proto": "TCP", "sp": 443, "dp": 50000, "flags": "SA", "len": 74, "t": 1.02},
+        {"src": A, "dst": B, "proto": "TCP", "sp": 50001, "dp": 443, "flags": "S", "len": 74, "t": 1.03},  # άλλη σύνδεση
+        {"src": A, "dst": B, "proto": "TCP", "sp": 50000, "dp": 443, "flags": "A", "len": 66, "t": 1.04},
+        {"src": A, "dst": B, "proto": "TCP", "sp": 50000, "dp": 443, "flags": "PA", "len": 583, "t": 1.05, "sni": "example.com"},
+        {"src": A, "dst": "8.8.8.8", "proto": "UDP", "sp": 5353, "dp": 53, "len": 70, "t": 1.06},
+    ]
+    c = packets.conversation(rec, A, B, "TCP", 50000, 443)
+    assert [x["f"] for x in c] == ["S", "SA", "A", "PA"] and [x["dir"] for x in c] == ["ab", "ba", "ab", "ab"]
+    assert c[-1]["n"] == "example.com" and "payload" not in repr(c)
+    rec2 = [{"src": A, "dst": "192.168.1.1", "proto": "ARP", "arp": {"op": 1}, "len": 42, "t": 1},
+            {"src": "192.168.1.1", "dst": A, "proto": "ARP", "arp": {"op": 2}, "len": 42, "t": 1.001}]
+    assert [x["f"] for x in packets.conversation(rec2, A, "192.168.1.1", "ARP")] == ["who-has", "is-at"]
