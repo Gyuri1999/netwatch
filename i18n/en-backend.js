@@ -889,6 +889,14 @@ I18N.add({
   "Το branch δεν παρακολουθεί κάποιο remote (git branch -u origin/main).": "The branch does not track a remote (git branch -u origin/main).",
   "Αυτή η έκδοση δεν έχει NetWatch.zip / SHA256SUMS — κατέβασέ τη από τη σελίδα του GitHub.": "This release has no NetWatch.zip / SHA256SUMS — download it from the GitHub page.",
   "Αυτή η έκδοση δεν είναι υπογεγραμμένη — για ασφάλεια δεν εγκαθίσταται αυτόματα.": "This release is not signed — for safety it is not installed automatically.",
+  "Αυτή η έκδοση δεν έχει υπογεγραμμένο πακέτο για Windows — κατέβασέ τη από τη σελίδα του GitHub.": "This release has no signed Windows package — download it from the GitHub page.",
+  "Λείπει το OpenSSH Client των Windows (χρειάζεται για τον έλεγχο υπογραφής): Ρυθμίσεις → Εφαρμογές → Προαιρετικές δυνατότητες → OpenSSH Client. Ή κατέβασέ τη με το χέρι από το GitHub.": "Windows OpenSSH Client is missing (needed to verify the signature): Settings → Apps → Optional features → OpenSSH Client. Or download it manually from GitHub.",
+  "Δεν υπάρχει έτοιμη ενημέρωση — πάτα πρώτα «Εγκατάσταση».": "No update is ready — press “Install” first.",
+  "Το SHA256SUMS-windows δεν περιέχει το NetWatch-windows-x64.zip.": "SHA256SUMS-windows does not list NetWatch-windows-x64.zip.",
+  "Το SHA-256 του NetWatch-windows-x64.zip δεν ταιριάζει — δεν εγκαταστάθηκε τίποτα.": "The SHA-256 of NetWatch-windows-x64.zip does not match — nothing was installed.",
+  "Το zip δεν περιέχει φάκελο NetWatch με NetWatch.exe.": "The zip does not contain a NetWatch folder with NetWatch.exe.",
+  "κατέβασμα NetWatch-windows-x64.zip": "downloading NetWatch-windows-x64.zip",
+  "έλεγχος της νέας έκδοσης": "checking the new version",
   "Στα Windows: κατέβασε το NetWatch-windows-x64.zip από το GitHub, κλείσε το NetWatch (εικονίδιο ασπίδας → Έξοδος) και αντικατέστησε τον παλιό φάκελο. Οι ρυθμίσεις σου μένουν.": "On Windows: download NetWatch-windows-x64.zip from GitHub, quit NetWatch (shield icon → Έξοδος / Exit) and replace the old folder. Your settings are kept.",
   "Έχεις τοπικές αλλαγές στον κώδικα — κάνε commit/stash πρώτα (δεν τις πειράζω).": "You have local code changes — commit/stash them first (I won't touch them).",
   "Σε Docker: docker compose pull && docker compose up -d": "On Docker: docker compose pull && docker compose up -d",
@@ -3149,6 +3157,10 @@ I18N.add({
   [
    "^Η υπογραφή της ενημέρωσης ΔΕΝ είναι έγκυρη — δεν εγκαταστάθηκε τίποτα\\. ?(.*)$",
    "The update signature is NOT valid — nothing was installed. $1"
+  ],
+  [
+   "^Η (\\S+) κατέβηκε και ελέγχθηκε\\. Πάτα «Επανεκκίνηση τώρα»: το NetWatch θα κλείσει και θα ανοίξει ξανά στη νέα έκδοση \\(το παλιό μένει ως \\.previous\\)\\.$",
+   "$1 was downloaded and verified. Press “Restart now”: NetWatch will close and reopen on the new version (the old one is kept as .previous)."
   ],
   [
    "^Εγκαταστάθηκε η (\\S+)\\. Το παλιό κρατήθηκε ως (\\S+)\\. Κάνε επανεκκίνηση του NetWatch\\.$",

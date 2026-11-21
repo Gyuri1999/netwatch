@@ -37,7 +37,7 @@
     return l.trim() ? `<div>${il(l)}</div>` : '';
   }).join('');
   const when = t => t ? new Date(t * 1000).toLocaleString(EN() ? 'en-GB' : 'el-GR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false }) : T('ποτέ', 'never');
-  const KIND = () => ({ app: T('Mac app (NetWatch.app)', 'Mac app (NetWatch.app)'), git: T('κώδικας από git clone', 'source from git clone'), docker: 'Docker', files: T('αρχεία', 'files') });
+  const KIND = () => ({ app: T('Mac app (NetWatch.app)', 'Mac app (NetWatch.app)'), git: T('κώδικας από git clone', 'source from git clone'), docker: 'Docker', winapp: T('Windows app (NetWatch.exe)', 'Windows app (NetWatch.exe)'), files: T('αρχεία', 'files') });
 
   function pill() {
     let p = document.getElementById('upd-pill');
@@ -82,6 +82,8 @@
       <div>2️⃣ <span>${T('Ελέγχω την <b>ψηφιακή υπογραφή</b> του <code>SHA256SUMS</code> με το κλειδί που είναι ήδη μέσα στο app σου (<code>ssh-keygen -Y verify</code>). Λάθος ή καθόλου υπογραφή → δεν αλλάζει τίποτα.', 'I verify the <b>digital signature</b> of <code>SHA256SUMS</code> against the key already inside your app (<code>ssh-keygen -Y verify</code>). Wrong or missing signature → nothing changes.')}</span></div>
       ${V.kind === 'app' ? `<div>3️⃣ <span>${T('Ελέγχω το <b>SHA-256</b> του αρχείου, το bundle id, την έκδοση και το <code>codesign</code>.', 'I check the file’s <b>SHA-256</b>, the bundle id, the version and <code>codesign</code>.')}</span></div>
       <div>4️⃣ <span>${T('Κρατάω την παλιά έκδοση ως <code>NetWatch.app.previous</code> — αν κάτι πάει στραβά, γυρνάω πίσω.', 'I keep the old version as <code>NetWatch.app.previous</code> — if anything goes wrong, I roll back.')}</span></div>`
+      : V.kind === 'winapp' ? `<div>3️⃣ <span>${T('Ελέγχω το <b>SHA-256</b> του <code>NetWatch-windows-x64.zip</code>, ότι περιέχει <code>NetWatch.exe</code> και ότι η έκδοση ταιριάζει με το tag.', 'I check the <b>SHA-256</b> of <code>NetWatch-windows-x64.zip</code>, that it contains <code>NetWatch.exe</code> and that its version matches the tag.')}</span></div>
+      <div>4️⃣ <span>${T('Στην «Επανεκκίνηση» το NetWatch κλείνει, ο φάκελος αλλάζει και ανοίγει η νέα έκδοση. Η παλιά μένει ως <code>NetWatch.previous</code> δίπλα του· ρυθμίσεις και δεδομένα (στο %LOCALAPPDATA%) δεν πειράζονται.', 'On “Restart” NetWatch closes, the folder is swapped and the new version opens. The old one stays next to it as <code>NetWatch.previous</code>; settings and data (in %LOCALAPPDATA%) are untouched.')}</span></div>`
       : V.os === 'win32' ? `<div>3️⃣ <span>${T('Στα Windows <b>δεν</b> εγκαθιστώ μόνο μου: κατεβάζεις το <code>NetWatch-windows-x64.zip</code> από το GitHub (και αν θες ελέγχεις το SHA-256 με <code>Get-FileHash</code> απέναντι στο <code>SHA256SUMS</code>).', 'On Windows I do <b>not</b> install by myself: you download <code>NetWatch-windows-x64.zip</code> from GitHub (optionally check its SHA-256 with <code>Get-FileHash</code> against <code>SHA256SUMS</code>).')}</span></div>
       <div>4️⃣ <span>${T('Κλείσε το NetWatch (ασπίδα δίπλα στο ρολόι → Έξοδος), αντικατέστησε τον φάκελο και άνοιξέ το ξανά. Οι ρυθμίσεις και τα δεδομένα σου είναι στο %LOCALAPPDATA% και μένουν.', 'Quit NetWatch (shield next to the clock → Έξοδος / Exit), replace the folder and start it again. Your settings and data live in %LOCALAPPDATA% and are kept.')}</span></div>`
       : `<div>3️⃣ <span>${T('Ελέγχω το <b>SHA-256</b> κάθε αρχείου πριν το χρησιμοποιήσω.', 'I check every file’s <b>SHA-256</b> before using it.')}</span></div>`}</div>
@@ -104,6 +106,7 @@
       busy = false;
       if (a === 'check') { V = j; pill(); draw(); return; }
       if (j.error) { alert(tr(j.error)); }
+      if (a === 'restart' && j.ok && j.closing) { box().innerHTML = `<div class="card">↻ ${T('Το NetWatch κλείνει και ανοίγει ξανά στη νέα έκδοση σε λίγα δευτερόλεπτα…', 'NetWatch is closing and will reopen on the new version in a few seconds…')}</div>`; setTimeout(() => { try { window.close(); } catch (e) { /* */ } }, 6000); return; }
       if (a === 'restart' && j.ok) { box().innerHTML = `<div class="card">↻ ${j.demo ? T('Demo: εδώ θα γινόταν επανεκκίνηση.', 'Demo: this is where it would restart.') : T('Επανεκκίνηση… το NetWatch θα ανοίξει ξανά σε λίγα δευτερόλεπτα.', 'Restarting… NetWatch will reopen in a few seconds.')}</div>`; return; }
       load();
     }).catch(() => { busy = false; draw(); });
