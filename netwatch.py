@@ -286,6 +286,10 @@ def main():
                                           on_save=chown_to_user if live else None)
     import assess
     state.assess = assess.Assess(state)  # 📋 αναφορά «νέο δίκτυο»
+    import vulnwatch  # 🛡 ευπάθειες για τις συσκευές σου (CISA KEV + EPSS, μία φορά τη μέρα· demo: ενσωματωμένο δείγμα)
+    state.vulns = vulnwatch.VulnWatch(state, DATA if live else None, demo=demo)
+    if live:
+        threading.Thread(target=state.vulns.run_forever, daemon=True).start()
     import l2guard  # 🛡 rogue DHCP / ARP spoofing με ένα κουμπί (DHCPDISCOVER + ARP μόνο στο τοπικό LAN)
     state.l2guard = l2guard.L2Guard(state, sim=demo) if mode != "pcap" else None
     import updater  # 🔄 ενημερώσεις από GitHub (υπογεγραμμένες· στα apps μπαίνουν και μόνες τους)
