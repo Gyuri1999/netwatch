@@ -11,6 +11,7 @@ import threading
 import time
 
 import packets
+import techkit
 from concurrent.futures import ThreadPoolExecutor
 
 from core import BRUTE_PORTS, DEFAULT_CONFIG, EXTRA_MITRE, MITRE, PLAIN_PORTS, RISKY_SERVICES, RULES_DIR, SERVICES, SEV, SUSPECT_PORTS, TOR_PORTS, DistinctWindow, Window, app_label, chown_to_user, detect_net, detector_for, dga_score, entropy, ip_kind, local_tor_running, log, mask_user, mitre_for, norm_mac, random_mac, service_port, split_domain
@@ -545,6 +546,7 @@ class NetState:
         if proto == "ARP":
             return self._arp(P, t)
         self._intel_check(src, dst, dp, t, proto, fl)
+        techkit.observe(self, P, t)  # 🧰 Modbus/BACnet εγγραφές, ψεύτικο IPv6 RA
         ed = getattr(self, "encdns", None)
         if ed is not None:
             try:
@@ -665,7 +667,7 @@ class NetState:
                        key=f"{dst}:{dp}" if benign else None, cooldown=3600 if benign else None, benign=benign)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
-    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "timeline", "hunt", "cases", "configbak", "changecheck", "triage", "handover", "whereis", "expiry", "segcheck", "sitecheck", "topomap", "ssh", "devnames", "updater", "l2guard", "presence", "app_ctl", "npcap", "hygiene", "assess", "vulns", "upnp", "probes", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
+    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "timeline", "hunt", "cases", "configbak", "changecheck", "triage", "handover", "whereis", "expiry", "segcheck", "sitecheck", "topomap", "ssh", "devnames", "updater", "l2guard", "presence", "app_ctl", "npcap", "hygiene", "assess", "vulns", "upnp", "ot", "accept", "sites", "labels", "v6", "nac", "iotinv", "radio", "field", "uplink", "probes", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
             "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors", "own_tool", "test_ips")
 
     def reset(self, mode, iface, me_ips, gateway, history, feed, notifier=None):

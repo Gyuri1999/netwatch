@@ -97,3 +97,12 @@ jobs:
           sed -i 's/^#define OTA_ENABLE 0/#define OTA_ENABLE 1/' firmware/esp32-canary/secrets.h
           grep -q '^#define OTA_ENABLE 1' firmware/esp32-canary/secrets.h
           arduino-cli compile --fqbn esp32:esp32:esp32 --warnings all --library firmware/common firmware/esp32-canary
+      # 🧰 Αισθητήρες της εργαλειοθήκης τεχνικού (πρωτόκολλο «Οι συσκευές μου», firmware/common/nw_probe.h)
+      - name: Compile tech-kit sensors (rack, PoE, BLE, LoRa node + gateway)
+        run: |
+          for s in rack poe ble lora-node lora-gw; do cp firmware/esp32-$s/secrets.example.h firmware/esp32-$s/secrets.h; done
+          arduino-cli compile --fqbn esp32:esp32:esp32 --library firmware/common firmware/esp32-rack
+          arduino-cli compile --fqbn esp32:esp32:esp32-poe --library firmware/common firmware/esp32-poe
+          arduino-cli compile --fqbn esp32:esp32:esp32:PartitionScheme=min_spiffs --library firmware/common firmware/esp32-ble
+          arduino-cli compile --fqbn esp32:esp32:esp32 --library firmware/common firmware/esp32-lora-node
+          arduino-cli compile --fqbn esp32:esp32:esp32 --library firmware/common firmware/esp32-lora-gw

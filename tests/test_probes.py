@@ -116,9 +116,117 @@ def test_pair_rejects_unknown_kind_and_mqtt_kinds(tmp_path):
 def test_demo():
     p = probes.Probes(None, demo=True)
     v = p.view()
-    assert v["demo"] and len(v["probes"]) == 3 and v["counts"]["online"] >= 2
+    assert v["demo"] and len(v["probes"]) == 7 and v["counts"]["online"] >= 6
+    kinds = {x["kind"]: x for x in v["probes"]}
+    assert {"pc", "vlan", "rack", "field", "ble", "zigbee", "lora"} == set(kinds)
+    rack = kinds["rack"]["status"]
+    assert rack["metrics"]["volt"] > 200 and rack["metrics"]["door"] is False and rack["metrics"]["leak"] is False and rack["hum"]
+    assert kinds["field"]["status"]["link"]["lldp_port"] and kinds["field"]["status"]["link"]["poe"] is True
+    assert kinds["ble"]["items_n"] >= 5 and kinds["zigbee"]["items_n"] >= 5 and kinds["lora"]["items_n"] == 3
+    assert "items" not in kinds["ble"]  # η προβολή δίνει μόνο το πλήθος
+    assert all(len(json.dumps(x)) < 4000 for x in v["probes"])
+    assert {r["mac"] for r in p.items("ble")[0]["items"]} >= {"d3:5a:91:0c:44:e2"}
+    assert p.items("zigbee")[0]["metrics"]["ch11"] > 0 and len(p.items("lora")[0]["items"]) == 3
+    json.dumps(v), json.dumps(p.items())
     r = p.pair("δοκιμή", "pc")
-    assert r["ok"] and len(p.view()["probes"]) == 4
+    assert r["ok"] and len(p.view()["probes"]) == 8
+
+
+def _paired(tmp_path, kind, clock=None):
+    p = mk(tmp_path, clock)
+    p.enabled = True
+    r = p.pair("x", kind)
+    return p, r["id"], token_of(r["code"])
+
+
+def test_new_kinds_pairable_ready_and_have_fw_hint(tmp_path):
+    for k in ("rack", "field", "ble", "zigbee", "lora"):
+        assert k in probes.PAIRABLE and probes.KINDS[k]["ready"] is True and probes.KINDS[k]["fw"]
+        p, _pid, _tok = _paired(tmp_path / k, k)
+        assert p.view()["probes"][0]["kind"] == k and p.view()["kinds"][k]["fw"] == probes.KINDS[k]["fw"]
+    assert probes.KINDS["rack"]["hw"] == "ESP32 + SHT31 + μαγνητική επαφή + αισθητήρας νερού + PZEM-004T (προαιρετικά)"
+    assert probes.KINDS["field"]["hw"] == "Olimex ESP32-POE ή Raspberry Pi"
+    assert probes.KINDS["zigbee"]["fw"] == "tools/zigbee_sniff.py" and probes.KINDS["lora"]["fw2"] == "firmware/esp32-lora-node"
+    assert probes.KINDS["field"]["fw"] == "firmware/esp32-poe" and probes.KINDS["field"]["fw2"] == "tools/fieldbox"
+
+
+def test_items_stored_flattened_replaced_and_exposed(tmp_path):
+    p, pid, tok = _paired(tmp_path, "ble")
+    rows = [{"mac": "aa:bb:cc:dd:ee:%02x" % i, "rssi": -60 - i, "name": "dev<%d>" % i, "mfr": 76, "svc": "feaa", "ad": "0215",
+             "rnd": True, "conn": False} for i in range(5)]
+    assert p.report(tok, "192.168.1.60", json.dumps({"status": {"metrics": {"seen": 5}}, "items": rows}).encode())[0] == 200
+    v = p.view()["probes"][0]
+    assert v["items_n"] == 5 and "items" not in v
+    it = p.items("ble")
+    assert len(it) == 1 and it[0]["id"] == pid and it[0]["name"] == "x" and it[0]["kind"] == "ble" and it[0]["seen"] == 1000.0
+    assert it[0]["items"][0] == rows[0] and it[0]["metrics"] == {"seen": 5}
+    assert p.items("zigbee") == [] and len(p.items()) == 1
+    # αναφορά χωρίς το κλειδί → η λίστα μένει· με το κλειδί → αντικαθίσταται
+    p.report(tok, "192.168.1.60", b'{"status":{}}')
+    assert p.view()["probes"][0]["items_n"] == 5
+    p.report(tok, "192.168.1.60", json.dumps({"items": rows[:2]}).encode())
+    assert len(p.items("ble")[0]["items"]) == 2
+    p.report(tok, "192.168.1.60", b'{"items":[]}')
+    assert p.items("ble")[0]["items"] == []
+    it[0]["items"].append({"x": 1})  # αντίγραφο, όχι η ζωντανή λίστα
+    assert p.items("ble")[0]["items"] == []
+
+
+def test_items_hostile_input(tmp_path):
+    p, _pid, tok = _paired(tmp_path, "zigbee")
+    big = [{"ch": 11, "pan": "1a62", "src": "%04x" % i, "n": i} for i in range(300)]
+    body = json.dumps({"items": big}).encode()
+    assert len(body) <= probes.MAX_BODY  # χωράει στο όριο· ο server κρατά μόνο 80
+    assert p.report(tok, "192.168.1.60", body)[0] == 200
+    assert len(p.items()[0]["items"]) == probes.MAX_ITEMS == 80
+    nested = [{"ch": 11, "deep": {"a": {"b": [1, 2]}}, "lst": [1], "nul": None, "s": "x" * 500, "bad key!": 1, "inf": 1e300},
+              "string", 5, None, ["list"], {}, {"only": {"nested": 1}}, dict(("k%d" % i, i) for i in range(40))]
+    assert p.report(tok, "192.168.1.60", json.dumps({"items": nested}).encode())[0] == 200
+    it = p.items()[0]["items"]
+    assert len(it) == 2  # μη-dict και άδειες γραμμές πετιούνται
+    assert it[0] == {"ch": 11, "s": "x" * 60, "badkey": 1} and len(it[1]) == 12
+    for junk in ('"text"', "5", "null", '{"a":1}', "true"):
+        assert p.report(tok, "192.168.1.60", ('{"items":%s}' % junk).encode())[0] == 200
+        assert p.items()[0]["items"] == []
+    assert p.view()["probes"][0]["items_n"] == 0
+    json.dumps(p.view())
+
+
+def test_new_events_alerts_and_notes(tmp_path):
+    want = {"water_leak": ("Διαρροή νερού στο rack (αισθητήρας)", "high"), "power_fail": ("Διακοπή ρεύματος στο rack (αισθητήρας)", "high"),
+            "humid_high": ("Υψηλή υγρασία στο rack (αισθητήρας)", "med"), "ble_tracker": ("Bluetooth tracker κοντά (αισθητήρας)", "med"),
+            "poe_lost": ("Χάθηκε το PoE (αισθητήρας)", "med"), "link_down": ("Έπεσε η σύνδεση Ethernet (αισθητήρας)", "med"),
+            "lora_node_lost": ("Κόμβος LoRa σιώπησε (αισθητήρας)", "med"), "batt_low": ("Χαμηλή μπαταρία (αισθητήρας)", "low")}
+    for k, v in want.items():
+        assert probes.EVENTS[k] == v
+    assert all(t.endswith("(αισθητήρας)") for t, _s in probes.EVENTS.values())
+    assert "power_back" not in probes.EVENTS
+    p, _pid, tok = _paired(tmp_path, "rack")
+    evs = [{"type": k, "detail": "δοκιμή " + k} for k in want]
+    p.report(tok, "192.168.1.61", json.dumps({"events": evs}).encode())
+    assert [(a[0], a[1]) for a in p.state.alerts] == list(want.values())
+    assert p.state.alerts[0][3] == "αισθητήρας x" and p.state.alerts[0][4] == "δοκιμή water_leak"
+    n = len(p.state.alerts)
+    p.report(tok, "192.168.1.61", json.dumps({"events": [{"type": "power_back", "detail": "ήρθε το ρεύμα"}]}).encode())
+    assert len(p.state.alerts) == n  # μόνο σημείωση στο ιστορικό
+    assert p.view()["probes"][0]["events"][0]["type"] == "power_back"
+
+
+def test_per_node_events_get_their_own_alert_key(tmp_path):
+    class St(State):
+        def alert(self, typ, sev, actor, target, detail, t, **kw):
+            self.alerts.append((typ, kw.get("key")))
+    p = probes.Probes(St(), str(tmp_path), port=0, clock=Clock(), cert=("x", "y", "AA:BB"))
+    p.enabled = True
+    r = p.pair("gw", "lora")
+    tok = token_of(r["code"])
+    evs = [{"type": "lora_node_lost", "detail": "a", "data": {"node": "silo-01"}}, {"type": "lora_node_lost", "detail": "b", "data": {"node": "pump-03"}},
+           {"type": "ble_tracker", "detail": "c", "data": {"mac": "aa:bb:cc:dd:ee:ff", "kind": "findmy"}},
+           {"type": "batt_low", "detail": "d", "data": {"node": True}}, {"type": "door_open", "detail": "e"}]
+    p.report(tok, "192.168.1.64", json.dumps({"events": evs}).encode())
+    keys = [k for _t, k in p.state.alerts]
+    assert keys == [("probe", r["id"], "lora_node_lost", "silo-01"), ("probe", r["id"], "lora_node_lost", "pump-03"),
+                    ("probe", r["id"], "ble_tracker", "aa:bb:cc:dd:ee:ff"), ("probe", r["id"], "batt_low"), ("probe", r["id"], "door_open")]
 
 
 def test_qr_sizes():

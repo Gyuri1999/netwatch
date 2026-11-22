@@ -435,6 +435,8 @@ def main():
                              {"ip": "192.168.1.20", "name": "ESP32 κήπου"}, {"ip": "192.168.1.30", "name": "Home Assistant"},
                              {"ip": "192.168.1.150", "name": "Εκτυπωτής"}]}
     state.ipam = ipam.Ipam(icfg, os.path.join(DATA, "ipam.json") if live else os.path.join(DATA, "ipam-demo.json"))
+    import techkit  # 🧰 εργαλειοθήκη τεχνικού πεδίου: tester πρίζας, τεστ αποδοχής, πελάτες, ετικέτες, OT, IoT, IPv6, 802.1X
+    techkit.setup(state, cfg, mode, DATA, on_save=chown_to_user)
     import ops
     mw = cfg.get("maintenance")
     if mode == "demo" and not mw:
@@ -504,6 +506,7 @@ def main():
     for port in range(args.port, args.port + 20):
         try:
             srv = _Server((bind, port), make_handler(state))
+            state.port = port  # 🏷 για τα QR των ετικετών
             break
         except OSError:
             log(f"Η θύρα {port} είναι πιασμένη (τρέχει ήδη άλλο NetWatch;) — δοκιμάζω την {port + 1}")

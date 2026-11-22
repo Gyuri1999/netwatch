@@ -1,0 +1,23 @@
+# NetWatch field box — οθόνη OLED (SSD1306) + κουμπί. Προαιρετικό: το εγκαθιστά το install.sh --oled.
+# Τα __DIR__, __USER__, __PORT__, __BUTTON__ τα αντικαθιστά το install.sh.
+[Unit]
+Description=NetWatch field box OLED display
+After=netwatch-fieldbox.service
+Wants=netwatch-fieldbox.service
+
+[Service]
+Type=simple
+User=__USER__
+SupplementaryGroups=i2c gpio
+WorkingDirectory=__DIR__
+# Ίδιος χρήστης με το NetWatch, για να διαβάζει το data/agent-token (0600). Μιλά μόνο με το 127.0.0.1.
+ExecStart=__DIR__/.venv-oled/bin/python __DIR__/tools/fieldbox/oled.py --url https://127.0.0.1:__PORT__ --token-file __DIR__/data/agent-token --cert __DIR__/data/agent.crt __BUTTON__
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

@@ -92,6 +92,8 @@ def make_handler(state):
                 lim = 2 * 1024 * 1024 if u.path == "/api/configs/upload" else 10000  # 💾 επικόλληση ρυθμίσεων έως 512 KB
                 if u.path == "/api/segcheck/report":  # 🧱 αποτέλεσμα ελέγχου διαχωρισμού από άλλο VLAN
                     lim = 256 * 1024
+                if u.path.startswith("/api/kit/"):  # 🧰 π.χ. λογότυπο εταιρείας για τις αναφορές
+                    lim = __import__("techkit").MAX_BODY
                 if u.path == "/api/names":  # 🏷 πολλά ονόματα μαζί (οδηγός / μεταφορά από τον browser)
                     lim = 256 * 1024
                 if u.path == "/api/configs/upload" and n > lim:
@@ -100,6 +102,9 @@ def make_handler(state):
             except (ValueError, json.JSONDecodeError):
                 return self._json({"error": "bad json"}, 400)
             try:
+                if u.path.startswith("/api/kit/"):  # 🧰 εργαλειοθήκη τεχνικού
+                    import techkit
+                    return techkit.respond(self, state, "POST", u, body)
                 if u.path == "/api/ipam/note":
                     ip_ = getattr(state, "ipam", None)
                     if not ip_:
@@ -774,7 +779,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/assessui.js", "/vulnui.js", "/upnpui.js", "/probesui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/assessui.js", "/vulnui.js", "/upnpui.js", "/otui.js", "/acceptui.js", "/sitesui.js", "/labelsui.js", "/calcui.js", "/v6ui.js", "/nacui.js", "/iotinvui.js", "/radioui.js", "/fieldui.js", "/probesui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -856,6 +861,9 @@ def make_handler(state):
             if u.path == "/api/probes":  # 🧩 οι συσκευές μου
                 pr = getattr(state, "probes", None)
                 return self._json(pr.view() if pr else {"error": "off"})
+            if u.path.startswith("/api/kit/"):  # 🧰 εργαλειοθήκη τεχνικού (OT, τεστ αποδοχής, πελάτες, ετικέτες, IPv6, 802.1X, IoT, πρίζα)
+                import techkit
+                return techkit.respond(self, state, "GET", u)
             if u.path == "/api/upnp":  # 🔓 θύρες που άνοιξαν μόνες τους στο router (UPnP)
                 uw = getattr(state, "upnp", None)
                 return self._json(uw.view() if uw else {"error": "off"})

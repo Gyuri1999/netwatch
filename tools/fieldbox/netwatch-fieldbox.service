@@ -1,0 +1,29 @@
+# NetWatch field box — το NetWatch ως υπηρεσία στο Raspberry Pi (tester πρίζας).
+# Τα __DIR__, __USER__, __IFACE__, __PORT__ τα αντικαθιστά το tools/fieldbox/install.sh.
+# Εγκατάσταση με το χέρι: αντικατάστησέ τα και αντίγραψε το αρχείο στο /etc/systemd/system/.
+[Unit]
+Description=NetWatch field box (socket tester, agent mode)
+Documentation=file://__DIR__/tools/fieldbox/README.md
+After=network.target NetworkManager.service
+Wants=network.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__DIR__
+# --agent: HTTPS + token, ακούει και στο LAN/hotspot ώστε να ανοίγει από το κινητό (βλ. docs/agent.md).
+ExecStart=__DIR__/.venv/bin/python __DIR__/netwatch.py --agent --no-open -i __IFACE__ --port __PORT__
+Restart=on-failure
+RestartSec=5
+# Όχι root: μόνο ό,τι χρειάζεται η καταγραφή πακέτων.
+#   CAP_NET_RAW   raw sockets (scapy: ακρόαση LLDP/CDP, DHCPDISCOVER), ping, SO_BINDTODEVICE για τον έλεγχο LTE
+#   CAP_NET_ADMIN promiscuous mode (το LLDP είναι multicast 01:80:c2:00:00:0e)
+AmbientCapabilities=CAP_NET_RAW CAP_NET_ADMIN
+CapabilityBoundingSet=CAP_NET_RAW CAP_NET_ADMIN
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target
