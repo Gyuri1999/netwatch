@@ -45,4 +45,5 @@ def test_notifier_translates(monkeypatch):
     monkeypatch.setattr(n, "_ntfy", lambda *a: False, raising=False)
     n.cfg["telegram"] = {"token": "x", "chat_id": "y"}
     n._send({"type": "Δοκιμή", "sev": "high", "actor": "1.2.3.4", "target": "5.6.7.8", "detail": "Δοκιμή"})
-    assert sent and sent[0][0] == "NetWatch — Test" and sent[0][1].endswith(": Test")
+    # headline = εικονίδιο σοβαρότητας + μεταφρασμένος τύπος· σώμα = μεταφρασμένη εξήγηση (χωρίς «IP → IP:»)
+    assert sent and sent[0][0] == "🔴 Test" and sent[0][1] == "Test"

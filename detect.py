@@ -1222,10 +1222,11 @@ class NetState:
             if n >= th["count"]:
                 self.alert("Network sweep (ARP)", "med", psrc, pdst,
                            f"ARP ερωτήσεις για {n} IP σε {th['window']}s — κάποιος σκανάρει το LAN", t)
-        if psrc and psrc != "0.0.0.0" and hw and hw != "ff:ff:ff:ff:ff:ff":
+        if psrc and psrc != "0.0.0.0" and hw and hw not in ("ff:ff:ff:ff:ff:ff", "00:00:00:00:00:00"):
             old = self.arp_table.get(psrc)
             trusted = self.arp_first.setdefault(psrc, old or hw)
-            if old and old != hw and hw != trusted:
+            # Αγνόησε: μηδενική MAC (κάρτα που κοιμάται/ξυπνά) και τη ΔΙΚΗ σου IP (δεν είναι MITM — εσύ στέλνεις το ARP σου)
+            if old and old != hw and hw != trusted and psrc not in self.me:
                 gw = psrc == self.gateway
                 others = [i for i in self.mac_ips.get(hw, ()) if i != psrc and self.arp_first.get(i) == hw]
                 actor = others[0] if others else psrc
@@ -1271,7 +1272,7 @@ class NetState:
                    "high": by.get("high", 0), "med": by.get("med", 0), "low": by.get("low", 0),
                    "hosts": len(self.hosts), "pkts": self.total_pkts, "bytes": self.total_bytes,
                    "lan": sum(1 for h in self.hosts.values() if h.get("kind") == "local"),
-                   "last": {k: last[k] for k in ("id", "t", "type", "sev", "actor", "target")} if last else None,
+                   "last": {k: last[k] for k in ("id", "t", "type", "sev", "actor", "target", "detail")} if last else None,
                    "recent": [{k: a.get(k) for k in ("id", "t", "type", "sev", "actor", "target", "maint")} for a in al[:6]]}
         try:
             hs = self.health.status()["targets"] if self.health else []

@@ -205,13 +205,18 @@ class Notifier:
     def _send(self, a):
         from i18n import tr
         lang = self.cfg.get("lang", "el")  # config.yaml → lang: en
-        title = f"NetWatch — {tr(a['type'], lang)}"
+        typ = tr(a["type"], lang)
+        detail = tr(a["detail"], lang)
+        sev_ic = {"high": "🔴", "med": "🟠", "low": "🟡"}.get(a["sev"], "⚠️")
+        headline = f"{sev_ic} {typ}"              # τύπος με χρώμα σοβαρότητας (Windows / Telegram / ntfy)
+        title = f"{sev_ic} NetWatch"              # macOS: τίτλος + υπότιτλος = ο τύπος, σώμα = η εξήγηση
+        body = detail                            # η εξήγηση είναι ήδη ολοκληρωμένη πρόταση — χωρίς «IP → IP:»
         mac_only = a.get("_mac_only")
-        body = f"{a['actor']} → {a['target']}: {tr(a['detail'], lang)}"
-        if self.cfg.get("macos") and sys.platform == "darwin":
+        # Όταν τρέχουμε μέσα στην εφαρμογή macOS, τις ειδοποιήσεις τις στέλνει η ίδια (δικό μας εικονίδιο + κουμπιά)
+        if self.cfg.get("macos") and sys.platform == "darwin" and not os.environ.get("NETWATCH_HOST_APP"):
             cmd = ["osascript", "-e", "on run argv", "-e",
-                   'display notification (item 2 of argv) with title (item 1 of argv) sound name "Basso"',
-                   "-e", "end run", title, body[:220]]
+                   'display notification (item 3 of argv) with title (item 1 of argv) subtitle (item 2 of argv) sound name "Basso"',
+                   "-e", "end run", title, typ[:80], body[:200]]
             uid, user = os.environ.get("SUDO_UID"), os.environ.get("SUDO_USER")
             if user and uid and os.geteuid() == 0:
                 cmd = ["launchctl", "asuser", uid, "sudo", "-u", user] + cmd
@@ -222,19 +227,19 @@ class Notifier:
         elif self.cfg.get("macos") and sys.platform == "win32":  # ίδια ρύθμιση: «ειδοποιήσεις υπολογιστή»
             try:
                 import winplat
-                winplat.toast(title, body)
+                winplat.toast(headline, body)
             except Exception as e:
                 log("Windows notification error:", e)
         for name, fn in (() if mac_only else (("telegram", self._telegram), ("ntfy", self._ntfy))):
             try:
-                fn(title, body, a["sev"])
+                fn(headline, body, a["sev"])
             except Exception as e:
                 log(f"{name} error:", e)
         if not mac_only:
             import ops
             for name, fn in ops.CHANNELS.items():
                 try:
-                    fn(self.cfg.get(name), title, body, a["sev"], a)
+                    fn(self.cfg.get(name), headline, body, a["sev"], a)
                 except Exception as e:
                     log(f"{name} error:", str(e)[:200])
 
