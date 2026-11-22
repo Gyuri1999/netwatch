@@ -2,6 +2,13 @@
 I18N.add({
  "exact": {
   "interface / εγώ": "interface / me",
+  "Σύνοψη δικτύου": "Network overview",
+  "ειδοποιήσεις που θέλουν προσοχή": "alerts needing attention",
+  "κίνηση που παρατηρήθηκε": "traffic observed",
+  "ασφάλεια Wi‑Fi": "Wi-Fi security",
+  "Όλα ήρεμα": "All clear",
+  "οι σοβαρότερες εμφανίζονται πρώτες. Άνοιξε «Πες μου περισσότερα» για εξήγηση και επόμενο βήμα.": "highest severity first. Open “Tell me more” for an explanation and next step.",
+  "🧭 Δες μια σύντομη ξενάγηση": "🧭 Take a quick tour",
   "πακέτα/s": "packets/s",
   "κίνηση": "traffic",
   "επιθέσεις": "attacks",
