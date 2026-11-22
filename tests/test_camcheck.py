@@ -205,11 +205,13 @@ class Web(Net):
     """Ψεύτικη κάμερα: καταγράφει κάθε αίτημα και αν είχε Authorization."""
     def __init__(self, pages, **kw):
         super().__init__(**kw)
-        self.pages, self.calls = pages, []
+        self.pages, self.calls, self.ports = pages, [], []
 
-    def http_get(self, ip, scheme, path, auth=None):
+    def http_get(self, ip, scheme, path, auth=None, port=None):
         self.calls.append((scheme, path, auth))
-        f = self.pages.get((scheme, path))
+        if port:
+            self.ports.append(port)
+        f = self.pages.get((scheme, path) if not port else (scheme, path, port))
         return f(auth) if f else ((404, "", b"") if any(k[0] == scheme for k in self.pages) else None)
 
 
@@ -284,3 +286,22 @@ def test_snapshot_demo_needs_no_credentials():
     c = cc.CamCheck(None, demo=True)
     code, r = c.api("POST", "snapshot", {}, {"ip": "10.20.0.101"})
     assert code == 200 and r["img"].startswith("data:image/svg+xml;base64,") and r["via"] == "demo"
+
+
+def test_real_ping_is_slow_enough_for_icmp_rate_limits(monkeypatch):
+    """Πραγματικό NVR (TVT) έδειχνε 40–70% «απώλεια» με ping ανά 0,2″ και 0% με ανά 1″: περιορίζει το ICMP."""
+    import changecheck
+    seen = {}
+    monkeypatch.setattr(changecheck, "ping", lambda ip, **kw: seen.update(kw) or {"ok": True, "loss_pct": 0.0, "avg": 6.0, "err": None})
+    assert cc.RealNet().ping("192.168.1.100") == {"ok": True, "loss": 0.0, "ms": 6.0, "err": None}
+    assert seen["interval"] >= 1.0 and seen["count"] >= 4
+
+
+def test_snapshot_uses_web_port_announced_by_the_device():
+    """Πραγματικό καταγραφικό είχε το web UI στην 8000 (όχι 80/443) — η θύρα έρχεται από το ONVIF XAddr."""
+    wsd = WSD.replace(b"http://192.168.1.64/onvif", b"http://10.20.0.150:8000/onvif")
+    web = Web({("http", "/snap.jpg", 8000): lambda a: (200, "", JPEG)}, wsd=[(wsd, "10.20.0.150")])
+    c = mk(web)
+    c.discover()
+    assert c.cams["10.20.0.150"]["web"] == 8000
+    assert c.snapshot("10.20.0.150", "", "")["ok"] and 8000 in web.ports

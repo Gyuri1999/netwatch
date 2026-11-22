@@ -231,7 +231,8 @@ class RealNet:
 
     def ping(self, ip):
         import changecheck
-        r = changecheck.ping(ip, count=10, interval=0.2, timeout=1.0)
+        # 1 ping/δευτ.: πολλές κάμερες/NVR περιορίζουν το ICMP (rate limit) και στα γρήγορα ping δείχνουν ψεύτικη απώλεια 40–70%
+        r = changecheck.ping(ip, count=5, interval=1.0, timeout=1.0)
         return {"ok": bool(r.get("ok")), "loss": r.get("loss_pct"), "ms": r.get("avg"), "err": r.get("err")}
 
     def arp_macs(self, ip):
@@ -267,7 +268,7 @@ class RealNet:
     def onvif_time(self, ip, port, path):
         return self._tcp(ip, port, onvif_time_request(ip, port, path))
 
-    def http_get(self, ip, scheme, path, auth=None):
+    def http_get(self, ip, scheme, path, auth=None, port=None):
         """Ένα GET → (status, WWW-Authenticate, σώμα έως 3 MB) ή None. Δεν ακολουθεί ανακατευθύνσεις."""
         import http.client
         import ssl
@@ -275,9 +276,9 @@ class RealNet:
             if scheme == "https":
                 ctx = ssl.create_default_context()
                 ctx.check_hostname, ctx.verify_mode = False, ssl.CERT_NONE  # κάμερα στο LAN με self-signed
-                c = http.client.HTTPSConnection(ip, 443, timeout=4, context=ctx)
+                c = http.client.HTTPSConnection(ip, port or 443, timeout=4, context=ctx)
             else:
-                c = http.client.HTTPConnection(ip, 80, timeout=4)
+                c = http.client.HTTPConnection(ip, port or 80, timeout=4)
             hd = {"User-Agent": "NetWatch-CamCheck", "Accept": "image/jpeg", "Connection": "close"}
             if auth:
                 hd["Authorization"] = auth
@@ -365,6 +366,8 @@ class CamCheck:
             for k in ("mac", "vendor", "model", "fw"):
                 if extra.get(k):
                     c[k] = clean(extra[k], 60)
+            if isinstance(extra.get("web"), int) and 0 < extra["web"] < 65536:
+                c["web"] = extra["web"]      # θύρα του web UI όπως τη δήλωσε η συσκευή (π.χ. 8000 σε καταγραφικά TVT)
         return {"ok": True}
 
     def _import_known(self):
@@ -404,7 +407,8 @@ class CamCheck:
             self.found, self.conflicts = sorted(out, key=lambda x: (not x["off_subnet"], x["ip"]))[:256], conflicts
         for f in out:
             if not f["off_subnet"]:
-                self.add(f["ip"], f.get("name") or "", "found", mac=f.get("mac"), model=f.get("model"), fw=f.get("fw"), vendor="Hikvision" if f["via"] == "SADP" else "")
+                self.add(f["ip"], f.get("name") or "", "found", mac=f.get("mac"), model=f.get("model"), fw=f.get("fw"), vendor="Hikvision" if f["via"] == "SADP" else "",
+                         web=next((x[1] for x in (f.get("xaddrs") or []) if x[0] == f["ip"]), None))
         return out
 
     def _local(self):
@@ -558,16 +562,18 @@ class CamCheck:
         paths = [path] if path else [p for v, p in sorted(SNAP_PATHS, key=lambda vp: not (vp[0] and vp[0] in hint))]
         # 1) χωρίς κωδικό: ποια διεύθυνση υπάρχει; (404 → επόμενη· 401 → αυτή είναι, ζητά κωδικό)
         target = None
-        for scheme in ("https", "http"):
+        web = cam.get("web") if isinstance(cam.get("web"), int) else None
+        ways = [("https", None), ("http", None)] + ([("http", web)] if web and web not in (80, 443) else [])
+        for scheme, port in ways:
             for p in paths:
-                r = self.net.http_get(ip, scheme, p)
+                r = self.net.http_get(ip, scheme, p, None, port)
                 if not r:
                     break                      # το scheme δεν απαντά καθόλου
                 st, www, body = r
                 if st == 200 and is_jpeg(body):
                     return self._img(body, scheme, True)
                 if st == 401:
-                    target = (scheme, p, parse_challenge(www))
+                    target = (scheme, p, parse_challenge(www), port)
                     break
             if target:
                 break
@@ -576,7 +582,7 @@ class CamCheck:
                      "No snapshot address found on this camera. Enter the path from its manual (e.g. /cgi-bin/snapshot.cgi).")
         if not user or not password:
             return E("Η κάμερα ζητά όνομα χρήστη και κωδικό.", "The camera asks for a user name and password.")
-        scheme, p, ch = target
+        scheme, p, ch, port = target
         # 2) ΜΙΑ προσπάθεια με τα στοιχεία του χρήστη
         if ch["digest"]:
             auth = digest_header(user, password, "GET", p, ch["digest"])
@@ -589,7 +595,7 @@ class CamCheck:
             auth = "Basic " + base64.b64encode(f"{user}:{password}".encode("utf-8")).decode()
         else:
             return E("Η κάμερα ζητά τρόπο σύνδεσης που δεν υποστηρίζω.", "The camera asks for a login method I do not support.")
-        r = self.net.http_get(ip, scheme, p, auth)
+        r = self.net.http_get(ip, scheme, p, auth, port)
         del auth, password
         if not r:
             return E("Η κάμερα δεν απάντησε.", "The camera did not answer.")

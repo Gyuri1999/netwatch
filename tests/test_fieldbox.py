@@ -336,7 +336,8 @@ def test_verdict_each_failure_mode():
     # Wi‑Fi δεν κρίνεται ως «χαλασμένο ζεύγος»
     r = R(speed=144)
     r["link"]["kind"] = "wifi"
-    assert code(r) == ("ok", None)
+    assert code(r) == ("warn", None)                      # … αλλά ούτε «Πρίζα ΟΚ»: δεν δοκιμάστηκε πρίζα
+    assert "Wi‑Fi" in fb.verdict(r)["el"] and "Πρίζα ΟΚ" not in fb.verdict(r)["el"] and "Ethernet" in fb.verdict(r)["fix"]
     assert fb.verdict({})["level"] == "fail"
 
 
@@ -461,7 +462,9 @@ def test_run_without_root_degrades():
     rec = box(net).run_test("D-1")
     st = {s["id"]: s for s in rec["steps"]}
     assert st["nbr"]["status"] == "skip" and "root" in st["nbr"]["detail"] and st["dhcp"]["status"] == "skip"
-    assert rec["level"] == "ok" and rec["sw"] == "" and rec["l3"]["gateway"] == "ok"
+    # χωρίς δικαιώματα ΔΕΝ λέμε «Πρίζα ΟΚ»: ο έλεγχος ήταν μερικός (βρέθηκε σε πραγματικό δίκτυο, χωρίς sudo)
+    assert rec["level"] == "warn" and "Μερικός έλεγχος" in rec["verdict"] and "Πρίζα ΟΚ" not in rec["verdict"]
+    assert rec["sw"] == "" and rec["l3"]["gateway"] == "ok" and "sudo" in rec["fix"]
 
 
 def test_cdp_then_lldp_merge_and_trunk():

@@ -293,12 +293,21 @@ class Net:
         from scapy.all import AsyncSniffer, Ether, ICMPv6ND_RS, ICMPv6NDOptSrcLLAddr, IPv6, conf, get_if_hwaddr, sendp
         iface = iface or conf.iface
         mac = get_if_hwaddr(iface)
-        sn = AsyncSniffer(iface=iface, filter="icmp6", store=True, timeout=timeout)
+        # (το AsyncSniffer των νεότερων scapy δεν δέχεται timeout= — σταματάμε εμείς μετά από `timeout` δευτερόλεπτα)
+        sn = AsyncSniffer(iface=iface, filter="icmp6", store=True)
         sn.start()
         time.sleep(0.4)
-        sendp(Ether(src=mac, dst="33:33:00:00:00:02") / IPv6(dst="ff02::2", hlim=255) / ICMPv6ND_RS()
-              / ICMPv6NDOptSrcLLAddr(lladdr=mac), iface=iface, verbose=0)
-        sn.join(timeout + 2)
+        if not getattr(sn, "running", True):  # δεν άνοιξε η καταγραφή (συνήθως: χωρίς δικαιώματα διαχειριστή)
+            raise PermissionError("η καταγραφή πακέτων θέλει δικαιώματα διαχειριστή (Live)")
+        try:
+            sendp(Ether(src=mac, dst="33:33:00:00:00:02") / IPv6(dst="ff02::2", hlim=255) / ICMPv6ND_RS()
+                  / ICMPv6NDOptSrcLLAddr(lladdr=mac), iface=iface, verbose=0)
+            time.sleep(timeout)
+        finally:
+            try:
+                sn.stop()
+            except Exception:  # noqa: BLE001
+                pass
         return [bytes(getattr(p, "original", None) or bytes(p)) for p in list(sn.results or [])[:200]]
 
     def addresses(self):
