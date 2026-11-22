@@ -296,6 +296,8 @@ def main():
     if live and state.probes:
         state.probes.start()
         threading.Thread(target=state.probes.run_forever, daemon=True).start()
+    import watchers  # 👁 ποιος σε κοιτάζει: παθητικός εντοπισμός trackers/ACR (SNI/DNS)
+    state.watchers = watchers.Watchers(state, sim=demo)
     import upnpwatch  # 🔓 θύρες που άνοιξαν μόνες τους στο router (UPnP) — μόνο ανάγνωση, κάθε 15'
     state.upnp = upnpwatch.UpnpWatch(state, DATA if live else None, demo=demo) if mode != "pcap" else None
     if demo:

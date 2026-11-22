@@ -91,6 +91,7 @@ def main():
     shutil.copy2(os.path.join(ROOT, "vulnui.js"), out)
     shutil.copy2(os.path.join(ROOT, "upnpui.js"), out)
     shutil.copy2(os.path.join(ROOT, "probesui.js"), out)
+    shutil.copy2(os.path.join(ROOT, "watchui.js"), out)
     for f in ("otui.js", "acceptui.js", "sitesui.js", "labelsui.js", "calcui.js", "v6ui.js", "nacui.js", "iotinvui.js", "radioui.js", "fieldui.js"):  # 🧰 εργαλειοθήκη τεχνικού
         shutil.copy2(os.path.join(ROOT, f), out)
     shutil.copy2(os.path.join(ROOT, "acl.js"), out)
