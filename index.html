@@ -596,6 +596,61 @@ html.glass th,html.glass thead,html.glass table tr:first-child th{background:rgb
 html.glass[data-theme=light] th{background:rgb(255 255 255 / 45%)!important}
 html.glass td,html.glass th{border-color:var(--line)}
 html.glass.nomo *{transition:none!important}
+/* ===== NetWatch polish: clearer surfaces, calmer motion, stronger focus ===== */
+:root{--ease:cubic-bezier(.22,.75,.25,1);--t1:160ms;--t2:280ms}
+header{position:relative;z-index:20;background:linear-gradient(180deg,color-mix(in srgb,var(--panel2) 88%,var(--cyan) 4%),var(--bg2));box-shadow:0 8px 28px -24px color-mix(in srgb,var(--cyan) 46%,transparent)}
+header::after{content:"";position:absolute;left:0;right:0;bottom:-1px;height:1px;background:linear-gradient(90deg,transparent,color-mix(in srgb,var(--cyan) 24%,transparent),transparent);pointer-events:none}
+#viz{isolation:isolate;background-image:radial-gradient(circle at 50% 45%,color-mix(in srgb,var(--cyan) 4%,transparent),transparent 48%),linear-gradient(rgb(var(--w) / 1.6%) 1px,transparent 1px),linear-gradient(90deg,rgb(var(--w) / 1.6%) 1px,transparent 1px);background-size:auto,32px 32px,32px 32px}
+aside{box-shadow:-18px 0 44px -42px #000;z-index:2}
+#rail button{position:relative;transition:background-color var(--t1) var(--ease),color var(--t1) var(--ease),transform var(--t1) var(--ease)}
+#rail button:hover{transform:translateX(2px)}
+#rail button.on::before{content:"";position:absolute;left:-8px;top:7px;bottom:7px;width:2px;border-radius:2px;background:var(--cyan);box-shadow:0 0 12px color-mix(in srgb,var(--cyan) 55%,transparent)}
+nav{background:color-mix(in srgb,var(--panel) 88%,transparent)}
+nav button{transition:color var(--t1),background-color var(--t1),border-color var(--t1)}
+.tab.on{animation:nw-fade var(--t2) var(--ease)}
+.card,.kpi,.wsi,.mcard,.tactic,.al{transition:transform var(--t1) var(--ease),border-color var(--t1),background-color var(--t1),box-shadow var(--t1)}
+.card:hover{border-color:color-mix(in srgb,var(--cyan) 12%,var(--line2))}
+.kpi[data-go]:hover,.hgo:hover,.mcard:hover,.wsi:hover{transform:translateY(-2px);box-shadow:0 12px 28px -20px color-mix(in srgb,var(--cyan) 30%,#000),inset 0 1px 0 rgb(var(--w) / 3%)}
+button.b,.railbtn,#zc button{transition:transform var(--t1) var(--ease),background-color var(--t1),border-color var(--t1),color var(--t1),box-shadow var(--t1)}
+button.b:hover,#zc button:hover{transform:translateY(-1px);box-shadow:0 5px 14px -10px color-mix(in srgb,var(--cyan) 60%,transparent)}
+button.b:active,#zc button:active{transform:translateY(0) scale(.97)}
+input.f,select.f,textarea{transition:border-color var(--t1),box-shadow var(--t1),background-color var(--t1)}
+tr.r td{transition:background-color var(--t1),color var(--t1)}
+tr.r:hover td{background:color-mix(in srgb,var(--cyan) 5%,var(--panel2))}
+table{border-spacing:0}
+th{letter-spacing:.025em}
+.badge.live{animation:nw-live 2.8s ease-in-out infinite}
+@keyframes nw-live{50%{box-shadow:0 0 0 4px color-mix(in srgb,var(--red) 7%,transparent)}}
+.toast{animation:nw-toast-in 300ms var(--ease) both}
+@keyframes nw-toast-in{from{opacity:0;transform:translateY(-8px) scale(.985)}to{opacity:1;transform:none}}
+#legend,#tip,#zl{box-shadow:0 8px 24px -16px #000}
+@media (max-width:900px){#viz{background-size:auto,26px 26px,26px 26px}}
+@media (prefers-reduced-motion:reduce){.badge.live{animation:none!important}}
+html.nomo .badge.live{animation:none!important}
+/* A calmer, more useful home and alert experience across screen sizes. */
+.home-snapshot{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 12px}
+.home-snapshot button{min-width:0;width:100%;display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line2);border-radius:var(--r);background:linear-gradient(145deg,var(--panel2),color-mix(in srgb,var(--panel2) 78%,var(--cyan) 5%));color:inherit;text-align:left;font:inherit;cursor:pointer;transition:transform var(--t1) var(--ease),border-color var(--t1),box-shadow var(--t1)}
+.home-snapshot button:hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--cyan) 30%,var(--line2));box-shadow:0 12px 28px -22px color-mix(in srgb,var(--cyan) 45%,#000)}
+.home-snapshot .hs-ic{font-size:19px}.home-snapshot b{display:block;color:var(--head);font-size:16px;font-variant-numeric:tabular-nums;line-height:1.2}.home-snapshot span:last-child{display:block;color:var(--dim);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hal{border:1px solid var(--line2);border-left:3px solid var(--dim);border-radius:8px;padding:9px 10px;transition:background-color var(--t1),transform var(--t1)}
+.hal:hover{background:rgb(var(--w) / 4%);transform:translateX(2px)}
+.al{scroll-margin-top:12px}.al.high{box-shadow:inset 3px 0 0 color-mix(in srgb,var(--red) 24%,transparent)}
+.al .act{flex-wrap:wrap}.al .act .b{min-height:32px}
+.empty{max-width:620px;margin:22px auto;padding:24px 18px;border:1px dashed var(--line2);border-radius:var(--r);background:rgb(var(--w) / 1.5%);line-height:1.65}
+@media (max-width:900px){
+  nav{overflow-x:auto;overscroll-behavior-x:contain;scrollbar-width:none}
+  nav::-webkit-scrollbar{display:none}nav button{flex:none;min-height:42px;padding-left:12px;padding-right:12px}
+  body.rail-open #rail{box-shadow:0 0 0 100vmax rgb(0 0 0 / 48%),12px 0 30px #000a}
+  .home-snapshot{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .tab{padding-bottom:calc(24px + env(safe-area-inset-bottom))}
+}
+@media (max-width:600px){
+  button.b,.hgo,.chooser button{min-height:40px}
+  .home-snapshot{gap:7px}.home-snapshot button{padding:10px 9px;gap:7px}.home-snapshot .hs-ic{font-size:17px}.home-snapshot b{font-size:14px}
+  .al .h{align-items:flex-start}.al .h>span:last-child{white-space:nowrap}
+  .al .act .b{flex:1 1 auto}
+}
+@media (prefers-reduced-motion:reduce){.home-snapshot button:hover,.hal:hover{transform:none}}
 </style>
 </head>
 <body>
@@ -1233,7 +1288,8 @@ function drawBlock(){const d=blockData,el=$('t-block');if(d.error&&!d.blocked){e
 let alSeen=-1;
 function renderAlerts(){const el=$('t-alerts');if(!S.alerts.length)return;setTimeout(()=>{alSeen=Math.max(alSeen,...S.alerts.map(a=>a.id))},0);
   const counts={};S.alerts.forEach(a=>counts[a.sev]=(counts[a.sev]||0)+1);
-  el.innerHTML=`<div style="margin-bottom:8px"><button class="b" onclick="exportReport()">⬇ Αναφορά συμβάντος (JSON)</button></div><div class="sm" style="margin-bottom:8px">${counts.high||0} σοβαρές · ${counts.med||0} μέτριες · ${counts.low||0} χαμηλές — πάτα «Πες μου περισσότερα» για αναλυτική εξήγηση ή «🧐 Γιατί;» για τα στοιχεία</div>`+(window.ALWHY?ALWHY.header():'')+S.alerts.filter(a=>!window.ALWHY||ALWHY.visible(a)).slice(0,200).map(alertHTML).join('');bindCommon(el)}
+  const rank={high:0,med:1,low:2},priority=a=>a.lab||a.selftest||a.benign?3:(rank[a.sev]??3);const ordered=S.alerts.map((a,i)=>({a,i})).sort((x,y)=>priority(x.a)-priority(y.a)||y.a.t-x.a.t||x.i-y.i).map(x=>x.a);
+  el.innerHTML=`<div class="al-summary"><div style="margin-bottom:8px"><button class="b" onclick="exportReport()">⬇ Αναφορά συμβάντος (JSON)</button></div><div class="sm" style="margin-bottom:8px">${counts.high||0} σοβαρές · ${counts.med||0} μέτριες · ${counts.low||0} χαμηλές — οι σοβαρότερες εμφανίζονται πρώτες. Άνοιξε «Πες μου περισσότερα» για εξήγηση και επόμενο βήμα.</div></div>`+(window.ALWHY?ALWHY.header():'')+ordered.filter(a=>!window.ALWHY||ALWHY.visible(a)).slice(0,200).map(alertHTML).join('');bindCommon(el)}
 
 let sortK='bytes',sortD=-1;
 document.querySelectorAll('#t-hosts th').forEach(th=>th.onclick=()=>{const k=th.dataset.s;sortD=sortK===k?-sortD:(k==='bytes'?-1:1);sortK=k;renderHosts()});
@@ -1736,12 +1792,15 @@ const NK_TOOLS=[
   ['http','🌐 HTTP / TLS','Redirects, status, server, headers ασφαλείας, πιστοποιητικό (λήξη, SAN, εμπιστοσύνη).',[['url','https://192.168.1.16:8006']]],
   ['wol','⏰ Wake-on-LAN','Ξύπνα έναν υπολογιστή/server που κοιμάται (magic packet στη θύρα 9).',[['mac','aa:bb:cc:dd:ee:ff'],['wol_bcast','broadcast (προαιρ.)','150px']]],
   ['names','🏷 Ονόματα συσκευών','Ποια ονόματα δίνουν οι συσκευές για τον εαυτό τους (DNS, mDNS, NetBIOS, UPnP).',[['names_target','192.168.1.0/24']]],
+  ['maildns','✉️ Ασφάλεια email domain','Παθητικός έλεγχος DNS για SPF και DMARC: εντοπίζει εγγραφές που λείπουν, διπλές ή επιτρέπουν spoofing. Χρησιμοποίησέ το σε domain που διαχειρίζεσαι.',[['maildns_domain','example.com']]],
+  ['webcheck','🗂 Έκθεση αρχείων web','HEAD μόνο (δεν κατεβάζει περιεχόμενο) σε συνηθισμένα ευαίσθητα paths. Μόνο σε ιδιωτική IP που σου ανήκει· τα 200 θέλουν χειροκίνητη επιβεβαίωση.',[['webcheck_url','http://192.168.1.20:8080']]],
   ['subnet','🧮 Υπολογιστής subnet','IP/μάσκα → δίκτυο, broadcast, πρώτο/τελευταίο host, πλήθος, wildcard (για ACL). Τρέχει τοπικά.',[['subnet_in','192.168.1.37/26']]],
 ];
 function nkBody(t){const g=k=>(PTIN[k]||'').trim();
   return {ping:{tool:'ping',host:g('ping_host'),count:+(g('ping_count')||5)},dns:{tool:'dns',name:g('dns_name'),type:g('dns_type')||'A',server:g('dns_server')||undefined},
     dnscmp:{tool:'dnscmp',name:g('dnscmp_name')},ports:{tool:'ports',host:g('ports_host'),ports:g('ports_list')||'22,80,443'},http:{tool:'http',url:g('url')},
-    wol:{tool:'wol',mac:g('mac'),broadcast:g('wol_bcast')||undefined},names:/\//.test(g('names_target'))?{tool:'names',target:g('names_target')}:{tool:'names',ips:g('names_target').split(/[\s,]+/).filter(Boolean)}}[t]}
+    wol:{tool:'wol',mac:g('mac'),broadcast:g('wol_bcast')||undefined},names:/\//.test(g('names_target'))?{tool:'names',target:g('names_target')}:{tool:'names',ips:g('names_target').split(/[\s,]+/).filter(Boolean)},
+    maildns:{tool:'maildns',domain:g('maildns_domain')},webcheck:{tool:'webcheck',url:g('webcheck_url')}}[t]}
 function nkRun(t){if(t==='subnet'){NK.subnet={res:subnetCalc((PTIN.subnet_in||'').trim()),at:Date.now()};drawPentest();return}
   NK[t]={loading:true};drawPentest();
   post('/api/netkit',nkBody(t)).then(r=>{NK[t]=r.error?{err:r.error}:{res:r,at:Date.now()};if(tab==='pentest')drawPentest()}).catch(e=>{NK[t]={err:String(e)};drawPentest()})}
@@ -1768,6 +1827,14 @@ function nkResult(t){const x=NK[t];if(!x)return MODE!=='tech'?learnTxt(t):'';if(
     if(r.tls){const T=r.tls;o+=`<div style="margin-top:6px"><b class="sm">🔒 TLS</b><div class="kvs">${kv('έκδοση',esc(T.version||''))}${kv('για',esc(T.subject||''))}${kv('από',esc(T.issuer||''))}${kv('λήγει',T.days_left!=null?`${esc(T.not_after||'')} (${T.days_left} μέρες)`:null)}${kv('εμπιστοσύνη',T.trusted?'✅ έγκυρο':'⚠ '+esc(T.trust_error||'όχι (self-signed;)'))}</div>${(T.sans||[]).length?`<div class="sm" data-noi18n>SAN: ${T.sans.slice(0,8).map(esc).join(', ')}</div>`:''}${(T.findings||[]).map(f=>`<div class="sm">⚠ ${esc(f[1])}</div>`).join('')}</div>`}}
   if(t==='wol')o+=r.ok?`✅ Στάλθηκε magic packet στο <b>${esc(r.mac)}</b> μέσω ${esc(r.broadcast)}:${r.port} (${r.bytes} bytes)${r.sim?' <span class="tag y">demo</span>':''}<div class="sm">Αν δεν ξυπνήσει: ενεργοποίησε το Wake-on-LAN στο BIOS και στην κάρτα δικτύου, και να είναι στο ίδιο LAN.</div>`:`❌ ${esc(r.error||'απέτυχε')}`;
   if(t==='names'){const e=Object.entries(r.hosts||{});o+=e.length?`<table><tbody>${e.map(([ip,v])=>`<tr><td style="width:120px">${esc(ip)}</td><td data-noi18n style="white-space:normal"><b style="color:var(--hi)">${(v.names||[]).map(esc).join(', ')||'—'}</b>${v.model?' · 📦 '+esc(v.model):''}</td><td class="sm">${Object.keys(v.sources||{}).join(', ')}</td></tr>`).join('')}</tbody></table><div class="sm">Μπήκαν και στον χάρτη / στις 📟 Συσκευές.</div>`:'<div class="sm">Καμία συσκευή δεν είπε όνομα.</div>'}
+  if(t==='maildns'){const color={ok:'var(--green)',low:'var(--orange)',high:'var(--red)'}[r.severity]||'var(--dim)';
+    o+=`<div style="border-left:3px solid ${color};padding:4px 8px"><b style="color:${color}">${r.score}/${r.of} ${TT('έλεγχοι εντάξει','checks passed')}</b> <span class="sm">${esc(r.domain)}</span></div>`+
+      (r.checks||[]).map(c=>`<div class="card" style="padding:8px;margin-top:6px"><b style="color:${c.status==='good'?'var(--green)':c.status==='warn'?'var(--orange)':'var(--red)'}">${c.status==='good'?'✓':c.status==='warn'?'!':'×'} ${esc(c.name)}</b><div class="sm" style="white-space:normal">${esc(c.detail)}</div>${c.value?`<code style="display:block;white-space:normal;word-break:break-word;margin-top:4px" data-noi18n>${esc(c.value)}</code>`:''}</div>`).join('')+
+      `<div class="sm" style="margin-top:6px">${TT('Έγιναν μόνο ερωτήματα DNS· δεν στάλθηκε email. Πριν αλλάξεις SPF/DMARC, επιβεβαίωσε όλους τους νόμιμους αποστολείς σου.','DNS lookups only; no email was sent. Before changing SPF/DMARC, verify every legitimate sender for your domain.')}</div>`}
+  if(t==='webcheck'){const label={candidate:TT('πιθανή έκθεση — επιβεβαίωσε','possible exposure — verify'),restricted:TT('ζητά πρόσβαση','access restricted'),absent:TT('δεν βρέθηκε','not found'),redirect:TT('ανακατεύθυνση (δεν ακολουθήθηκε)','redirect (not followed)'), 'head-unsupported':TT('δεν υποστηρίζεται HEAD','HEAD unsupported'),other:TT('απάντηση server','server response'),error:TT('σφάλμα σύνδεσης','connection error')};
+    o+=`<div class="sm">${esc(r.url)} · ${r.candidates} ${TT('πιθανά ευρήματα','possible findings')} · ${TT('μόνο HEAD, χωρίς λήψη περιεχομένου','HEAD only, no content downloaded')}</div><div class="pgrid">`+
+      (r.results||[]).map(x=>`<div class="pp ${x.state==='candidate'?'open':x.state==='error'?'filtered':'closed'}"><b data-noi18n>${esc(x.path)}</b><span>${x.status==null?'—':x.status} · ${label[x.state]||esc(x.state)}${x.length!=null?' · '+fmtB(x.length):''}</span>${x.type?`<span data-noi18n>${esc(x.type)}</span>`:''}${x.error?`<span>${esc(x.error)}</span>`:''}</div>`).join('')+
+      `</div><div class="sm" style="margin-top:6px">${TT('Η εφαρμογή μπορεί να επιστρέφει 200 για κάθε διαδρομή (SPA/fallback). Έλεγξε χειροκίνητα πριν θεωρήσεις ένα αποτέλεσμα πραγματική έκθεση.','Some apps return 200 for every path (SPA/fallback). Verify manually before treating a result as an exposure.')}</div>`}
   if(t==='subnet')o+=r.error?`<span style="color:var(--redt)">${esc(r.error)}</span>`:`<div class="kvs">${kv('δίκτυο',r.net+'/'+r.prefix)}${kv('μάσκα',r.mask)}${kv('wildcard',r.wild)}${kv('broadcast',r.bc)}${kv('hosts',r.first+' – '+r.last)}${kv('πλήθος hosts',r.n.toLocaleString())}${kv('είδος',r.kind)}</div><div class="sm" data-noi18n style="margin-top:4px">${r.bits}</div>`;
   return o+'</div>'+(MODE!=='tech'?learnTxt(t):'')}
 const LEARN_NK={
@@ -1778,6 +1845,8 @@ const LEARN_NK={
   http:['Τα <b>headers ασφαλείας</b> λένε στον browser πώς να προστατευτεί (HSTS = πάντα HTTPS, CSP = μόνο έμπιστα scripts). Το <b>πιστοποιητικό</b> αποδεικνύει ποιος είναι ο server· self-signed = κανείς τρίτος δεν το εγγυάται (συνηθισμένο σε Proxmox/router).','<b>Security headers</b> tell the browser how to protect itself (HSTS = always HTTPS, CSP = only trusted scripts). The <b>certificate</b> proves who the server is; self-signed = no third party vouches for it (common on Proxmox/routers).'],
   wol:['Το <b>magic packet</b> είναι 6 × FF και μετά 16 φορές η MAC, σε broadcast UDP. Η κάρτα δικτύου μένει «ξύπνια» και ξυπνά τον υπολογιστή όταν το δει.','The <b>magic packet</b> is 6 × FF followed by the MAC 16 times, sent as broadcast UDP. The network card stays “awake” and wakes the computer when it sees it.'],
   names:['Οι συσκευές λένε το όνομά τους με διάφορους τρόπους: <b>mDNS</b> (Apple, εκτυπωτές — .local), <b>NetBIOS</b> (Windows), <b>UPnP/SSDP</b> (TV, router — μοντέλο), και το <b>DNS</b> του router (από το DHCP).','Devices announce their name in several ways: <b>mDNS</b> (Apple, printers — .local), <b>NetBIOS</b> (Windows), <b>UPnP/SSDP</b> (TVs, routers — model), and the router’s <b>DNS</b> (from DHCP).'],
+  maildns:['Το <b>SPF</b> δηλώνει ποιοι servers επιτρέπεται να στέλνουν email για το domain. Το <b>DMARC</b> λέει στους παραλήπτες τι να κάνουν όταν αποτυγχάνουν οι έλεγχοι και πού να στέλνουν αναφορές. Ξεκίνα με παρακολούθηση και βεβαιώσου ότι έχεις καταγράψει όλους τους νόμιμους αποστολείς πριν επιβάλεις απόρριψη.','<b>SPF</b> lists which servers may send email for a domain. <b>DMARC</b> tells receivers what to do when authentication fails and where to send reports. Start with monitoring and account for every legitimate sender before enforcing rejection.'],
+  webcheck:['Στέλνει μόνο <b>HEAD</b> αιτήματα σε λίγες γνωστές διαδρομές ευαίσθητων αρχείων. Δεν κατεβάζει περιεχόμενο και δέχεται μόνο ιδιωτική IP. Ένα <b>200</b> είναι ένδειξη για έλεγχο, όχι απόδειξη διαρροής — πολλές εφαρμογές απαντούν με την ίδια σελίδα για κάθε URL.','Sends only <b>HEAD</b> requests to a short list of commonly sensitive file paths. It downloads no content and accepts only a private IP. A <b>200</b> is a lead to review, not proof of a leak — many apps return the same page for every URL.'],
   subnet:['Η <b>μάσκα</b> χωρίζει τη διεύθυνση σε δίκτυο | host (τα bits με |). /24 = 256 διευθύνσεις, 254 hosts (η πρώτη είναι το δίκτυο, η τελευταία broadcast). Το <b>wildcard</b> είναι η «ανάποδη» μάσκα που θέλουν τα Cisco ACL και το OSPF.','The <b>mask</b> splits the address into network | host (the bits with |). /24 = 256 addresses, 254 hosts (the first is the network, the last is broadcast). The <b>wildcard</b> is the “inverted” mask that Cisco ACLs and OSPF want.']};
 const learnTxt=k=>{const x=LEARN_NK[k];return x?`<div class="learn" data-noi18n>💡 ${window.I18N&&I18N.lang==='en'?x[1]:x[0]}</div>`:''};
 function spark(a){a=a.filter(x=>x!=null);if(a.length<2)return'';const w=220,h=28,mx=Math.max(...a)*1.1||1;
@@ -2202,7 +2271,13 @@ function renderHomeLearn(){homeLoad();const el=$('t-home'),G='#3ddc97',Y='#ffd23
   const al=S.alerts.filter(a=>!a.lab&&!a.benign&&!a.selftest),hi=al.filter(a=>a.sev==='high').length,me=al.filter(a=>a.sev==='med').length;
   const devs=[...S.hosts.values()].filter(h=>h.kind==='local'&&!h.me&&!h.gw&&!h.ip.includes(':')),newD=devs.filter(h=>h.threat===1).length;
   const w=wifiData&&wifiData.result,pr=privData&&privData.result,au=auditData;
-  let h=(MODE?'':chooserHTML())+learnCardHTML()+`<div class="card" style="white-space:normal"><b style="color:var(--hi)">🧭 Από πού ξεκινάω;</b><div class="sm" style="margin-top:3px">Ακολούθησε τα βήματα με τη σειρά. Κάθε κουμπί σε πάει στη σωστή καρτέλα· εκεί, κάθε ειδοποίηση έχει «Πες μου περισσότερα» με εξήγηση.</div></div>`;
+  const traffic=S.stats.bytes||0,online=devs.length,attn=hi?`${hi} σοβαρές`:me?`${me} μέτριες`:newD?`${newD} νέες συσκευές`:'Όλα ήρεμα';
+  let h=(MODE?'':chooserHTML())+`<div class="home-snapshot" aria-label="Σύνοψη δικτύου">
+    <button type="button" data-go="devs"><span class="hs-ic">📟</span><span><b>${online}</b><span>συσκευές στο LAN${newD?` · ${newD} νέες`:''}</span></span></button>
+    <button type="button" data-go="alerts"><span class="hs-ic">${hi?'🔴':me?'🟡':'🟢'}</span><span><b>${esc(attn)}</b><span>ειδοποιήσεις που θέλουν προσοχή</span></span></button>
+    <button type="button" data-go="map"><span class="hs-ic">🌐</span><span><b>${fmtB(traffic)}</b><span>κίνηση που παρατηρήθηκε</span></span></button>
+    <button type="button" data-go="wifi"><span class="hs-ic">${w?({ok:'✅',warn:'⚠️',bad:'❌'}[w.level]||'☕'):'☕'}</span><span><b>${w?esc(w.verdict):'Δεν ελέγχθηκε'}</b><span>ασφάλεια Wi‑Fi</span></span></button>
+  </div>`+learnCardHTML()+`<div class="card" style="white-space:normal"><b style="color:var(--hi)">🧭 Από πού ξεκινάω;</b><div class="sm" style="margin-top:3px">Ακολούθησε τα βήματα με τη σειρά. Κάθε κουμπί σε πάει στη σωστή καρτέλα· εκεί, κάθε ειδοποίηση έχει «Πες μου περισσότερα» με εξήγηση.</div></div>`;
   h+='<div class="hgrid">';
   h+=step(1,'Είμαι ασφαλής σε αυτό το Wi‑Fi;',w?`${{ok:'✅',warn:'⚠️',bad:'❌'}[w.level]} ${esc(w.verdict)}${w.wifi&&w.wifi.ssid?' — «'+esc(w.wifi.ssid)+'»':''}`:'δεν έχει ελεγχθεί ακόμα',w?{ok:G,warn:Y,bad:R}[w.level]:D,'wifi','☕ Wi‑Fi','Εκεί: κρυπτογράφηση, ψεύτικα δίκτυα (evil twin), DNS/TLS παγίδες, firewall & VPN του Mac — με οδηγίες διόρθωσης.');
   h+=step(2,'Μου επιτίθεται κάποιος τώρα;',hi?`🔴 ${hi} σοβαρές ειδοποιήσεις`:me?`🟡 ${me} μέτριες ειδοποιήσεις`:al.length?`🟢 μόνο ${al.length} χαμηλές (συνήθως αθώες)`:'🟢 τίποτα ύποπτο',hi?R:me?Y:G,'alerts','⚠ Επιθέσεις','Εκεί: κάθε ειδοποίηση λέει με απλά λόγια αν είναι κακό και τι να κάνεις. «Ποιος είναι;» → όλα για την IP.');
@@ -2213,7 +2288,7 @@ function renderHomeLearn(){homeLoad();const el=$('t-home'),G='#3ddc97',Y='#ffd23
   h+=step(7,'Θέλω να μάθω / να εξασκηθώ','🎓 → ❓ → 🔴 → 🚩','#b388ff','academy','🎓 Ακαδημία','Σειρά: 🎓 Ακαδημία (CCNA από το μηδέν & IoT security με ESP32/Raspberry Pi, με animations και labs) → ❓ Κουίζ → 🔴 Pentest (σκάναρε το δίκτυό σου, purple-team lab) → 🧩 Κανόνες → 🚩 CTF.');
   h+='</div>';
   // ζωντανά, με μια ματιά: οι 4 τελευταίες ειδοποιήσεις + οι δύο χάρτες (το πλήρες σε δική του οθόνη)
-  const last=S.alerts.filter(a=>!a.benign&&!a.lab&&!a.selftest).slice(0,4);
+  const last=S.alerts.filter(a=>!a.benign&&!a.lab&&!a.selftest).slice().sort((a,b)=>({high:0,med:1,low:2}[a.sev]??3)-({high:0,med:1,low:2}[b.sev]??3)||b.t-a.t).slice(0,4);
   h+=`<div class="hgrid" style="margin-top:6px"><div class="card"><div class="brow"><b style="color:var(--hi)">⚠ Τελευταίες ειδοποιήσεις</b><button class="b" data-go="alerts">Όλες →</button></div>
     ${last.length?last.map(a=>`<div class="hal ${a.sev}"><span class="sev ${a.sev}">${a.sev.toUpperCase()}</span> <b style="color:var(--hi)">${esc(a.type)}</b>${whoTag(a)}<div class="sm">${esc(a.actor)} → ${esc(String(a.target))} · ${fmtT(a.t)}</div></div>`).join(''):'<div class="sm" style="margin-top:6px">Καμία — όλα ήσυχα. 👀</div>'}</div>
     <div class="card"><b style="color:var(--hi)">👁 Δες ζωντανά</b>
@@ -2271,12 +2346,13 @@ function renderHome(){const el=$('t-home');(MODE==='tech'?renderHomeTech:renderH
   if(homeFirst||el.classList.contains('enter')){homeFirst=false;countUp(el)}}
 function chooserHTML(){return`<div class="card" style="white-space:normal"><b style="color:var(--hi)">👋 Πώς θα το χρησιμοποιήσεις;</b><div class="sm" style="margin-top:3px">Αλλάζει μόνο η οργάνωση της οθόνης — μπορείς να το αλλάξεις όποτε θες από το κουμπί πάνω δεξιά.</div>
   <div class="chooser"><button data-mode="tech"><b>👷 Είμαι τεχνικός δικτύου</b>Πυκνή εικόνα: αριθμοί, κατάσταση homelab, γρήγορα εργαλεία (ping, DNS, θύρες…), ⌘K για εντολές.</button>
-  <button data-mode="learn"><b>🎓 Μαθαίνω (CCNA / IoT security)</b>Οδηγός βήμα-βήμα, εξηγήσεις σε κάθε αποτέλεσμα, Ακαδημία και ασκήσεις πρώτα.</button></div></div>`}
+  <button data-mode="learn"><b>🎓 Μαθαίνω (CCNA / IoT security)</b>Οδηγός βήμα-βήμα, εξηγήσεις σε κάθε αποτέλεσμα, Ακαδημία και ασκήσεις πρώτα.</button></div><button class="b" type="button" data-tour-start style="margin-top:8px">🧭 Δες μια σύντομη ξενάγηση</button></div>`}
 function learnCardHTML(){if(MODE==='tech')return'';const sk=streak();return`<div class="card" style="white-space:normal"><div class="brow"><b style="color:var(--hi)">🎓 Συνέχισε να μαθαίνεις ${sk>1?`<span class="streak">🔥 ${sk} μέρες στη σειρά</span>`:''}</b><button class="b" data-daily>▶ Το 10λεπτο σήμερα</button></div>
   <div class="qrow"><button class="b" data-go="academy">📚 Μαθήματα</button><button class="b" data-go="quiz">❓ Κουίζ</button><button class="b" data-go="ws">🦈 Wireshark</button><button class="b" data-pt="tools">🧰 Δοκίμασε τα εργαλεία</button><button class="b" data-pt="lab">🧪 Lab επίθεσης</button></div>
   <div class="sm" style="margin-top:6px">Συμβουλή: πάτα <kbd>Ctrl</kbd>/<kbd>⌘</kbd>+<kbd>K</kbd> και γράψε π.χ. <code>ping 192.168.1.1</code> ή <code>dns github.com</code> — τρέχει αμέσως και σου εξηγεί τι είδες.</div></div>`}
 function homeBind(el){
   el.querySelectorAll('[data-mode]').forEach(b=>b.onclick=()=>{setMode(b.dataset.mode);showTab('home')});
+  el.querySelectorAll('[data-tour-start]').forEach(b=>b.onclick=()=>tourStart());
   el.querySelectorAll('[data-daily]').forEach(b=>b.onclick=()=>window.ACADEMY&&ACADEMY.openDaily());
   el.querySelectorAll('[data-pt]').forEach(b=>b.onclick=()=>{ptSub=b.dataset.pt;try{localStorage.setItem('nw-ptsub',ptSub)}catch(e){}showTab('pentest')});
   el.querySelectorAll('[data-wsf]').forEach(b=>b.onclick=()=>setFeedFilter(b.dataset.wsf))}

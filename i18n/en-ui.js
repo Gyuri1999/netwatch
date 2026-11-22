@@ -2,6 +2,46 @@
 I18N.add({
  "exact": {
   "interface / εγώ": "interface / me",
+  "Σύνοψη δικτύου": "Network overview",
+  "ειδοποιήσεις που θέλουν προσοχή": "alerts needing attention",
+  "κίνηση που παρατηρήθηκε": "traffic observed",
+  "ασφάλεια Wi‑Fi": "Wi-Fi security",
+  "Όλα ήρεμα": "All clear",
+  "οι σοβαρότερες εμφανίζονται πρώτες. Άνοιξε «Πες μου περισσότερα» για εξήγηση και επόμενο βήμα.": "highest severity first. Open “Tell me more” for an explanation and next step.",
+  "🧭 Δες μια σύντομη ξενάγηση": "🧭 Take a quick tour",
+  "✉️ Ασφάλεια email domain": "✉️ Email domain security",
+  "Παθητικός έλεγχος DNS για SPF και DMARC: εντοπίζει εγγραφές που λείπουν, διπλές ή επιτρέπουν spoofing. Χρησιμοποίησέ το σε domain που διαχειρίζεσαι.": "Passive SPF and DMARC DNS check: finds missing or duplicate records and policies that allow spoofing. Use it on a domain you manage.",
+  "🗂 Έκθεση αρχείων web": "🗂 Web file exposure",
+  "HEAD μόνο (δεν κατεβάζει περιεχόμενο) σε συνηθισμένα ευαίσθητα paths. Μόνο σε ιδιωτική IP που σου ανήκει· τα 200 θέλουν χειροκίνητη επιβεβαίωση.": "HEAD requests only (no content is downloaded) for commonly sensitive paths. Only on a private IP you own; verify any 200 responses manually.",
+  "έλεγχοι εντάξει": "checks passed",
+  "πιθανά ευρήματα": "possible findings",
+  "μόνο HEAD, χωρίς λήψη περιεχομένου": "HEAD only, no content downloaded",
+  "πιθανή έκθεση — επιβεβαίωσε": "possible exposure — verify",
+  "ζητά πρόσβαση": "access restricted",
+  "δεν βρέθηκε": "not found",
+  "ανακατεύθυνση (δεν ακολουθήθηκε)": "redirect (not followed)",
+  "δεν υποστηρίζεται HEAD": "HEAD unsupported",
+  "απάντηση server": "server response",
+  "σφάλμα σύνδεσης": "connection error",
+  "Η εφαρμογή μπορεί να επιστρέφει 200 για κάθε διαδρομή (SPA/fallback). Έλεγξε χειροκίνητα πριν θεωρήσεις ένα αποτέλεσμα πραγματική έκθεση.": "An app may return 200 for every path (SPA/fallback). Verify manually before treating a result as an exposure.",
+  "Έγιναν μόνο ερωτήματα DNS· δεν στάλθηκε email. Πριν αλλάξεις SPF/DMARC, επιβεβαίωσε όλους τους νόμιμους αποστολείς σου.": "DNS lookups only; no email was sent. Before changing SPF/DMARC, verify every legitimate sender for your domain.",
+  "Δώσε domain που διαχειρίζεσαι, π.χ. example.com": "Enter a domain you manage, e.g. example.com",
+  "Δώσε τοπική διεύθυνση, π.χ. http://192.168.1.20:8080": "Enter a local address, e.g. http://192.168.1.20:8080",
+  "Χρησιμοποίησε URL χωρίς κωδικούς, query ή fragment": "Use a URL without credentials, a query, or a fragment",
+  "Ο έλεγχος δέχεται μόνο ιδιωτική IP (RFC 1918), π.χ. 192.168.1.20": "This check only accepts a private IP (RFC 1918), e.g. 192.168.1.20",
+  "Δεν βρέθηκε εγγραφή SPF.": "No SPF record found.",
+  "Υπάρχουν πολλές εγγραφές SPF· συνδύασέ τες σε μία.": "Multiple SPF records found; combine them into one.",
+  "Η πολιτική απορρίπτει αποστολείς που δεν έχουν εξουσιοδοτηθεί.": "The policy rejects unauthorized senders.",
+  "Το soft-fail μόνο επισημαίνει μη εξουσιοδοτημένους αποστολείς.": "Soft-fail only marks unauthorized senders.",
+  "Η πολιτική δεν δίνει σαφή οδηγία για μη εξουσιοδοτημένους αποστολείς.": "The policy gives no clear direction for unauthorized senders.",
+  "Η εγγραφή επιτρέπει σε οποιονδήποτε να στέλνει ως το domain.": "The record allows anyone to send as this domain.",
+  "Δεν βρέθηκε τελικός μηχανισμός all στην εγγραφή.": "No final all mechanism was found in the record.",
+  "Βρέθηκαν πολλές εγγραφές DMARC· πρέπει να υπάρχει μία.": "Multiple DMARC records found; only one should exist.",
+  "Τα μηνύματα που αποτυγχάνουν DMARC απορρίπτονται.": "Messages that fail DMARC are rejected.",
+  "Τα μηνύματα που αποτυγχάνουν DMARC οδηγούνται συνήθως στα ανεπιθύμητα.": "Messages that fail DMARC are usually sent to spam.",
+  "Το DMARC καταγράφει αποτυχίες, αλλά δεν ζητά ενέργεια από τον παραλήπτη.": "DMARC records failures but asks receivers to take no action.",
+  "Λείπει έγκυρη πολιτική p= από την εγγραφή.": "The record is missing a valid p= policy.",
+  "Άγνωστη πολιτική DMARC.": "Unknown DMARC policy.",
   "πακέτα/s": "packets/s",
   "κίνηση": "traffic",
   "επιθέσεις": "attacks",
@@ -5962,6 +6002,10 @@ I18N.add({
   [
    "^🏷 Ονόμασε τις άγνωστες \\((\\d+)\\)$",
    "🏷 Name the unknown ones ($1)"
+  ],
+  [
+   "^Δεν βρέθηκε εγγραφή _dmarc\\.(.+)\\.$",
+   "No DMARC record found at _dmarc.$1."
   ]
  ]
 });
