@@ -280,6 +280,18 @@ final class WebController: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
         decisionHandler(.allow)
     }
 
+    // αρχεία με «Content-Disposition: attachment» (PDF/PNG/SVG/draw.io/Markdown, αναφορές) → κατέβασμα στις Λήψεις,
+    // όχι άνοιγμα μέσα στο παράθυρο (αλλιώς το PDF «γεμίζει» την οθόνη χωρίς κουμπί επιστροφής).
+    func webView(_ w: WKWebView, decidePolicyFor r: WKNavigationResponse,
+                 decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void) {
+        if let resp = r.response as? HTTPURLResponse,
+           let cd = resp.value(forHTTPHeaderField: "Content-Disposition"),
+           cd.lowercased().contains("attachment") {
+            return decisionHandler(.download)
+        }
+        decisionHandler(.allow)
+    }
+
     func webView(_ w: WKWebView, navigationAction: WKNavigationAction, didBecome d: WKDownload) { d.delegate = self }
     func webView(_ w: WKWebView, navigationResponse: WKNavigationResponse, didBecome d: WKDownload) { d.delegate = self }
 
