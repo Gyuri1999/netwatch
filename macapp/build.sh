@@ -36,7 +36,7 @@ cp macapp/Info.plist "$OUT/Contents/Info.plist"
 VER=$(cat VERSION 2>/dev/null || echo 1.0.0)
 plutil -replace CFBundleShortVersionString -string "$VER" "$OUT/Contents/Info.plist"
 rsync -a --exclude '__pycache__' --exclude '*.md' ./*.py \
-  index.html edu.js wireshark.js infra.js sectools.js privtools.js protocols.js ciscolab.js uiplus.js pentestui.js socui.js worktools.js opstools.js cmdxlate.js navplus.js anontools.js topomap.js sshui.js vlsm.js updateui.js presenceui.js l2guardui.js assessui.js vulnui.js upnpui.js acl.js names.js golive.js alertwhy.js i18n.js i18n academy academy.html manifest.webmanifest sw.js config.example.yaml requirements.txt VERSION update_signers rules ctf samples "$OUT/Contents/Resources/netwatch/"
+  index.html edu.js wireshark.js infra.js sectools.js privtools.js protocols.js ciscolab.js uiplus.js pentestui.js socui.js worktools.js opstools.js cmdxlate.js navplus.js anontools.js topomap.js sshui.js vlsm.js updateui.js presenceui.js l2guardui.js assessui.js vulnui.js upnpui.js probesui.js acl.js names.js golive.js alertwhy.js i18n.js i18n academy academy.html manifest.webmanifest sw.js config.example.yaml requirements.txt VERSION update_signers rules ctf samples "$OUT/Contents/Resources/netwatch/"
 rm -f "$OUT/Contents/Resources/netwatch/rules/local.yaml"
 
 echo "▸ υπογραφή (ad-hoc)"

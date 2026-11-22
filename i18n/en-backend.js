@@ -2,6 +2,41 @@
 // health, playbooks, API errors, weekly report, CTF). Generated; see i18n/README.md for the format.
 I18N.add({
  "exact": {
+  "Υπολογιστής ή Raspberry Pi": "Computer or Raspberry Pi",
+  "Οποιοδήποτε Linux/Mac/Windows με Python 3 — π.χ. Pi Zero 2 W": "Any Linux/Mac/Windows with Python 3 — e.g. Pi Zero 2 W",
+  "0 € (ό,τι έχεις)": "€0 (what you have)",
+  "Αναφέρει ότι είναι ζωντανός, IP, φόρτο, και αν «βλέπει» το router — έτσι μαθαίνεις για διακοπές σε άλλο δωμάτιο ή VLAN.": "Reports that it is alive, its IP, load, and whether it can reach the router — so you learn about outages in another room or VLAN.",
+  "Αισθητήρας VLAN (ESP32)": "VLAN sensor (ESP32)",
+  "Οποιοδήποτε ESP32": "Any ESP32",
+  "Από το Wi-Fi επισκεπτών/IoT ελέγχει αν φτάνει στο κύριο δίκτυο — αν ναι, χάλασε ο διαχωρισμός.": "From the guest/IoT Wi-Fi it checks whether it can reach the main network — if so, segmentation is broken.",
+  "Tester τσέπης": "Pocket tester",
+  "Pi Zero 2 W + USB-Ethernet ή Olimex ESP32-POE": "Pi Zero 2 W + USB-Ethernet or Olimex ESP32-POE",
+  "Βάζεις καλώδιο → switch, θύρα, VLAN, DHCP, PoE, internet σε δευτερόλεπτα.": "Plug in a cable → switch, port, VLAN, DHCP, PoE, internet in seconds.",
+  "Κάλυψη Wi-Fi (ESP32)": "Wi-Fi coverage (ESP32)",
+  "ESP32 ανά δωμάτιο": "One ESP32 per room",
+  "~5 € / δωμάτιο": "~€5 / room",
+  "Σήμα του router και πόσο γεμάτο είναι το κανάλι, ανά δωμάτιο.": "Router signal and how busy the channel is, per room.",
+  "Rack: θερμοκρασία & πόρτα": "Rack: temperature & door",
+  "ESP32 + BME280 + μαγνητική επαφή": "ESP32 + BME280 + reed switch",
+  "Ζέστη/υγρασία στο ντουλάπι δικτύου και ποιος άνοιξε την πόρτα του.": "Heat/humidity in the network cabinet and who opened its door.",
+  "Sentinel: ασφάλεια Wi-Fi (ESP32)": "Sentinel: Wi-Fi security (ESP32)",
+  "Deauth flood, evil twin, ψεύτικα access points — καρτέλα 📡 Αισθητήρες.": "Deauth flood, evil twin, fake access points — 📡 Sensors tab.",
+  "Canary: ψεύτικη κάμερα-παγίδα (ESP32)": "Canary: fake decoy camera (ESP32)",
+  "Όποιος της μιλήσει σκανάρει το δίκτυό σου — καρτέλα 📡 Αισθητήρες.": "Whoever talks to it is scanning your network — 📡 Sensors tab.",
+  "Διαρροή διαχωρισμού VLAN (αισθητήρας)": "VLAN segmentation leak (sensor)",
+  "Διακοπή δικτύου (αισθητήρας)": "Network outage (sensor)",
+  "Δεύτερος DHCP server (αισθητήρας)": "Second DHCP server (sensor)",
+  "Υψηλή θερμοκρασία στο rack (αισθητήρας)": "High rack temperature (sensor)",
+  "Άνοιξε η πόρτα του rack (αισθητήρας)": "Rack door opened (sensor)",
+  "Αισθητήρας εκτός σύνδεσης": "Sensor offline",
+  "Ο αισθητήρας επανήλθε.": "The sensor is back.",
+  "Ο αισθητήρας σταμάτησε να στέλνει.": "The sensor stopped reporting.",
+  "Άγνωστος τύπος συσκευής.": "Unknown device type.",
+  "Δεν υπάρχει.": "Not found.",
+  "Το Wi-Fi επισκεπτών ΔΕΝ φτάνει στο 192.168.1.0/24 ✔": "Guest Wi-Fi does NOT reach 192.168.1.0/24 ✔",
+  "Άνοιξε η πόρτα του rack": "Rack door opened",
+  "Το router απαντά ξανά": "The router answers again",
+  "Διαθέσιμο μόνο σε Live/Demo.": "Available only in Live/Demo.",
   "Άνοιξε θύρα στο router (UPnP)": "Router port opened (UPnP)",
   "Κάμερα ανοιχτή προς το Internet — οι κάμερες είναι ο πρώτος στόχος των botnets (Mirai).": "Camera open to the Internet — cameras are the first target of botnets (Mirai).",
   "Έξυπνη συσκευή (IoT) ανοιχτή προς το Internet — σπάνια χρειάζεται· οι εφαρμογές τους δουλεύουν και χωρίς.": "Smart (IoT) device open to the Internet — rarely needed; their apps work without it.",
@@ -1223,6 +1258,34 @@ I18N.add({
   [
    "^Η ψηφιακή υπογραφή του installer δεν είναι έγκυρη \\((.*)\\) — δεν τον ανοίγω\\.$",
    "The installer's digital signature is not valid ($1) — I won't open it."
+  ],
+  [
+   "^Ο αισθητήρας «(.+?)» δεν έχει στείλει αναφορά εδώ και λίγα λεπτά — ρεύμα, Wi-Fi ή καλώδιο;$",
+   "Sensor “$1” has not reported for a few minutes — power, Wi-Fi or cable?"
+  ],
+  [
+   "^αισθητήρας (.+)$",
+   "sensor $1"
+  ],
+  [
+   "^Έως (\\d+) συσκευές\\.$",
+   "Up to $1 devices."
+  ],
+  [
+   "^Δεν άνοιξε η θύρα (\\d+): (.*)$",
+   "Could not open port $1: $2"
+  ],
+  [
+   "^Η θύρα αισθητήρων δεν ξεκίνησε: (.*)$",
+   "The sensor port did not start: $1"
+  ],
+  [
+   "^Δεν μπόρεσα να φτιάξω πιστοποιητικό: (.*)$",
+   "Could not create a certificate: $1"
+  ],
+  [
+   "^Δεν απαντά το router (\\S+) από το (.+)$",
+   "Router $1 does not answer from $2"
   ],
   [
    "^Θύρα (.+?) — δεν πρέπει ποτέ να είναι ανοιχτή προς το Internet\\.$",
