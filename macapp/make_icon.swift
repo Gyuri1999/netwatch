@@ -13,49 +13,49 @@ NSColor(red: 0.2, green: 0.75, blue: 1, alpha: 0.35).setStroke()
 bg.lineWidth = 6
 bg.stroke()
 
-let c = CGPoint(x: 512, y: 500), r: CGFloat = 270
-let cyan = NSColor(red: 0.25, green: 0.85, blue: 1, alpha: 1)
-ctx.saveGState()
-ctx.setShadow(offset: .zero, blur: 40, color: cyan.withAlphaComponent(0.8).cgColor)
-cyan.setStroke()
-let globe = NSBezierPath(ovalIn: CGRect(x: c.x - r, y: c.y - r, width: 2 * r, height: 2 * r))
-globe.lineWidth = 22
-globe.stroke()
-ctx.restoreGState()
-cyan.withAlphaComponent(0.55).setStroke()
-for k in [0.45, 0.85] as [CGFloat] {  // μεσημβρινοί
-    let p = NSBezierPath(ovalIn: CGRect(x: c.x - r * k, y: c.y - r, width: 2 * r * k, height: 2 * r))
-    p.lineWidth = 10
-    p.stroke()
-}
-for dy in [-0.5, 0, 0.5] as [CGFloat] {  // παράλληλοι
-    let y = c.y + dy * r, w = sqrt(1 - dy * dy) * r
-    let p = NSBezierPath()
-    p.move(to: CGPoint(x: c.x - w, y: y))
-    p.line(to: CGPoint(x: c.x + w, y: y))
-    p.lineWidth = 10
-    p.stroke()
-}
-// τόξο σύνδεσης προς τον «επιτιθέμενο»
-let arc = NSBezierPath()
-arc.move(to: CGPoint(x: 380, y: 430))
-arc.curve(to: CGPoint(x: 700, y: 640), controlPoint1: CGPoint(x: 430, y: 700), controlPoint2: CGPoint(x: 600, y: 760))
-NSColor(red: 1, green: 0.85, blue: 0.3, alpha: 0.95).setStroke()
-arc.lineWidth = 16
-arc.lineCapStyle = .round
-arc.stroke()
-NSColor(red: 0.3, green: 0.95, blue: 0.6, alpha: 1).setFill()
-NSBezierPath(ovalIn: CGRect(x: 350, y: 400, width: 60, height: 60)).fill()
-ctx.saveGState()
+let c = CGPoint(x: 512, y: 512), R: CGFloat = 384
+let cyan = NSColor(red: 0.24, green: 0.77, blue: 1, alpha: 1)
 let red = NSColor(red: 1, green: 0.23, blue: 0.36, alpha: 1)
-ctx.setShadow(offset: .zero, blur: 50, color: red.cgColor)
-red.setFill()
-NSBezierPath(ovalIn: CGRect(x: 662, y: 602, width: 76, height: 76)).fill()
+
+// σάρωση ραντάρ (πάνω-δεξιά τεταρτημόριο)
+let wedge = NSBezierPath()
+wedge.move(to: c)
+wedge.appendArc(withCenter: c, radius: R, startAngle: 35, endAngle: 90)
+wedge.close()
+cyan.withAlphaComponent(0.16).setFill()
+wedge.fill()
+
+// δακτύλιοι
+for (rad, op) in [(R, 0.28), (R * 0.66, 0.45), (R * 0.33, 0.6)] as [(CGFloat, CGFloat)] {
+    cyan.withAlphaComponent(op).setStroke()
+    let ring = NSBezierPath(ovalIn: CGRect(x: c.x - rad, y: c.y - rad, width: 2 * rad, height: 2 * rad))
+    ring.lineWidth = 16
+    ring.stroke()
+}
+
+// κόμβοι δικτύου + ακτίνες
+let nodes = [CGPoint(x: 512 - 244, y: 512 + 152), CGPoint(x: 512 - 168, y: 512 - 224)]
+let threat = CGPoint(x: 512 + 216, y: 512 - 168)
+cyan.withAlphaComponent(0.5).setStroke()
+for n in nodes + [threat] {
+    let l = NSBezierPath(); l.move(to: c); l.line(to: n); l.lineWidth = 12; l.lineCapStyle = .round; l.stroke()
+}
+cyan.setFill()
+for n in nodes { NSBezierPath(ovalIn: CGRect(x: n.x - 42, y: n.y - 42, width: 84, height: 84)).fill() }
+
+// κεντρικός κόμβος (λάμψη)
+ctx.saveGState()
+ctx.setShadow(offset: .zero, blur: 44, color: cyan.withAlphaComponent(0.85).cgColor)
+cyan.setFill()
+NSBezierPath(ovalIn: CGRect(x: c.x - 78, y: c.y - 78, width: 156, height: 156)).fill()
 ctx.restoreGState()
-red.withAlphaComponent(0.5).setStroke()
-let ring = NSBezierPath(ovalIn: CGRect(x: 630, y: 570, width: 140, height: 140))
-ring.lineWidth = 8
-ring.stroke()
+
+// κόκκινη «απειλή» (λάμψη)
+ctx.saveGState()
+ctx.setShadow(offset: .zero, blur: 52, color: red.cgColor)
+red.setFill()
+NSBezierPath(ovalIn: CGRect(x: threat.x - 52, y: threat.y - 52, width: 104, height: 104)).fill()
+ctx.restoreGState()
 img.unlockFocus()
 
 let rep = NSBitmapImageRep(data: img.tiffRepresentation!)!
