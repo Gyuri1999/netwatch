@@ -290,6 +290,12 @@ def main():
     state.vulns = vulnwatch.VulnWatch(state, DATA if live else None, demo=demo)
     if live:
         threading.Thread(target=state.vulns.run_forever, daemon=True).start()
+    import probes  # 🧩 οι συσκευές μου: αισθητήρες (ESP32/Pi/υπολογιστές) με σύζευξη QR, HTTPS + token ανά συσκευή
+    state.probes = probes.Probes(state, DATA if live else None, demo=demo, port=int((cfg.get("probes") or {}).get("port", probes.PORT)),
+                                 on_save=chown_to_user if live else None) if mode != "pcap" else None
+    if live and state.probes:
+        state.probes.start()
+        threading.Thread(target=state.probes.run_forever, daemon=True).start()
     import upnpwatch  # 🔓 θύρες που άνοιξαν μόνες τους στο router (UPnP) — μόνο ανάγνωση, κάθε 15'
     state.upnp = upnpwatch.UpnpWatch(state, DATA if live else None, demo=demo) if mode != "pcap" else None
     if demo:

@@ -275,6 +275,22 @@ def make_handler(state):
                         return self._json({"error": "off"}, 400)
                     threading.Thread(target=vw.refresh, args=(True,), daemon=True).start()
                     return self._json({**vw.view(), "busy": True})
+                if u.path.startswith("/api/probes/"):  # 🧩 σύζευξη / αφαίρεση / μετονομασία αισθητήρων
+                    pr = getattr(state, "probes", None)
+                    if not pr:
+                        return self._json({"error": "Διαθέσιμο μόνο σε Live/Demo."}, 400)
+                    act = u.path.rsplit("/", 1)[1]
+                    if act == "pair":
+                        r = pr.pair(body.get("name"), body.get("kind"))
+                    elif act == "enable":
+                        r = pr.set_enabled(bool(body.get("on")))
+                    elif act == "remove":
+                        r = pr.remove(str(body.get("id") or ""))
+                    elif act == "rename":
+                        r = pr.rename(str(body.get("id") or ""), body.get("name"))
+                    else:
+                        return self._json({"error": "not found"}, 404)
+                    return self._json(r, 400 if r.get("error") else 200)
                 if u.path == "/api/upnp/refresh":  # 🔓 ξαναδιάβασε τον πίνακα UPnP του router (μόνο ανάγνωση)
                     uw = getattr(state, "upnp", None)
                     if not uw:
@@ -749,7 +765,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/assessui.js", "/vulnui.js", "/upnpui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/assessui.js", "/vulnui.js", "/upnpui.js", "/probesui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -828,6 +844,9 @@ def make_handler(state):
             if u.path == "/api/vulns":  # 🛡 ευπάθειες για τις συσκευές σου (CISA KEV)
                 vw = getattr(state, "vulns", None)
                 return self._json(vw.view() if vw else {"error": "off"})
+            if u.path == "/api/probes":  # 🧩 οι συσκευές μου
+                pr = getattr(state, "probes", None)
+                return self._json(pr.view() if pr else {"error": "off"})
             if u.path == "/api/upnp":  # 🔓 θύρες που άνοιξαν μόνες τους στο router (UPnP)
                 uw = getattr(state, "upnp", None)
                 return self._json(uw.view() if uw else {"error": "off"})

@@ -137,6 +137,11 @@ INFO = {
 }
 # τύποι χωρίς ανιχνευτή στο core.MITRE (άλλα modules) → εξήγηση με βάση την αρχή του ονόματος
 PREFIX_INFO = [
+    ("Αισθητήρας εκτός σύνδεσης", "probes",
+     "Ένας αισθητήρας από τις 🧩 Οι συσκευές μου δεν έστειλε αναφορά για 3 φορές το διάστημά του (τουλάχιστον 3 λεπτά).",
+     "A sensor from 🧩 My devices has not reported for 3 times its interval (at least 3 minutes).",
+     "Βγήκε από την πρίζα, έπεσε το Wi-Fi, επανεκκίνηση του router, άλλαξε η IP του NetWatch.",
+     "Unplugged, Wi-Fi dropped, router reboot, NetWatch's IP changed."),
     ("Άνοιξε θύρα στο router (UPnP)", "upnp",
      "Κάθε 15 λεπτά το NetWatch διαβάζει (μόνο ανάγνωση) τον πίνακα UPnP του router σου. Εμφανίστηκε νέα γραμμή: μια συσκευή "
      "ζήτησε να ανοίξει θύρα προς το Internet. Κόκκινο = κάμερα ή επικίνδυνη θύρα (Telnet, RTSP, RDP, SMB…).",

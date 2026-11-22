@@ -90,6 +90,7 @@ def main():
     shutil.copy2(os.path.join(ROOT, "assessui.js"), out)
     shutil.copy2(os.path.join(ROOT, "vulnui.js"), out)
     shutil.copy2(os.path.join(ROOT, "upnpui.js"), out)
+    shutil.copy2(os.path.join(ROOT, "probesui.js"), out)
     shutil.copy2(os.path.join(ROOT, "acl.js"), out)
     shutil.copy2(os.path.join(ROOT, "names.js"), out)
     # Ακαδημία: scripts + εικονίδια του PWA (ό,τι δεν είναι .md).
