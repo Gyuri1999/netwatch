@@ -153,6 +153,11 @@ def test_export_files_are_checked_and_expire():
     r = tm.put_file("pdf", b"%PDF-1.4\n...")
     f = tm.get_file(r["id"])
     assert f["mime"] == "application/pdf" and f["name"].endswith(".pdf") and f["data"].startswith(b"%PDF")
+    # 📐 draw.io: το XML κατεβαίνει από τον ίδιο δρόμο (όχι ανοιχτό στο WebView → όχι «μαύρη οθόνη»)
+    rd = tm.put_file("drawio", b'<?xml version="1.0"?><mxfile></mxfile>')
+    fd = tm.get_file(rd["id"])
+    assert fd["mime"].startswith("application/xml") and fd["name"].endswith(".drawio")
+    assert "error" in tm.put_file("drawio", b"not xml")
     assert tm.get_file("nope") is None
     for _ in range(6):
         tm.put_file("svg", b"<svg></svg>")

@@ -246,6 +246,15 @@
       draw();
     }).catch(e => { TM.msg = String(e); draw(); });
   }
+  function saveDrawio() {  // 📐 το XML το φτιάχνει ο server και κατεβαίνει από τον ίδιο δρόμο με PDF/PNG/SVG (δουλεύει στο Mac app)
+    TM.msg = '⏳ ' + T('Ετοιμάζω το αρχείο…', 'Preparing the file…'); draw();
+    fetch('/api/topomap/export?fmt=drawio&lang=' + (EN() ? 'en' : 'el'), { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      .then(r => r.json()).then(j => {
+        TM.msg = j.error || ('✓ ' + T('Κατέβηκε στα Λήψεις (Downloads).', 'Saved to Downloads.'));
+        if (j.url) location.href = j.url;
+        draw();
+      }).catch(e => { TM.msg = String(e); draw(); });
+  }
   const svgImg = svg => new Promise((ok, bad) => {
     const img = new Image(), url = URL.createObjectURL(new Blob([svg], { type: 'image/svg+xml' }));
     img.onload = () => { URL.revokeObjectURL(url); ok(img); }; img.onerror = bad; img.src = url;
@@ -362,7 +371,7 @@
       <div class="dim" style="font-size:13px;margin-top:4px">${T('Ένα κουμπί: traceroute + ping σε router, modem, πάροχο, switch/AP και DNS, και σχέδιο σαν τεχνικό διάγραμμα. Το πρώτο κόκκινο κουτί στη διαδρομή από εσένα προς το Internet = εκεί κοιτάς.',
         'One button: traceroute + ping to router, modem, ISP, switches/APs and DNS, drawn like a technical diagram. The first red box on the path from you to the Internet = where to look.')}</div>
       <div class="tp-bar"><button class="b tp-go" id="tp-go" ${running ? 'disabled' : ''}>${running ? '⏳ ' + T('Χαρτογραφώ…', 'Mapping…') : '▶ ' + T('Χαρτογράφησε', 'Map it')}</button>
-      ${d.graph ? `<button class="b" id="tp-pdf" title="${T('Διάγνωση + διάγραμμα + πίνακας συσκευών, έτοιμο για εκτύπωση', 'Diagnosis + diagram + device table, ready to print')}">📄 PDF</button><button class="b" id="tp-png">🖼 PNG</button><button class="b" id="tp-svg" title="${T('Ανοίγει σε Illustrator/Inkscape/Figma', 'Opens in Illustrator/Inkscape/Figma')}">✏️ SVG</button><a class="b" href="/docs/network.drawio?lang=${en ? 'en' : 'el'}" style="text-decoration:none" title="${T('Επεξεργάσιμο στο draw.io / diagrams.net', 'Editable in draw.io / diagrams.net')}">📐 draw.io</a>
+      ${d.graph ? `<button class="b" id="tp-pdf" title="${T('Διάγνωση + διάγραμμα + πίνακας συσκευών, έτοιμο για εκτύπωση', 'Diagnosis + diagram + device table, ready to print')}">📄 PDF</button><button class="b" id="tp-png">🖼 PNG</button><button class="b" id="tp-svg" title="${T('Ανοίγει σε Illustrator/Inkscape/Figma', 'Opens in Illustrator/Inkscape/Figma')}">✏️ SVG</button><button class="b" id="tp-drawio" title="${T('Επεξεργάσιμο στο draw.io / diagrams.net', 'Editable in draw.io / diagrams.net')}">📐 draw.io</button>
       <span style="flex:1"></span><button class="b" id="tp-zo">−</button><button class="b" id="tp-zr">${Math.round(TM.zoom * 100)}%</button><button class="b" id="tp-zi">+</button>` : ''}</div>
       ${(d.faults || []).length ? `<div class="tp-chips"><span class="dim">🧪 ${T('Εξάσκηση (demo) — προσομοίωσε βλάβη:', 'Practice (demo) — simulate a fault:')}</span>${FAULTS.map(([k, el_, en_]) => `<button class="tp-chip${TM.fault === k ? ' on' : ''}" data-tpf="${k}">${en ? en_ : el_}</button>`).join('')}</div>` : ''}
       ${TM.msg ? `<div class="dim" style="color:var(--yellow);margin-top:8px">${E(TM.msg)}</div>` : ''}</div>`;
@@ -413,6 +422,7 @@
     if (t.id === 'tp-pdf' && TM.d && TM.d.graph) return exportPDF().catch(e => { TM.msg = String(e); draw(); });
     if (t.id === 'tp-png' && TM.d && TM.d.graph) return exportPNG().catch(e => { TM.msg = String(e); draw(); });
     if (t.id === 'tp-svg' && TM.d && TM.d.graph) return save('svg', new Blob([svgOf(TM.d, { light: true, availW: TM.availW }).svg], { type: 'image/svg+xml' }));
+    if (t.id === 'tp-drawio' && TM.d && TM.d.graph) return saveDrawio();
     if (t.id === 'tp-zi' || t.id === 'tp-zo' || t.id === 'tp-zr') {
       TM.fitted = true; TM.zoom = t.id === 'tp-zr' ? 1 : Math.min(2, Math.max(0.4, TM.zoom + (t.id === 'tp-zi' ? 0.15 : -0.15)));
       const s = el.querySelector('#tp-wrap svg'); if (s) { s.style.transform = `scale(${TM.zoom})`; fitSize(s); }
