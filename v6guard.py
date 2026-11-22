@@ -293,12 +293,21 @@ class Net:
         from scapy.all import AsyncSniffer, Ether, ICMPv6ND_RS, ICMPv6NDOptSrcLLAddr, IPv6, conf, get_if_hwaddr, sendp
         iface = iface or conf.iface
         mac = get_if_hwaddr(iface)
-        sn = AsyncSniffer(iface=iface, filter="icmp6", store=True, timeout=timeout)
+        # (το AsyncSniffer των νεότερων scapy δεν δέχεται timeout= — σταματάμε εμείς μετά από `timeout` δευτερόλεπτα)
+        sn = AsyncSniffer(iface=iface, filter="icmp6", store=True)
         sn.start()
         time.sleep(0.4)
-        sendp(Ether(src=mac, dst="33:33:00:00:00:02") / IPv6(dst="ff02::2", hlim=255) / ICMPv6ND_RS()
-              / ICMPv6NDOptSrcLLAddr(lladdr=mac), iface=iface, verbose=0)
-        sn.join(timeout + 2)
+        if not getattr(sn, "running", True):  # δεν άνοιξε η καταγραφή (συνήθως: χωρίς δικαιώματα διαχειριστή)
+            raise PermissionError("η καταγραφή πακέτων θέλει δικαιώματα διαχειριστή (Live)")
+        try:
+            sendp(Ether(src=mac, dst="33:33:00:00:00:02") / IPv6(dst="ff02::2", hlim=255) / ICMPv6ND_RS()
+                  / ICMPv6NDOptSrcLLAddr(lladdr=mac), iface=iface, verbose=0)
+            time.sleep(timeout)
+        finally:
+            try:
+                sn.stop()
+            except Exception:  # noqa: BLE001
+                pass
         return [bytes(getattr(p, "original", None) or bytes(p)) for p in list(sn.results or [])[:200]]
 
     def addresses(self):
@@ -796,12 +805,23 @@ class V6Guard:
         rogue = [r for r in routers if not r["trusted"] and not r.get("stub")]
         recent_bad = [e for e in events if e.get("sev") == "high" and now - e.get("t", 0) < 86400]
         has_global = any(a["scope"] == "global" for a in addrs)
-        on = bool(live or has_global or others)
+        # «Πραγματικό» IPv6 = κάποιος έχει δημόσια διεύθυνση ή το router μοιράζει δημόσιο prefix. Ένα router που στέλνει RA
+        # χωρίς prefix (συχνό σε παρόχους που δεν έχουν δώσει IPv6) δεν εκθέτει κανέναν — δεν είναι λόγος για συναγερμό.
+        def _gp(p):
+            try:
+                n = ipaddress.IPv6Network(p.get("prefix"), strict=False)
+            except (ValueError, TypeError):
+                return False
+            return n.is_global and n.prefixlen > 0
+        effective = bool(has_global or others or any(_gp(p) for r in live for p in (r.get("prefixes") or [])))
+        on = bool(live or effective)
         confirmed = bool(routers) and all(r["by"] in ("user", "gw") for r in routers if r["trusted"]) and any(r["trusted"] for r in routers)
         if not on and not res and not routers:
             status = "unknown"
         elif not on:
             status = "off"
+        elif not effective and not rogue and not recent_bad:
+            status = "ra_only"
         elif self.fw_ok and confirmed and not recent_bad and not rogue:
             status = "managed"
         else:
@@ -809,6 +829,10 @@ class V6Guard:
         VER = {"unknown": ("info", "Δεν ξέρω ακόμα αν το δίκτυο έχει IPv6 — πάτα «Έλεγχος».", "I don't know yet whether this network has IPv6 — press “Check”."),
                "off": ("ok", "Το IPv6 είναι κλειστό σε αυτό το δίκτυο — δεν υπάρχει κάτι να προστατέψεις (ούτε κάτι να ξεχάσεις).",
                        "IPv6 is off on this network — nothing to protect (and nothing to forget)."),
+               "ra_only": ("ok", "Το router ανακοινώνει IPv6, αλλά δεν μοιράζει δημόσιες διευθύνσεις: καμία συσκευή δεν φαίνεται από το Internet με IPv6. "
+                           "Αν ο πάροχος το ενεργοποιήσει αργότερα, ξανατρέξε τον έλεγχο.",
+                           "The router announces IPv6 but hands out no public addresses: no device is reachable from the Internet over IPv6. "
+                           "If the ISP enables it later, run the check again."),
                "managed": ("ok", "Το IPv6 είναι ανοιχτό και ελεγμένο: γνωστό router, firewall επιβεβαιωμένο από έξω.",
                            "IPv6 is on and managed: known router, firewall confirmed from outside."),
                "unmanaged": ("bad" if (recent_bad or rogue) else "warn",
@@ -837,7 +861,7 @@ class V6Guard:
                 "I learned the IPv6 router automatically (the first one seen). Confirm it is yours and press “Trusted”.")
         else:
             add("ra", "ok", "Router Advertisements μόνο από γνωστό, επιβεβαιωμένο router.", "Router Advertisements only from a known, confirmed router.")
-        if on:
+        if on and effective:
             if self.fw_ok:
                 add("fw", "ok", "Το IPv6 firewall του router επιβεβαιώθηκε από έξω (" + time.strftime("%d/%m/%Y", time.localtime(self.fw_ok["t"])) + ").",
                     "The router's IPv6 firewall was confirmed from outside (" + time.strftime("%d/%m/%Y", time.localtime(self.fw_ok["t"])) + ").")

@@ -336,7 +336,8 @@ def test_verdict_each_failure_mode():
     # Wi‑Fi δεν κρίνεται ως «χαλασμένο ζεύγος»
     r = R(speed=144)
     r["link"]["kind"] = "wifi"
-    assert code(r) == ("ok", None)
+    assert code(r) == ("warn", None)                      # … αλλά ούτε «Πρίζα ΟΚ»: δεν δοκιμάστηκε πρίζα
+    assert "Wi‑Fi" in fb.verdict(r)["el"] and "Πρίζα ΟΚ" not in fb.verdict(r)["el"] and "Ethernet" in fb.verdict(r)["fix"]
     assert fb.verdict({})["level"] == "fail"
 
 
@@ -461,7 +462,9 @@ def test_run_without_root_degrades():
     rec = box(net).run_test("D-1")
     st = {s["id"]: s for s in rec["steps"]}
     assert st["nbr"]["status"] == "skip" and "root" in st["nbr"]["detail"] and st["dhcp"]["status"] == "skip"
-    assert rec["level"] == "ok" and rec["sw"] == "" and rec["l3"]["gateway"] == "ok"
+    # χωρίς δικαιώματα ΔΕΝ λέμε «Πρίζα ΟΚ»: ο έλεγχος ήταν μερικός (βρέθηκε σε πραγματικό δίκτυο, χωρίς sudo)
+    assert rec["level"] == "warn" and "Μερικός έλεγχος" in rec["verdict"] and "Πρίζα ΟΚ" not in rec["verdict"]
+    assert rec["sw"] == "" and rec["l3"]["gateway"] == "ok" and "sudo" in rec["fix"]
 
 
 def test_cdp_then_lldp_merge_and_trunk():
@@ -699,3 +702,11 @@ def test_oled_script_follows_server_auth_rules(tmp_path):
     c = o.Client("https://127.0.0.1:8765", "tok123", str(tmp_path / "agent.crt"))
     assert c.headers(post=True)["Authorization"] == "Bearer tok123" and len(c.fp) == 64 and c.tls and c.port == 8765
     assert o.read_token(str(tmp_path / "nope")) == ""
+
+
+def test_dhcp_time_unknown_is_not_shown_as_zero():
+    """Σε πραγματικό δίκτυο ο χρόνος βγήκε 0 ms («DHCP σε 0.00 s»): όταν δεν μετριέται αξιόπιστα, δεν τον δείχνουμε."""
+    o = {"offer": "10.20.0.57", "prefix": 24, "server": "10.20.0.1", "gw": "10.20.0.1", "dns": ["10.20.0.1"], "lease": 86400, "ms": None, "opts": []}
+    rec = box(FakeNet(frames=[eth(FULL)], offers=[o])).run_test("E-1")
+    st = {s["id"]: s for s in rec["steps"]}
+    assert rec["dhcp_ms"] is None and st["dhcp"]["status"] == "ok" and " σε 0" not in st["dhcp"]["detail"] and "DHCP σε" not in rec["verdict"]

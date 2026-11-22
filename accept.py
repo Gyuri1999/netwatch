@@ -132,7 +132,7 @@ def real_run(fn, target, arg):
         if not cc.private_ip(target):
             return res(None, "", "Δώσε ιδιωτική IP στο σημείο (έλεγχος μόνο στο τοπικό δίκτυο)")
     if fn == "ping":
-        r = cc.ping(target, count=5, interval=0.2, timeout=1.0)
+        r = cc.ping(target, count=4, interval=1.0, timeout=1.0)  # 1/δευτ.: κάμερες/NVR περιορίζουν το ICMP — τα γρήγορα ping δείχνουν ψεύτικες απώλειες
         if r.get("err") == "noping":
             return res(None, "", "Δεν υπάρχει ping σε αυτό το σύστημα — τσέκαρέ το με το χέρι")
         return res(bool(r.get("ok")) and not r.get("loss_pct"), f"απώλειες {r.get('loss_pct', 100):g}% · {ms(r.get('avg'))}",

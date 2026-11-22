@@ -2,6 +2,7 @@
 // health, playbooks, API errors, weekly report, CTF). Generated; see i18n/README.md for the format.
 I18N.add({
  "exact": {
+  "Έπεσε το τούνελ απομακρυσμένης πρόσβασης": "Remote-access tunnel went down",
   "Ρυθμίσεις → Γενικά → «Live Plus» κλειστό, και Ρυθμίσεις → Υποστήριξη → «Συμφωνίες χρήστη» → απενεργοποίησε τη διαφήμιση.": "Settings → General → turn off “Live Plus”, and Settings → Support → User Agreements → disable advertising.",
   "Ρυθμίσεις → Όροι & Πολιτικές → «Viewing Information Services» κλειστό.": "Settings → Terms & Policies → turn off “Viewing Information Services”.",
   "Settings → Admin & Privacy → «Viewing Data» off.": "Settings → Admin & Privacy → “Viewing Data” off.",
