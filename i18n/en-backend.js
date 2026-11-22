@@ -2,6 +2,10 @@
 // health, playbooks, API errors, weekly report, CTF). Generated; see i18n/README.md for the format.
 I18N.add({
  "exact": {
+  "Ρυθμίσεις → Γενικά → «Live Plus» κλειστό, και Ρυθμίσεις → Υποστήριξη → «Συμφωνίες χρήστη» → απενεργοποίησε τη διαφήμιση.": "Settings → General → turn off “Live Plus”, and Settings → Support → User Agreements → disable advertising.",
+  "Ρυθμίσεις → Όροι & Πολιτικές → «Viewing Information Services» κλειστό.": "Settings → Terms & Policies → turn off “Viewing Information Services”.",
+  "Settings → Admin & Privacy → «Viewing Data» off.": "Settings → Admin & Privacy → “Viewing Data” off.",
+  "Ρυθμίσεις → Απόρρητο → Διαφημίσεις → «Εξατομίκευση» off.": "Settings → Privacy → Ads → turn off “Personalisation”.",
   "Olimex ESP32-POE ή Raspberry Pi": "Olimex ESP32-POE or Raspberry Pi",
   "Rack: θερμοκρασία, ρεύμα, νερό & πόρτα": "Rack: temperature, power, water & door",
   "Ζέστη/υγρασία στο ντουλάπι δικτύου, διακοπή ρεύματος, διαρροή νερού και ποιος άνοιξε την πόρτα του.": "Heat/humidity in the network cabinet, power failure, water leak and who opened its door.",

@@ -779,7 +779,7 @@ def make_handler(state):
             if u.path in ("/", "/index.html"):
                 with open(os.path.join(HERE, "index.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
-            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/assessui.js", "/vulnui.js", "/upnpui.js", "/otui.js", "/acceptui.js", "/sitesui.js", "/labelsui.js", "/calcui.js", "/v6ui.js", "/nacui.js", "/iotinvui.js", "/radioui.js", "/fieldui.js", "/probesui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
+            if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/assessui.js", "/vulnui.js", "/upnpui.js", "/otui.js", "/acceptui.js", "/sitesui.js", "/labelsui.js", "/calcui.js", "/v6ui.js", "/nacui.js", "/iotinvui.js", "/radioui.js", "/fieldui.js", "/probesui.js", "/watchui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
@@ -864,6 +864,15 @@ def make_handler(state):
             if u.path.startswith("/api/kit/"):  # 🧰 εργαλειοθήκη τεχνικού (OT, τεστ αποδοχής, πελάτες, ετικέτες, IPv6, 802.1X, IoT, πρίζα)
                 import techkit
                 return techkit.respond(self, state, "GET", u)
+            if u.path == "/api/watchers":  # 👁 ποιος σε κοιτάζει (trackers/ACR)
+                wa = getattr(state, "watchers", None)
+                return self._json(wa.view() if wa else {"error": "off"})
+            if u.path == "/api/watchers/report.html":  # 👁 αναφορά για εκτύπωση/PDF (ανοίγει σε νέα καρτέλα)
+                wa = getattr(state, "watchers", None)
+                if not wa:
+                    return self._json({"error": "off"}, 400)
+                lang = parse_qs(u.query).get("lang", ["el"])[0]
+                return self._send(200, wa.report_html("en" if lang == "en" else "el").encode(), "text/html; charset=utf-8")
             if u.path == "/api/upnp":  # 🔓 θύρες που άνοιξαν μόνες τους στο router (UPnP)
                 uw = getattr(state, "upnp", None)
                 return self._json(uw.view() if uw else {"error": "off"})
