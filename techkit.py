@@ -19,7 +19,7 @@ from core import log
 MAX_BODY = 512 * 1024  # POST JSON (π.χ. λογότυπο εταιρείας ως data URL)
 # όνομα στο URL → χαρακτηριστικό στο state
 NAMES = {"ot": "ot", "accept": "accept", "sites": "sites", "labels": "labels", "v6": "v6", "nac": "nac",
-         "iotinv": "iotinv", "radio": "radio", "field": "field", "uplink": "uplink", "soak": "soak", "remote": "remote"}
+         "iotinv": "iotinv", "radio": "radio", "field": "field", "uplink": "uplink", "soak": "soak", "remote": "remote", "camcheck": "camcheck"}
 OBSERVERS = ("ot", "v6")  # όσα κοιτάνε πακέτα (φθηνά: γυρνάνε αμέσως αν δεν είναι η θύρα τους)
 # έγγραφα για εκτύπωση: ποτέ scripts, ποτέ εξωτερικοί πόροι — ό,τι κι αν γράφει μέσα το όνομα μιας συσκευής
 DOC_CSP = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'"
@@ -126,6 +126,8 @@ def setup(state, cfg, mode, data, on_save=None):
     make("field", lambda: fieldbox.FieldBox(state, d, demo=demo, triage=getattr(state, "triage", None)))
     import soak
     make("soak", lambda: soak.Soak(state, d, demo=demo, site_reg=state.sites), run=False)
+    import camcheck
+    make("camcheck", lambda: camcheck.CamCheck(state, d, demo=demo, site_reg=state.sites))
     import remote
     make("remote", lambda: remote.Remote(state, d, demo=demo))
     if d:
