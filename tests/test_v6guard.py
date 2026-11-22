@@ -435,3 +435,30 @@ def test_demo():
     assert [a["kind"] for a in vw["addrs"]] == ["stable", "stable", "temp"]
     assert g.api("POST", "check", {}, {})[1]["checked"] == 1_700_000_000.0          # δεν αγγίζει το δίκτυο
     assert g.api("POST", "trust", {}, {"mac": v._DM["rogue"]})[1]["counts"]["rogue"] == 1   # το demo δεν αλλάζει
+
+
+def test_ra_without_public_prefix_is_not_an_alarm(monkeypatch):
+    """Πραγματικό router (Cosmote) στέλνει RA με default route αλλά ΧΩΡΙΣ prefix: κανείς δεν παίρνει δημόσια IPv6.
+    Αυτό δεν είναι «IPv6 ανοιχτό, χωρίς έλεγχο» — δεν εκτίθεται καμία συσκευή."""
+    import time as _t
+    import v6guard as v6
+    now = _t.time()
+    g = v6.V6Guard(None, None)
+    mac = "4c:22:f3:22:f2:2a"
+    g.routers[mac] = {"mac": mac, "src": "fe80::4e22:f3ff:fe22:f22a", "lifetime": 180, "prefixes": [], "rdnss": [], "routes": [{"prefix": "::/0"}],
+                      "first": now - 60, "last": now, "n": 4, "stub": False, "pref": "medium"}
+    g.trusted[mac] = {"by": "gw", "t": now}
+    monkeypatch.setattr(g, "_my_addrs", lambda: [{"addr": "fe80::1", "scope": "link-local", "eui64": False, "iface": "en0"}])
+    monkeypatch.setattr(g, "_devices", lambda mine: [])
+    v = g.view()
+    assert v["status"] == "ra_only" and v["verdict"]["level"] == "ok" and "δεν μοιράζει δημόσιες" in v["verdict"]["el"]
+    assert not any(c["id"] == "fw" for c in v["checklist"])            # δεν ζητάμε «έλεγχο firewall από έξω» χωρίς λόγο
+    # μόλις το router μοιράσει δημόσιο prefix, ξαναγίνεται «ανοιχτό, χωρίς έλεγχο»
+    g.routers[mac]["prefixes"] = [{"prefix": "2a02:587:1234:5600::/64", "len": 64, "L": True, "A": True}]
+    assert g.view()["status"] == "unmanaged"
+    # ULA prefix (τοπικό) δεν μετράει ως δημόσιο
+    g.routers[mac]["prefixes"] = [{"prefix": "fd00:1234::/64", "len": 64, "L": True, "A": True}]
+    assert g.view()["status"] == "ra_only"
+    # άγνωστο router που στέλνει RA παραμένει συναγερμός, ακόμη και χωρίς prefix
+    g.trusted.clear()
+    assert g.view()["status"] == "unmanaged" and g.view()["verdict"]["level"] == "bad"

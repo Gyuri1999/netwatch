@@ -748,7 +748,10 @@ class Net:
                 continue
             o["mac"], o["ip_src"] = r[Ether].src, r[IP].src if r.haslayer(IP) else ""
             o["server"] = o["server"] or o["ip_src"]
-            o["ms"] = max(0, int((float(r.time) - float(getattr(s, "sent_time", None) or r.time)) * 1000))
+            # χρόνος DISCOVER→OFFER μόνο όταν το scapy κράτησε ώρα αποστολής και η διαφορά βγαίνει θετική (αλλιώς «άγνωστο», όχι 0)
+            sent = getattr(s, "sent_time", None)
+            dt = (float(r.time) - float(sent)) * 1000 if sent else None
+            o["ms"] = int(round(dt)) if dt is not None and dt >= 1 else None
             out.append(o)
         return out[:8]
 

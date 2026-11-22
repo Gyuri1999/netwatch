@@ -105,7 +105,7 @@
       : !c.total ? T('Καμία κάμερα στη λίστα ακόμα', 'No cameras in the list yet')
         : c.pending === c.total ? T(`${c.total} κάμερες — δεν έχουν ελεγχθεί`, `${c.total} cameras — not checked yet`)
           : c.fail ? T(`${c.fail} από ${c.total} κάμερες έχουν πρόβλημα`, `${c.fail} of ${c.total} cameras have a problem`)
-            : c.warn ? T(`Όλες απαντούν · ${c.warn} θέλουν μια ματιά`, `All answer · ${c.warn} need a look`) : T(`Και οι ${c.total} κάμερες πέρασαν`, `All ${c.total} cameras passed`);
+            : c.warn ? T(c.warn === 1 ? 'Όλες απαντούν · 1 θέλει μια ματιά' : `Όλες απαντούν · ${c.warn} θέλουν μια ματιά`, c.warn === 1 ? 'All answer · 1 needs a look' : `All answer · ${c.warn} need a look`) : T(`Και οι ${c.total} κάμερες πέρασαν`, `All ${c.total} cameras passed`);
     let h = `<div class="card"><div class="cc-hero"><span class="cc-big">${ico}</span><div style="flex:1;min-width:220px">
       <b style="font-size:16px">${head}</b>${D.demo ? ' <span class="dim">DEMO</span>' : ''}
       <div class="dim" style="font-size:12.5px;margin-top:3px">${T('τελευταίος έλεγχος', 'last check')} ${when(D.scanned)}</div></div>
