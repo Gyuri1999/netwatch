@@ -156,6 +156,9 @@ a.mitre:hover{border-color:var(--purple)}
 .hbtn{white-space:nowrap}#cmdk-btn{font-size:11px;color:var(--dim)}
 body.mode-tech .tab .card{padding:9px 11px;margin-bottom:9px}body.mode-tech .learn{display:none}
 .learn{margin-top:8px;padding:7px 9px;border-left:3px solid var(--purple);background:color-mix(in srgb,var(--purple) 6.3%,transparent);border-radius:4px;white-space:normal;color:var(--purplet);font-size:12px}
+.dstat{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:color-mix(in srgb,var(--c) 10%,var(--panel2));border:1px solid color-mix(in srgb,var(--c) 40%,var(--line));border-left:4px solid var(--c);border-radius:12px;padding:12px 16px;margin-bottom:12px}
+.dstat-ic{font-size:22px;line-height:1}.dstat b{font-size:16px;color:var(--hi)}.dstat-sub{margin-left:auto;color:var(--dim)}
+@media (max-width:600px){.dstat-sub{margin-left:0;flex-basis:100%}}
 .kpis.tk .kpi{cursor:pointer;min-width:120px;flex:1 1 120px}.kpi{background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;flex-direction:column}
 .kpi b{font-size:22px;color:var(--hi);font-variant-numeric:tabular-nums}.kpi span{font-size:10.5px;color:var(--dim)}.kpi[data-go]:hover{border-color:color-mix(in srgb,var(--cyan) 53.3%,transparent)}
 .qrow{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}.chooser{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px}
@@ -2066,6 +2069,11 @@ function drawSensor(){const d=sensData,el=$('t-sensor');if(d.error&&!d.sensors){
   el.innerHTML=h;el.querySelectorAll('[data-lesson]').forEach(a=>a.onclick=e=>{e.preventDefault();ACADEMY.openLesson('iot',a.dataset.lesson)})}
 // ---- 🔎 Υγεία homelab ----
 let hlData=null,hlT=0;
+// 🧭 δεδομένα για την αρχική: ευπάθειες, trackers/ACR, θύρες UPnP (φόρτωση με cache, ανανέωση όταν έρθουν)
+let dashData={},dashT=0;
+function dashLoad(){if(Date.now()-dashT<20000)return;dashT=Date.now();
+  Promise.all([fetch('/api/vulns').then(r=>r.json()).catch(()=>null),fetch('/api/watchers').then(r=>r.json()).catch(()=>null),fetch('/api/upnp').then(r=>r.json()).catch(()=>null)])
+   .then(([v,w,u])=>{dashData={vulns:v,watch:w,upnp:u};if(tab==='home'&&!tabHover())renderHome()}).catch(()=>{})}
 function renderHealth(){if(Date.now()-hlT>5000){hlT=Date.now();fetch('/api/health').then(r=>r.json()).then(j=>{hlData=j;if(tab==='health'&&!tabHover())drawHealth()})}
   if(!hlData)$('t-health').innerHTML='<div class="empty">φόρτωση…</div>'}
 function spark(h){const v=h.filter(x=>x!=null),mx=Math.max(1,...v),w=120,n=Math.max(1,h.length-1);
@@ -2279,15 +2287,29 @@ const QT_IN={ping:'ping_host',dns:'dns_name',dnscmp:'dnscmp_name',ports:'ports_h
 function qtRun(t,target,extra){if(!QT_IN[t])return;PTIN[QT_IN[t]]=target;Object.assign(PTIN,extra||{});
   ptSub='tools';try{localStorage.setItem('nw-ptsub','tools')}catch(e){}showTab('pentest');nkRun(t);
   setTimeout(()=>{const c=document.querySelector(`#t-pentest [data-tool="${t}"]`);if(c)c.scrollIntoView({behavior:'smooth',block:'center'})},60)}
-function renderHomeTech(){const el=$('t-home');hlLoad();if(!scanData)loadScan();const now=Date.now()/1000;
+function renderHomeTech(){const el=$('t-home');hlLoad();dashLoad();if(!scanData)loadScan();const now=Date.now()/1000;
   const devs=[...S.hosts.values()].filter(h=>h.kind==='local'&&!h.me&&!h.ip.includes(':')),newD=devs.filter(h=>h.threat===1).length;
   const real=S.alerts.filter(a=>!a.lab&&!a.benign&&!a.selftest),hi1=real.filter(a=>a.sev==='high'&&now-a.t<3600).length,med1=real.filter(a=>a.sev==='med'&&now-a.t<3600).length;
   const T=hlData&&hlData.targets||[],up=T.filter(x=>x.up).length,down=T.filter(x=>x.up===false);
   const sc=scanData||{},d=sc.diff,dn=d?d.new_ports.length+d.new_hosts.length:0,pub=[...S.hosts.values()].filter(h=>h.kind==='public').length;
   const kpi=(go,v,l,c,sp)=>`<div class="kpi" data-go="${go}"><b data-count style="color:${c||'#fff'}">${v}</b><span>${l}</span>${sp?ksp(KH[sp],c&&c!=='#fff'?c:'#3ec5ff'):''}</div>`;
-  let h=(MODE?'':chooserHTML())+`<div class="kpis tk">`+
+  // 🧭 νέα δεδομένα: ευπάθειες, trackers/ACR, θύρες UPnP
+  const vu=dashData.vulns,nv=vu&&!vu.error?(vu.devices||[]).length:null;
+  const wa=dashData.watch,nacr=wa&&!wa.error?(wa.acr_devices||0):null,ncomp=wa&&!wa.error?(wa.companies||0):0;
+  const upn=dashData.upnp,ur=upn&&!upn.error&&upn.counts?(upn.counts.high||0)+(upn.counts.med||0):null;
+  const upHi=upn&&!upn.error&&upn.counts?upn.counts.high||0:0;
+  // μπάρα συνολικής κατάστασης
+  const redN=hi1+down.length+upHi,ywN=med1+newD+(nv||0)+(nacr||0)+(ur||0)+dn;
+  const st=redN?['#ff3b5c','🔴',`${redN} ${redN===1?'σοβαρό θέμα θέλει':'σοβαρά θέματα θέλουν'} προσοχή τώρα`]
+    :ywN?['#ffd23f','🟡',`Όλα ήρεμα — ${ywN} ${ywN===1?'πράγμα αξίζει':'πράγματα αξίζουν'} μια ματιά`]
+    :['#3ddc97','🟢','Το δίκτυό σου δείχνει ασφαλές αυτή τη στιγμή'];
+  let h=(MODE?'':chooserHTML())+`<div class="dstat" style="--c:${st[0]}"><span class="dstat-ic">${st[1]}</span><b>${st[2]}</b><span class="sm dstat-sub">${devs.length} συσκευές · ${T.length?`homelab ${up}/${T.length}`:'homelab —'}${ncomp?` · 👁 ${ncomp} που παρακολουθούν`:''}</span></div>`+
+    `<div class="kpis tk">`+
     kpi('devs',devs.length,newD?`συσκευές · ${newD} νέες`:'συσκευές στο LAN',newD?'#ffd23f':'','devs')+
     kpi('alerts',hi1,`σοβαρές την τελευταία ώρα${med1?` · ${med1} μέτριες`:''}`,hi1?'#ff3b5c':med1?'#ffd23f':'#3ddc97','hi')+
+    kpi('vulns',nv==null?'—':nv,nv?'συσκευές με γνωστές ευπάθειες':'καμία ευάλωτη συσκευή',nv?'#ff8a3d':'#3ddc97')+
+    kpi('watch',nacr==null?'—':ncomp,nacr?`εταιρείες σε παρακολουθούν · ${nacr} με ACR`:(ncomp?'εταιρείες σε παρακολουθούν':'κανείς δεν σε παρακολουθεί'),nacr?'#ff3b5c':ncomp?'#ffd23f':'#3ddc97')+
+    kpi('upnp',ur==null?'—':ur,ur?'θύρες router θέλουν προσοχή':'καμία ύποπτη θύρα router',ur?'#ff8a3d':'#3ddc97')+
     kpi('health',T.length?`${up}/${T.length}`:'—',down.length?`homelab · εκτός: ${down.map(x=>x.name).join(', ')}`:'homelab πάνω',down.length?'#ff3b5c':'#3ddc97','lab')+
     kpi('pentest',sc.finished?ago(now-sc.finished):'—',sc.finished?`από τη σάρωση${dn?` · ${dn} αλλαγές`:''}`:'καμία σάρωση ακόμα',dn?'#ffd23f':'')+
     kpi('map',pub,'servers στο Internet τώρα','','pub')+`</div>`;
