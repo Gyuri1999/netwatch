@@ -5,6 +5,7 @@ import os
 import queue
 import re
 import subprocess
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -72,6 +73,41 @@ def parse_traceroute(text):
     return hops
 
 
+# Windows: το `tracert` έχει άλλη μορφή (IP στο τέλος, «Request timed out», «<1 ms»)
+_TRACERT_HOP = re.compile(r"^\s*(\d+)\s+(.*\S)\s*$")
+_TRACERT_IP = re.compile(r"^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]+:[0-9a-fA-F:]+$")
+_TRACERT_MS = re.compile(r"<?(\d+)\s*ms", re.I)
+
+
+def parse_tracert(text):
+    hops = []
+    for line in text.splitlines():
+        m = _TRACERT_HOP.match(line)
+        if not m:
+            continue
+        rest = m.group(2)
+        ip = next((t for t in reversed(rest.split()) if _TRACERT_IP.match(t)), None)
+        mm = _TRACERT_MS.search(rest)
+        hops.append({"n": int(m.group(1)), "ip": ip, "ms": float(mm.group(1)) if mm else None})
+    return hops
+
+
+def trace_cmd(target, max_hops, v6=False):
+    if sys.platform == "win32":  # tracert: -d χωρίς DNS, -w σε ms, -h μέγιστα hops
+        return ["tracert", "-d", "-h", str(max_hops), "-w", "1000", target]
+    exe = "traceroute6" if v6 else "traceroute"
+    return [exe, "-n", "-q", "1", "-w", "1", "-m", str(max_hops), target]
+
+
+def sys_trace(target, max_hops=20, timeout=60, v6=False):
+    """traceroute (Unix) / tracert (Windows) → λίστα hops [{n, ip, ms}]. Κενή λίστα αν αποτύχει."""
+    try:
+        out = subprocess.run(trace_cmd(target, max_hops, v6), capture_output=True, text=True, timeout=timeout).stdout
+    except (subprocess.TimeoutExpired, OSError):
+        return []
+    return parse_tracert(out) if sys.platform == "win32" else parse_traceroute(out)
+
+
 def geo_batch(ips):
     ips = [i for i in dict.fromkeys(ips) if i and ip_kind(i) == "public"][:100]
     if not ips:
@@ -89,10 +125,7 @@ def traceroute(state, ip, max_hops=20):
         raise ValueError("Μόνο για διευθύνσεις του Internet")
     if state.mode == "demo":
         return demo_trace(state, ip)
-    exe = "traceroute6" if a.version == 6 else "traceroute"
-    out = subprocess.run([exe, "-n", "-q", "1", "-w", "1", "-m", str(max_hops), ip],
-                         capture_output=True, text=True, timeout=60).stdout
-    hops = parse_traceroute(out)
+    hops = sys_trace(ip, max_hops, 60, v6=a.version == 6)
     reached = bool(hops) and hops[-1]["ip"] == ip
     while hops and hops[-1]["ip"] is None:  # οι τελευταίοι «σιωπηλοί» routers δεν λένε τίποτα
         hops.pop()

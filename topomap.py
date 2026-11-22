@@ -80,13 +80,8 @@ def _sys_ping(host):
 
 
 def _sys_trace(target=PUBLIC_TARGET):
-    from osint import parse_traceroute
-    try:
-        out = subprocess.run(["traceroute", "-n", "-q", "1", "-w", "1", "-m", str(MAX_HOPS), target],
-                             capture_output=True, text=True, timeout=25).stdout
-    except (subprocess.TimeoutExpired, OSError):
-        return []
-    return parse_traceroute(out)
+    from osint import sys_trace  # traceroute (Unix) / tracert (Windows)
+    return sys_trace(target, MAX_HOPS, 25)
 
 
 def _sys_resolve(name=DNS_NAME, timeout=3.0):

@@ -834,3 +834,17 @@ def test_sweep_from_named_device_is_expected_but_not_from_iot(state, tmp_path):
 def test_sweep_from_unknown_device_still_alerts(state):
     al = _sweep(state, EVIL, "de:ad:be:ef:00:66")
     assert al and not al[0].get("benign")
+
+
+def test_arp_spoofing_ignores_zero_mac_and_self(state):
+    # μηδενική MAC (κάρτα δικτύου που κοιμάται/ξυπνά) → κανένας συναγερμός
+    c = Clock()
+    feed(state, c, src=GW, dst=ME, proto="ARP", arp=dict(op=2, psrc=GW, pdst=ME, hwsrc="00:00:00:00:00:00"))
+    assert [a for a in state.alerts if a["type"].startswith("ARP spoofing")] == []
+    # αλλαγή MAC στη ΔΙΚΗ σου IP → όχι MITM (εσύ στέλνεις το δικό σου ARP)
+    feed(state, c, src=ME, dst=GW, proto="ARP", arp=dict(op=2, psrc=ME, pdst=GW, hwsrc="aa:bb:cc:dd:ee:01"))
+    feed(state, c, src=ME, dst=GW, proto="ARP", arp=dict(op=2, psrc=ME, pdst=GW, hwsrc="aa:bb:cc:dd:ee:02"), dt=5)
+    assert [a for a in state.alerts if a["type"].startswith("ARP spoofing")] == []
+    # ο router όμως που αλλάζει MAC χτυπά κανονικά (δεν χαλάσαμε την ανίχνευση)
+    feed(state, c, src=GW, dst=ME, proto="ARP", arp=dict(op=2, psrc=GW, pdst=ME, hwsrc="de:ad:be:ef:00:66"), dt=5)
+    assert len([a for a in state.alerts if a["type"].startswith("ARP spoofing")]) == 1
