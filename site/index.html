@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="el">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NetWatch — δες το δίκτυό σου, πιάσε την απειλή</title>
+<meta name="description" content="Παθητικός επόπτης δικτύου & IDS για σπίτι και μικρό γραφείο. Χάρτης συσκευών, ανίχνευση επιθέσεων, ευπάθειες, trackers/ACR, διαγράμματα, Academy CCNA/IoT. Αμυντικό, μόνο ανάγνωση. Windows, macOS, Android, Docker.">
+<meta property="og:title" content="NetWatch — δες το δίκτυό σου, πιάσε την απειλή">
+<meta property="og:description" content="Παθητικός επόπτης δικτύου & IDS για σπίτι και μικρό γραφείο — αμυντικό, μόνο ανάγνωση.">
+<meta property="og:type" content="website">
+<link rel="icon" href="data:image/svg+xml,%3Csvg%20xmlns%3D%22http%3A//www.w3.org/2000/svg%22%20viewBox%3D%220%200%2024%2024%22%3E%3Crect%20width%3D%2224%22%20height%3D%2224%22%20rx%3D%226%22%20fill%3D%22%23081020%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%229.6%22%20fill%3D%22none%22%20stroke%3D%22%233ec5ff%22%20stroke-opacity%3D%22.3%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%226.3%22%20fill%3D%22none%22%20stroke%3D%22%233ec5ff%22%20stroke-opacity%3D%22.5%22/%3E%3Cpath%20d%3D%22M12%2012%2019.6%207.2%22%20stroke%3D%22%233ec5ff%22%20stroke-width%3D%222%22/%3E%3Ccircle%20cx%3D%2212%22%20cy%3D%2212%22%20r%3D%221.9%22%20fill%3D%22%233ec5ff%22/%3E%3Ccircle%20cx%3D%2217.4%22%20cy%3D%2216.2%22%20r%3D%221.3%22%20fill%3D%22%23ff3b5c%22/%3E%3C/svg%3E">
+<style>
+:root{--bg:#070c18;--bg2:#0b1324;--panel:#0f1830;--line:#1e2b45;--txt:#e6edfb;--dim:#93a6c6;--cyan:#3ec5ff;--red:#ff3b5c;--green:#3ddc97}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--txt);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1080px;margin:0 auto;padding:0 20px}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--panel);color:var(--txt);border-radius:10px;padding:11px 18px;font-weight:600;font-size:15px;cursor:pointer;transition:.15s}
+.btn:hover{border-color:color-mix(in srgb,var(--cyan) 55%,transparent);transform:translateY(-1px)}
+.btn.pri{background:linear-gradient(180deg,#44c9ff,#2a9fe0);border-color:transparent;color:#04121f}
+.btn.pri:hover{filter:brightness(1.07)}
+nav{position:sticky;top:0;z-index:5;background:color-mix(in srgb,var(--bg) 86%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+nav .wrap{display:flex;align-items:center;gap:18px;height:60px}
+.brand{display:flex;align-items:center;gap:10px;font-weight:800;letter-spacing:.14em;font-size:15px}
+.brand svg{width:26px;height:26px}
+nav .sp{flex:1}
+nav .lk{color:var(--dim);font-weight:600;font-size:14.5px}nav .lk:hover{color:var(--txt)}
+@media(max-width:720px){nav .lk.hide{display:none}}
+.hero{position:relative;overflow:hidden;padding:64px 0 36px;background:radial-gradient(1100px 520px at 50% -10%,#15325a55,transparent 70%)}
+.hero h1{font-size:clamp(34px,6vw,58px);line-height:1.04;margin:14px 0 6px;letter-spacing:-.5px}
+.hero h1 .g{background:linear-gradient(90deg,#5fd0ff,#8affc9);-webkit-background-clip:text;background-clip:text;color:transparent}
+.hero p.lead{font-size:clamp(16px,2.4vw,20px);color:var(--dim);max-width:640px;margin:0 auto 22px}
+.hero .cta{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.hero,.hero .wrap{text-align:center}
+.herologo{width:70px;height:70px}
+.badges{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-top:18px}
+.badge{font-size:12.5px;color:var(--dim);border:1px solid var(--line);border-radius:20px;padding:4px 12px;background:var(--bg2)}
+.shot-hero{margin:40px auto 0;max-width:960px;border:1px solid var(--line);border-radius:14px;overflow:hidden;box-shadow:0 30px 80px #0008;background:var(--panel)}
+.shot-hero .bar{display:flex;gap:7px;padding:10px 14px;border-bottom:1px solid var(--line);background:#0c1424}
+.shot-hero .bar i{width:11px;height:11px;border-radius:50%;background:#2a3858;display:inline-block}
+.shot-hero img{display:block;width:100%}
+section{padding:58px 0}
+.h2{font-size:clamp(24px,3.5vw,34px);text-align:center;margin:0 0 6px;letter-spacing:-.3px}
+.sub{color:var(--dim);text-align:center;max-width:620px;margin:0 auto 34px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:20px}
+.card .ic{font-size:26px;line-height:1}
+.card h3{margin:10px 0 5px;font-size:17px}
+.card p{margin:0;color:var(--dim);font-size:14.5px}
+.gal{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.gal figure{margin:0;border:1px solid var(--line);border-radius:12px;overflow:hidden;background:var(--panel)}
+.gal img{display:block;width:100%}
+.gal figcaption{padding:10px 14px;color:var(--dim);font-size:13.5px}
+.dl{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:16px}
+.dl a{display:flex;flex-direction:column;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:18px;transition:.15s}
+.dl a:hover{border-color:color-mix(in srgb,var(--cyan) 55%,transparent);transform:translateY(-2px)}
+.dl .os{font-size:22px}.dl b{font-size:16px}.dl span{color:var(--dim);font-size:13.5px}
+.note{max-width:760px;margin:26px auto 0;color:var(--dim);font-size:13.5px;text-align:center;line-height:1.7}
+.safe{background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:26px;display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.safe .ic{font-size:30px}.safe b{color:var(--green)}
+footer{border-top:1px solid var(--line);padding:30px 0;color:var(--dim);font-size:13.5px}
+footer .wrap{display:flex;gap:14px;justify-content:space-between;flex-wrap:wrap;align-items:center}
+</style>
+</head>
+<body>
+<nav><div class="wrap">
+  <a class="brand" href="#top"><svg viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 12 L12 2.4 A9.6 9.6 0 0 1 20.4 7.3 Z" fill="#3ec5ff" fill-opacity=".16"/>
+<circle cx="12" cy="12" r="9.6" fill="none" stroke="#3ec5ff" stroke-opacity=".28" stroke-width="1"/>
+<circle cx="12" cy="12" r="6.3" fill="none" stroke="#3ec5ff" stroke-opacity=".45" stroke-width="1"/>
+<circle cx="12" cy="12" r="3.1" fill="none" stroke="#3ec5ff" stroke-opacity=".6" stroke-width="1"/>
+<g stroke="#3ec5ff" stroke-opacity=".5" stroke-width=".8"><line x1="12" y1="12" x2="5.9" y2="8.2"/><line x1="12" y1="12" x2="7.8" y2="17.6"/><line x1="12" y1="12" x2="17.4" y2="16.2"/></g>
+<g fill="#3ec5ff"><circle cx="5.9" cy="8.2" r="1.15"/><circle cx="7.8" cy="17.6" r="1.15"/></g>
+<circle cx="12" cy="12" r="1.9" fill="#3ec5ff"/>
+<circle cx="17.4" cy="16.2" r="1.3" fill="#ff3b5c"/></svg>NETWATCH</a>
+  <span class="sp"></span>
+  <a class="lk hide" href="#features">Χαρακτηριστικά</a>
+  <a class="lk hide" href="#shots">Εικόνες</a>
+  <a class="lk" href="#download">Λήψη</a>
+  <a class="lk" href="https://github.com/Gyuri1999/netwatch">GitHub</a>
+</div></nav>
+
+<header class="hero" id="top"><div class="wrap">
+  <svg class="herologo" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M12 12 L12 2.4 A9.6 9.6 0 0 1 20.4 7.3 Z" fill="#3ec5ff" fill-opacity=".16"/>
+<circle cx="12" cy="12" r="9.6" fill="none" stroke="#3ec5ff" stroke-opacity=".28" stroke-width="1"/>
+<circle cx="12" cy="12" r="6.3" fill="none" stroke="#3ec5ff" stroke-opacity=".45" stroke-width="1"/>
+<circle cx="12" cy="12" r="3.1" fill="none" stroke="#3ec5ff" stroke-opacity=".6" stroke-width="1"/>
+<g stroke="#3ec5ff" stroke-opacity=".5" stroke-width=".8"><line x1="12" y1="12" x2="5.9" y2="8.2"/><line x1="12" y1="12" x2="7.8" y2="17.6"/><line x1="12" y1="12" x2="17.4" y2="16.2"/></g>
+<g fill="#3ec5ff"><circle cx="5.9" cy="8.2" r="1.15"/><circle cx="7.8" cy="17.6" r="1.15"/></g>
+<circle cx="12" cy="12" r="1.9" fill="#3ec5ff"/>
+<circle cx="17.4" cy="16.2" r="1.3" fill="#ff3b5c"/></svg>
+  <h1>Δες το δίκτυό σου.<br><span class="g">Πιάσε την απειλή.</span></h1>
+  <p class="lead">Παθητικός επόπτης δικτύου και σύστημα ανίχνευσης εισβολών για το σπίτι και το μικρό γραφείο. Χάρτης συσκευών, ειδοποιήσεις, ευπάθειες και ιδιωτικότητα — <b>αμυντικό, μόνο ανάγνωση</b>.</p>
+  <div class="cta">
+    <a class="btn pri" href="app/">▶ Δοκίμασε το demo</a>
+    <a class="btn" href="#download">⬇ Κατέβασέ το</a>
+    <a class="btn" href="https://github.com/Gyuri1999/netwatch">★ GitHub</a>
+  </div>
+  <div class="badges">
+    <span class="badge">🪟 Windows</span><span class="badge">🍎 macOS</span><span class="badge">🤖 Android</span><span class="badge">🐳 Docker / Linux</span><span class="badge">🇬🇷 Ελληνικά & English</span>
+  </div>
+  <div class="shot-hero"><div class="bar"><i></i><i></i><i></i></div><img src="shots/dashboard.png" alt="NetWatch dashboard" loading="lazy"></div>
+</div></header>
+
+<section id="features"><div class="wrap">
+  <h2 class="h2">Τι κάνει</h2>
+  <p class="sub">Ακούει παθητικά την κίνηση και σου εξηγεί με απλά λόγια τι συμβαίνει — χωρίς να πειράζει καμία συσκευή.</p>
+  <div class="grid">
+    <div class="card"><div class="ic">🛡</div><h3>Ανίχνευση επιθέσεων</h3><p>ARP spoofing, σαρώσεις, rogue DHCP, beaconing/C2, παράκαμψη DNS — με εξήγηση «γιατί χτύπησε».</p></div>
+    <div class="card"><div class="ic">📟</div><h3>Χάρτης συσκευών</h3><p>Ποιος είναι συνδεδεμένος, με ονόματα και κατασκευαστή, και πού καταλήγει η κίνησή του.</p></div>
+    <div class="card"><div class="ic">🛡</div><h3>Ευπάθειες συσκευών</h3><p>Η λίστα CISA KEV ματσαρισμένη τοπικά στις δικές σου συσκευές, με βαθμό EPSS.</p></div>
+    <div class="card"><div class="ic">👁</div><h3>Ποιος σε κοιτάζει</h3><p>Trackers και ACR έξυπνων TV που «καλούν σπίτι» — τι μαθαίνει για σένα η τηλεόρασή σου.</p></div>
+    <div class="card"><div class="ic">🗺</div><h3>Διάγραμμα δικτύου</h3><p>Αυτόματο σχέδιο με ένα κουμπί, με επαγγελματικά σύμβολα — εξαγωγή σε draw.io και PDF.</p></div>
+    <div class="card"><div class="ic">📚</div><h3>Academy</h3><p>CCNA 200-301 και IoT security στα ελληνικά: μαθήματα, κουίζ, Cisco CLI, subnetting.</p></div>
+    <div class="card"><div class="ic">🧰</div><h3>Εργαλεία τεχνικού</h3><p>Ping, DNS, θύρες, Wireshark φίλτρα, έλεγχος TLS/SSH, «πού είναι συνδεδεμένο».</p></div>
+    <div class="card"><div class="ic">🧩</div><h3>Αισθητήρες & agent</h3><p>Τρέξε το σε Raspberry Pi/Docker· σύνδεσε ESP32 αισθητήρες με σύζευξη QR.</p></div>
+  </div>
+</div></section>
+
+<section id="shots" style="background:var(--bg2)"><div class="wrap">
+  <h2 class="h2">Μια ματιά</h2>
+  <p class="sub">Όλες οι εικόνες από τη λειτουργία demo (προσομοιωμένη κίνηση).</p>
+  <div class="gal">
+    <figure><img src="shots/topology.png" alt="Διάγραμμα δικτύου" loading="lazy"><figcaption>🗺 Διάγραμμα δικτύου — πού είναι η βλάβη</figcaption></figure>
+    <figure><img src="shots/trackers.png" alt="Trackers" loading="lazy"><figcaption>👁 Ποιος σε κοιτάζει — trackers & ACR</figcaption></figure>
+    <figure><img src="shots/wireshark.png" alt="Wireshark" loading="lazy"><figcaption>🦈 Wireshark — φίλτρα & tshark</figcaption></figure>
+    <figure><img src="shots/academy.png" alt="Academy" loading="lazy"><figcaption>📚 Academy — CCNA & IoT στα ελληνικά</figcaption></figure>
+    <figure><img src="shots/map.png" alt="Χάρτης" loading="lazy"><figcaption>🌍 Πού στέλνει πακέτα κάθε συσκευή</figcaption></figure>
+  </div>
+</div></section>
+
+<section id="download"><div class="wrap">
+  <h2 class="h2">Κατέβασέ το</h2>
+  <p class="sub">Δωρεάν και ανοιχτού κώδικα. Διάλεξε πλατφόρμα — ή δοκίμασέ το πρώτα στο demo.</p>
+  <div class="dl">
+    <a href="https://github.com/Gyuri1999/netwatch/releases/latest/download/NetWatch-windows-x64.zip"><span class="os">🪟</span><b>Windows</b><span>NetWatch-windows-x64.zip · χρειάζεται Npcap</span></a>
+    <a href="https://github.com/Gyuri1999/netwatch/releases/latest/download/NetWatch.dmg"><span class="os">🍎</span><b>macOS</b><span>NetWatch.dmg · universal (Intel + Apple Silicon)</span></a>
+    <a href="https://github.com/Gyuri1999/netwatch/releases/latest/download/NetWatch-android.apk"><span class="os">🤖</span><b>Android</b><span>NetWatch-android.apk</span></a>
+    <a href="https://github.com/Gyuri1999/netwatch#readme"><span class="os">🐳</span><b>Docker / Linux</b><span>docker compose up · οδηγίες στο GitHub</span></a>
+  </div>
+  <p class="note">Το Windows app δεν είναι ακόμη code-signed (το SmartScreen ρωτά μία φορά → «More info → Run anyway»). Το macOS app είναι ad-hoc signed (πρώτη φορά: δεξί κλικ → Άνοιγμα). Κάθε έκδοση έχει <a href="https://github.com/Gyuri1999/netwatch/releases/latest" style="color:var(--cyan)">SHA256SUMS</a> για επαλήθευση.</p>
+  <div class="safe" style="margin-top:34px">
+    <div class="ic">🔒</div><div style="flex:1;min-width:240px"><b>Αμυντικό & μόνο ανάγνωση.</b> Το NetWatch ακούει παθητικά και εξηγεί — <b>ποτέ</b> δεν κάνει επιθέσεις, δεν δοκιμάζει κωδικούς και δεν «οπλίζει» τίποτα. Οι ενεργοί έλεγχοι γίνονται μόνο στο δικό σου LAN.</div>
+  </div>
+</div></section>
+
+<footer><div class="wrap">
+  <span>NetWatch · ανοιχτού κώδικα · φτιαγμένο από μαθητή CCNA / IoT security</span>
+  <span><a href="https://github.com/Gyuri1999/netwatch" style="color:var(--cyan)">GitHub</a> · <a href="app/" style="color:var(--cyan)">Demo</a> · <a href="app/academy.html" style="color:var(--cyan)">Academy</a></span>
+</div></footer>
+</body>
+</html>

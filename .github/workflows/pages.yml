@@ -29,8 +29,10 @@ jobs:
       - run: pip install -r requirements.txt
       - name: Record demo mode (simulated traffic)
         run: python tools/record_static_demo.py --seconds 150
-      - name: Build dist-pages/
-        run: python tools/build_static_demo.py --repo-url "https://github.com/${{ github.repository }}#readme"
+      - name: Build the live demo into dist-pages/app
+        run: python tools/build_static_demo.py --out dist-pages/app --repo-url "https://github.com/${{ github.repository }}#readme"
+      - name: Put the landing page at the site root
+        run: cp -r site/. dist-pages/
       - name: Server log (on failure)
         if: failure()
         run: cat build/static-demo/server.log || true
