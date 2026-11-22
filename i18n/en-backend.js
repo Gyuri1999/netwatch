@@ -2,6 +2,10 @@
 // health, playbooks, API errors, weekly report, CTF). Generated; see i18n/README.md for the format.
 I18N.add({
  "exact": {
+  "SMBv1 ενεργό — το παλιό πρωτόκολλο του WannaCry/EternalBlue. Κλείσ' το (Windows: «SMB 1.0/CIFS» · NAS: ρυθμίσεις SMB → ελάχιστο SMBv2).": "SMBv1 enabled — the old protocol behind WannaCry/EternalBlue. Turn it off (Windows: “SMB 1.0/CIFS” · NAS: SMB settings → minimum SMBv2).",
+  "Η υπογραφή SMB δεν είναι υποχρεωτική — επιτρέπει επιθέσεις «NTLM relay». Ενεργοποίησε «απαιτείται υπογραφή» (require signing) στον server.": "SMB signing is not required — allows “NTLM relay” attacks. Turn on “require signing” on the server.",
+  "Το RDP δέχεται «standard RDP security» χωρίς NLA — ευάλωτο σε BlueKeep και σε δοκιμές κωδικών. Ενεργοποίησε το «Network Level Authentication» στις ρυθμίσεις απομακρυσμένης επιφάνειας.": "RDP accepts “standard RDP security” without NLA — vulnerable to BlueKeep and password guessing. Turn on “Network Level Authentication” in the remote desktop settings.",
+  "Ο RDP server δεν δέχεται TLS/NLA — μόνο παλιό «standard RDP security». Αναβάθμισε και ενεργοποίησε το «Network Level Authentication».": "The RDP server does not accept TLS/NLA — only old “standard RDP security”. Upgrade and turn on “Network Level Authentication”.",
   "Υπολογιστής ή Raspberry Pi": "Computer or Raspberry Pi",
   "Οποιοδήποτε Linux/Mac/Windows με Python 3 — π.χ. Pi Zero 2 W": "Any Linux/Mac/Windows with Python 3 — e.g. Pi Zero 2 W",
   "0 € (ό,τι έχεις)": "€0 (what you have)",

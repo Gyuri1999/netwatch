@@ -57,8 +57,15 @@ DEMO_SCAN = {  # «αποτελέσματα» σάρωσης για το demo (�
     "192.168.1.30": ("c0:56:e3:30:30:30", [(23, "\xff\xfd\x01BusyBox v1.19.4 built-in shell\r\nipcam login:"),
                                            (80, "HTTP/1.0 200 OK\r\nServer: GoAhead-Webs"), (554, "RTSP/1.0 200 OK")]),
     "192.168.1.40": ("00:1e:0b:40:40:40", [(21, "220 (vsFTPd 2.3.4)"), (80, "HTTP/1.1 200 OK\r\nServer: Apache/2.2.15"),
-                                           (631, ""), (9100, "")]),
-    "192.168.1.77": ("de:ad:be:ef:77:77", [(22, "SSH-2.0-OpenSSH_7.4"), (4444, "")]),
+                                           (445, ""), (631, ""), (9100, "")]),
+    "192.168.1.77": ("de:ad:be:ef:77:77", [(22, "SSH-2.0-OpenSSH_7.4"), (3389, ""), (4444, "")]),
+}
+
+DEMO_SVCFIND = {  # 🔎 demo: ευρήματα ασφαλούς απαρίθμησης (SMB/RDP)
+    ("192.168.1.40", 445): [("high", "SMBv1 ενεργό — το παλιό πρωτόκολλο του WannaCry/EternalBlue. Κλείσ' το "
+                                     "(Windows: «SMB 1.0/CIFS» · NAS: ρυθμίσεις SMB → ελάχιστο SMBv2).")],
+    ("192.168.1.77", 3389): [("med", "Το RDP δέχεται «standard RDP security» χωρίς NLA — ευάλωτο σε BlueKeep και σε δοκιμές "
+                                     "κωδικών. Ενεργοποίησε το «Network Level Authentication» στις ρυθμίσεις απομακρυσμένης επιφάνειας.")],
 }
 DEMO_TLS = {("192.168.1.1", 443): {"version": "TLSv1", "subject": "CN=router.home", "issuer": "CN=router.home",
                                    "not_after": "Jan  1 00:00:00 2021 GMT", "days_left": -2100,
@@ -85,6 +92,8 @@ def demo_scan(set_state):
             sv = {"port": p, "banner": banner, "product": prod, "version": ver}
             if (ip, p) in DEMO_TLS:
                 sv["tls"] = DEMO_TLS[(ip, p)]
+            if (ip, p) in DEMO_SVCFIND:
+                sv["findings"] = list(DEMO_SVCFIND[(ip, p)])
             svcs.append(sv)
         hosts.append({"ip": ip, "mac": mac, "services": svcs})
     return hosts
