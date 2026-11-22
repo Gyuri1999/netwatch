@@ -161,7 +161,8 @@ def test_parse_matches_scapy_layout():
     theirs = bytearray(bytes(pkt))
     theirs[56:58] = b"\x00\x00"              # checksum: ο δικός μας κατασκευαστής το αφήνει 0
     assert bytes(theirs) == mine             # ο χειροποίητος κατασκευαστής των tests συμφωνεί byte προς byte με το scapy
-    d = (sc.Ether(src=BAD_MAC) / sc.IPv6(src=BAD_LL, dst="fe80::1") / sc.UDP(sport=547, dport=546) / sc.DHCP6_Advertise(trid=1))
+    # σταθερή MAC προορισμού: αλλιώς στα Windows χωρίς npcap το scapy προσπαθεί να τη «λύσει» (L2) και σκάει
+    d = (sc.Ether(src=BAD_MAC, dst="33:33:00:01:00:02") / sc.IPv6(src=BAD_LL, dst="fe80::1") / sc.UDP(sport=547, dport=546) / sc.DHCP6_Advertise(trid=1))
     assert v.dhcp6_type(bytes(d)) == 2
 
 
