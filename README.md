@@ -2,7 +2,7 @@
 
 **A live network-traffic map and intrusion-detection sensor in a single Python file.** Every packet on your network becomes an animated arc on a world map. NetWatch watches for scans, brute force, man-in-the-middle attacks, DoS, **C2 beaconing, DNS tunneling, DGA malware** and **known-bad IPs from threat-intel feeds**. It maps each alert to **MITRE ATT&CK**, keeps a SQLite history, can notify you on macOS or Telegram, and gives you OSINT on every IP it sees.
 
-**▶ [Live online demo](https://gyuri1999.github.io/netwatch/)** (simulated traffic, runs in the browser) · **📚 [Academy](https://gyuri1999.github.io/netwatch/academy.html)**
+**🌐 [Website](https://gyuri1999.github.io/netwatch/)** · **▶ [Live online demo](https://gyuri1999.github.io/netwatch/app/)** (simulated traffic, runs in the browser) · **📚 [Academy](https://gyuri1999.github.io/netwatch/app/academy.html)**
 
 **⬇ [Download the latest release](https://github.com/Gyuri1999/netwatch/releases/latest)**: [Windows 10/11 (`NetWatch-windows-x64.zip`)](https://github.com/Gyuri1999/netwatch/releases/latest/download/NetWatch-windows-x64.zip) · [macOS (`NetWatch.dmg`)](https://github.com/Gyuri1999/netwatch/releases/latest/download/NetWatch.dmg) · [Android companion (`NetWatch-android.apk`)](https://github.com/Gyuri1999/netwatch/releases/latest/download/NetWatch-android.apk)
 
