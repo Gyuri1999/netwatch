@@ -3,7 +3,8 @@
 Ένα κοινό «πρωτόκολλο αισθητήρα» για όλα:
   POST https://<NetWatch>:8790/probe/v1/report      Authorization: Bearer <token>
   {"status": {"fw", "hw", "ip", "mac", "uptime", "heap", "rssi", "batt", "temp", "hum", "interval", "metrics", "link"},
-   "events": [{"type": "vlan_leak" | "outage" | "dhcp_rogue" | "temp_high" | "door_open" | …, "detail": "…", "data": {…}}]}
+   "events": [{"type": "vlan_leak" | "outage" | "dhcp_rogue" | "temp_high" | "door_open" | …, "detail": "…", "data": {…}}],
+   "items":  [{…}, …]}      προαιρετικό: έως 80 απλές γραμμές (συσκευές BLE, κόμβοι Zigbee/LoRa) — αντικαθιστά την προηγούμενη λίστα
 
 Ασφάλεια:
   • Ξεχωριστή θύρα μόνο για αισθητήρες (όχι το UI), HTTPS με το self-signed πιστοποιητικό του NetWatch.
@@ -31,27 +32,40 @@ import qr
 PORT = 8790  # έξω από τις 8765–8784 που δοκιμάζει το UI
 MAX_BODY = 16 * 1024
 MAX_PROBES = 64
+MAX_ITEMS = 80  # γραμμές «items» ανά αναφορά (BLE/Zigbee/LoRa)· κάθε γραμμή έως 12 απλά πεδία
 RATE = 60  # αιτήματα / λεπτό / IP
 ID_RX = re.compile(r"^p-[0-9a-f]{6,12}$")
 
 KINDS = {  # τι μπορείς να συνδέσεις — «ready» = υπάρχει έτοιμο λογισμικό
     "pc": {"icon": "💻", "title": "Υπολογιστής ή Raspberry Pi", "hw": "Οποιοδήποτε Linux/Mac/Windows με Python 3 — π.χ. Pi Zero 2 W",
-           "price": "0 € (ό,τι έχεις)", "ready": True,
+           "price": "0 € (ό,τι έχεις)", "ready": True, "fw": "tools/netwatch_probe.py",
            "what": "Αναφέρει ότι είναι ζωντανός, IP, φόρτο, και αν «βλέπει» το router — έτσι μαθαίνεις για διακοπές σε άλλο δωμάτιο ή VLAN."},
     "vlan": {"icon": "🧱", "title": "Αισθητήρας VLAN (ESP32)", "hw": "Οποιοδήποτε ESP32", "price": "~5 €", "ready": False,
              "what": "Από το Wi-Fi επισκεπτών/IoT ελέγχει αν φτάνει στο κύριο δίκτυο — αν ναι, χάλασε ο διαχωρισμός."},
-    "field": {"icon": "🔌", "title": "Tester τσέπης", "hw": "Pi Zero 2 W + USB-Ethernet ή Olimex ESP32-POE", "price": "~25 €",
-              "ready": False, "what": "Βάζεις καλώδιο → switch, θύρα, VLAN, DHCP, PoE, internet σε δευτερόλεπτα."},
+    "field": {"icon": "🔌", "title": "Tester τσέπης", "hw": "Olimex ESP32-POE ή Raspberry Pi", "price": "~25 €",
+              "ready": True, "fw": "firmware/esp32-poe", "fw2": "tools/fieldbox",
+              "what": "Βάζεις καλώδιο → switch, θύρα, VLAN, DHCP, PoE, internet σε δευτερόλεπτα."},
     "wifi": {"icon": "📶", "title": "Κάλυψη Wi-Fi (ESP32)", "hw": "ESP32 ανά δωμάτιο", "price": "~5 € / δωμάτιο", "ready": False,
              "what": "Σήμα του router και πόσο γεμάτο είναι το κανάλι, ανά δωμάτιο."},
-    "rack": {"icon": "🌡", "title": "Rack: θερμοκρασία & πόρτα", "hw": "ESP32 + BME280 + μαγνητική επαφή", "price": "~10 €",
-             "ready": False, "what": "Ζέστη/υγρασία στο ντουλάπι δικτύου και ποιος άνοιξε την πόρτα του."},
+    "rack": {"icon": "🌡", "title": "Rack: θερμοκρασία, ρεύμα, νερό & πόρτα",
+             "hw": "ESP32 + SHT31 + μαγνητική επαφή + αισθητήρας νερού + PZEM-004T (προαιρετικά)", "price": "~15–25 €",
+             "ready": True, "fw": "firmware/esp32-rack",
+             "what": "Ζέστη/υγρασία στο ντουλάπι δικτύου, διακοπή ρεύματος, διαρροή νερού και ποιος άνοιξε την πόρτα του."},
+    "ble": {"icon": "🔵", "title": "Σαρωτής Bluetooth (ESP32)", "hw": "Οποιοδήποτε ESP32 με BLE (π.χ. ESP32-C3)", "price": "~5 €",
+            "ready": True, "fw": "firmware/esp32-ble",
+            "what": "Ποιες συσκευές Bluetooth εκπέμπουν γύρω από το δίκτυο — και αν κάποιο άγνωστο tracker (τύπου AirTag) μένει κοντά — καρτέλα 📻 Ασύρματα IoT."},
+    "zigbee": {"icon": "🐝", "title": "Sniffer Zigbee / Thread", "hw": "nRF52840 USB dongle σε Raspberry Pi ή υπολογιστή", "price": "~12 €",
+               "ready": True, "fw": "tools/zigbee_sniff.py",
+               "what": "Ποια κανάλια 802.15.4 είναι γεμάτα, ποια δίκτυα (PAN) υπάρχουν και πού το σήμα είναι αδύναμο — καρτέλα 📻 Ασύρματα IoT."},
+    "lora": {"icon": "🛰", "title": "Πύλη LoRa (ESP32)", "hw": "ESP32 + SX1276/SX1262 (π.χ. TTGO LoRa32, Heltec) + κόμβοι LoRa", "price": "~20 € + ~12 € / κόμβο",
+             "ready": True, "fw": "firmware/esp32-lora-gw", "fw2": "firmware/esp32-lora-node",
+             "what": "Αισθητήρες μακριά από το Wi-Fi (αποθήκη, αντλιοστάσιο, χωράφι): σήμα, μπαταρία και πότε μίλησαν τελευταία — καρτέλα 📻 Ασύρματα IoT."},
     "sentinel": {"icon": "📡", "title": "Sentinel: ασφάλεια Wi-Fi (ESP32)", "hw": "ESP32 + Mosquitto (MQTT/TLS)", "price": "~5 €",
                  "ready": True, "mqtt": True, "what": "Deauth flood, evil twin, ψεύτικα access points — καρτέλα 📡 Αισθητήρες."},
     "canary": {"icon": "🍯", "title": "Canary: ψεύτικη κάμερα-παγίδα (ESP32)", "hw": "ESP32 + Mosquitto (MQTT/TLS)", "price": "~5 €",
                "ready": True, "mqtt": True, "what": "Όποιος της μιλήσει σκανάρει το δίκτυό σου — καρτέλα 📡 Αισθητήρες."},
 }
-PAIRABLE = ("pc", "vlan", "field", "wifi", "rack")
+PAIRABLE = ("pc", "vlan", "field", "wifi", "rack", "ble", "zigbee", "lora")
 
 EVENTS = {  # γεγονός αισθητήρα → (τίτλος ειδοποίησης, σοβαρότητα)· άγνωστα μένουν μόνο στο ιστορικό
     "vlan_leak": ("Διαρροή διαχωρισμού VLAN (αισθητήρας)", "high"),
@@ -59,7 +73,16 @@ EVENTS = {  # γεγονός αισθητήρα → (τίτλος ειδοποί
     "dhcp_rogue": ("Δεύτερος DHCP server (αισθητήρας)", "high"),
     "temp_high": ("Υψηλή θερμοκρασία στο rack (αισθητήρας)", "med"),
     "door_open": ("Άνοιξε η πόρτα του rack (αισθητήρας)", "med"),
-}
+    "water_leak": ("Διαρροή νερού στο rack (αισθητήρας)", "high"),
+    "power_fail": ("Διακοπή ρεύματος στο rack (αισθητήρας)", "high"),
+    "humid_high": ("Υψηλή υγρασία στο rack (αισθητήρας)", "med"),
+    "ble_tracker": ("Bluetooth tracker κοντά (αισθητήρας)", "med"),
+    "poe_lost": ("Χάθηκε το PoE (αισθητήρας)", "med"),
+    "link_down": ("Έπεσε η σύνδεση Ethernet (αισθητήρας)", "med"),
+    "lora_node_lost": ("Κόμβος LoRa σιώπησε (αισθητήρας)", "med"),
+    "batt_low": ("Χαμηλή μπαταρία (αισθητήρας)", "low"),
+}  # «power_back», «restored» κ.ά. δεν είναι εδώ επίτηδες: μένουν σημείωση στο ιστορικό, χωρίς ειδοποίηση
+SUBKEY = ("node", "mac")  # γεγονότα ανά κόμβο/συσκευή: ξεχωριστό cooldown για τον καθένα
 STATUS_NUM = ("uptime", "heap", "rssi", "batt", "temp", "hum", "interval")
 STATUS_TXT = ("fw", "hw", "ip", "mac", "os")
 
@@ -89,6 +112,21 @@ def _flat(d, n=20):
             out[k] = v
         elif isinstance(v, str):
             out[k] = _txt(v, 60)
+    return out
+
+
+def _items(x):
+    """«items» αναφοράς → έως 80 επίπεδες γραμμές· ό,τι δεν είναι dict (ή βγαίνει άδειο) πετιέται."""
+    if not isinstance(x, list):
+        return []
+    out = []
+    for r in x[:MAX_ITEMS * 4]:  # κοιτάμε λίγο παραπάνω ώστε τα σκουπίδια να μη «τρώνε» τις καλές γραμμές
+        if isinstance(r, dict):
+            f = _flat(r, 12)
+            if f:
+                out.append(f)
+                if len(out) >= MAX_ITEMS:
+                    break
     return out
 
 
@@ -256,6 +294,8 @@ class Probes:
             lv = self.live.setdefault(pid, {"events": []})
             back = lv.get("offline_alerted")
             lv.update(status=st, seen=now, frm=ip, offline_alerted=False)
+            if "items" in j:  # κάθε αναφορά που έχει το κλειδί αντικαθιστά τη λίστα (και την αδειάζει αν είναι σκουπίδια)
+                lv["items"] = _items(j["items"])
             evs = j.get("events") if isinstance(j.get("events"), list) else []
             fresh = []
             for e in evs[:10]:
@@ -289,8 +329,25 @@ class Probes:
             return
         typ, sev = m
         actor = ev["data"].get("src") if isinstance(ev["data"].get("src"), str) and is_private(ev["data"].get("src")) else ip
+        sub = next((str(ev["data"][k]) for k in SUBKEY if isinstance(ev["data"].get(k), (str, int)) and not isinstance(ev["data"].get(k), bool)), None)
         st.alert(typ, sev, actor, f"αισθητήρας {name}", ev["detail"] or typ, ev["t"],
-                 key=("probe", pid, ev["type"]), cooldown=600, mark=False)
+                 key=("probe", pid, ev["type"]) + ((sub[:40],) if sub else ()), cooldown=600, mark=False)
+
+    def items(self, kind=None):
+        """Οι λίστες «items» των αισθητήρων (BLE/Zigbee/LoRa) — τις διαβάζει η καρτέλα 📻 Ασύρματα IoT.
+        → [{"id", "name", "kind", "seen", "items", "metrics"}], μόνο όσοι έχουν στείλει αναφορά."""
+        if self.demo:
+            self._demo_tick(self.clock())
+        out = []
+        with self.lock:
+            for pid, p in self.reg.items():
+                lv = self.live.get(pid)
+                if (kind and p["kind"] != kind) or not lv or not lv.get("seen"):
+                    continue
+                out.append({"id": pid, "name": p["name"], "kind": p["kind"], "seen": lv["seen"],
+                            "items": [dict(r) for r in lv.get("items") or []],
+                            "metrics": dict((lv.get("status") or {}).get("metrics") or {})})
+        return out
 
     def check_offline(self):
         """Αισθητήρας που χάθηκε (3× το διάστημά του, τουλάχιστον 3′) → μία ειδοποίηση."""
@@ -375,7 +432,8 @@ class Probes:
                 seen = lv.get("seen")
                 state = "waiting" if not seen else "online" if now - seen <= max(90, 2.5 * iv) else "offline"
                 out.append({"id": pid, "name": p["name"], "kind": p["kind"], "created": p["created"], "state": state,
-                            "seen": seen, "ip": lv.get("frm"), "status": st, "events": (lv.get("events") or [])[-8:][::-1]})
+                            "seen": seen, "ip": lv.get("frm"), "status": st, "items_n": len(lv.get("items") or []),
+                            "events": (lv.get("events") or [])[-8:][::-1]})
         out.sort(key=lambda x: ({"offline": 0, "online": 1, "waiting": 2}[x["state"]], x["name"].lower()))
         mq = []
         sb = getattr(self.state, "sensor", None) if self.state is not None else None
@@ -404,12 +462,24 @@ class Probes:
         self.enabled = True
         t = self.clock()
         for pid, name, kind in (("p-a1b2c3", "Pi Zero · γραφείο", "pc"), ("p-d4e5f6", "ESP32 · Wi-Fi επισκεπτών", "vlan"),
-                                ("p-0a0b0c", "ESP32 · rack", "rack")):
+                                ("p-0a0b0c", "ESP32 · rack", "rack"), ("p-f1e1d1", "ESP32-POE · tester τσέπης", "field"),
+                                ("p-b1e001", "ESP32 · BLE γραφείο", "ble"), ("p-2b0154", "Pi + nRF52840 · αποθήκη", "zigbee"),
+                                ("p-10fa01", "LoRa πύλη · ταράτσα", "lora")):
             self.reg[pid] = {"name": name, "kind": kind, "hash": _h(pid), "created": t - 86400 * 3}
         self.live["p-d4e5f6"] = {"events": [
             {"t": t - 7200, "type": "vlan_check", "detail": "Το Wi-Fi επισκεπτών ΔΕΝ φτάνει στο 192.168.1.0/24 ✔", "data": {}}]}
         self.live["p-0a0b0c"] = {"events": [
+            {"t": t - 9000, "type": "power_fail", "detail": "Χάθηκε η τάση στο rack (PZEM: 0 V)", "data": {"volt": 0}},
+            {"t": t - 8760, "type": "power_back", "detail": "Το ρεύμα επανήλθε μετά από 4′ (231 V)", "data": {"volt": 231.2}},
             {"t": t - 5400, "type": "door_open", "detail": "Άνοιξε η πόρτα του rack", "data": {}}]}
+        self.live["p-f1e1d1"] = {"events": [
+            {"t": t - 240, "type": "link_up", "detail": "Πρίζα 2.14: 1000 Mbps full · sw-floor2 Gi1/0/14 · VLAN 20 · PoE ✔", "data": {}}]}
+        self.live["p-b1e001"] = {"events": [
+            {"t": t - 4200, "type": "ble_tracker", "detail": "Tracker τύπου Find My εκπέμπει κοντά εδώ και 2 ώρες",
+             "data": {"mac": "d3:5a:91:0c:44:e2", "kind": "findmy"}}]}
+        self.live["p-2b0154"] = {"events": []}
+        self.live["p-10fa01"] = {"events": [
+            {"t": t - 2600, "type": "batt_low", "detail": "Κόμβος αντλιοστάσιο: μπαταρία 3.21 V", "data": {"node": "pump-03"}}]}
 
     def _demo_tick(self, now):
         import random
@@ -420,9 +490,42 @@ class Probes:
             self.live["p-d4e5f6"].update(seen=now - random.randint(5, 50), frm="192.168.50.12", status={
                 "fw": "0.9.0", "hw": "ESP32-C3", "ip": "192.168.50.12", "uptime": 86400 + int(now) % 3600, "heap": 182000,
                 "rssi": random.randint(-66, -58), "interval": 60, "metrics": {"lan_reachable": False, "gw_ms": 4.1}, "link": {}})
-            self.live["p-0a0b0c"].update(seen=now - 900, frm="192.168.1.61", status={
-                "fw": "0.9.0", "hw": "ESP32 + BME280", "ip": "192.168.1.61", "uptime": 3600 * 5, "heap": 190000, "rssi": -71,
-                "temp": 31.5, "hum": 38, "interval": 60, "metrics": {"door": "closed"}, "link": {}})
+            watt = round(random.uniform(182, 196), 1)
+            self.live["p-0a0b0c"].update(seen=now - random.randint(5, 40), frm="192.168.1.61", status={
+                "fw": "1.0.0", "hw": "ESP32 + SHT31 + PZEM-004T", "ip": "192.168.1.61", "uptime": 3600 * 5 + int(now) % 600, "heap": 190000, "rssi": -71,
+                "temp": 31.5, "hum": 38, "interval": 60, "link": {},
+                "metrics": {"volt": 231.4, "amp": round(watt / 231.4 / 0.93, 2), "watt": watt, "kwh": 412.7, "freq": 50.0, "pf": 0.93,
+                            "door": False, "leak": False}})
+            self.live["p-f1e1d1"].update(seen=now - random.randint(5, 25), frm="192.168.20.57", status={
+                "fw": "1.0.0", "hw": "Olimex ESP32-POE", "ip": "192.168.20.57", "mac": "a8:03:2a:6f:10:c4", "uptime": 240, "heap": 201000, "interval": 30,
+                "metrics": {"gw_ms": 1.4, "inet_ms": 18.2},
+                "link": {"up": True, "speed": 1000, "duplex": "full", "poe": True, "dhcp_ms": 420, "gw": "192.168.20.1", "dns": "192.168.20.1",
+                         "mask": "255.255.255.0", "vlan": 20, "lldp_sw": "sw-floor2", "lldp_port": "Gi1/0/14"}})
+            ble = [("d3:5a:91:0c:44:e2", -61, "", 76, "", "1219a3f1c2d4e5f60718293a", True, False),
+                   ("f4:b8:5e:2a:91:07", -55, "Galaxy Watch5", 117, "", "0100020003", False, True),
+                   ("a4:c1:38:5b:0e:9d", -72, "LYWSD03MMC", -1, "fe95", "", False, True),
+                   ("c8:2e:47:10:aa:31", -78, "", 76, "", "0215b9407f30f5f8466eaff9", True, False),
+                   ("e7:1c:0b:93:5d:12", -83, "Tile", -1, "feed", "", True, True),
+                   ("5c:f3:70:8a:22:4b", -66, "Ruuvi 224B", 1177, "", "0512fc5394c37c0004fffc04", True, False)]
+            self.live["p-b1e001"].update(seen=now - random.randint(5, 40), frm="192.168.1.62", items=[
+                {"mac": m, "rssi": r + random.randint(-2, 2), "name": n, "mfr": mf, "svc": sv, "ad": ad, "rnd": rnd, "conn": cn}
+                for m, r, n, mf, sv, ad, rnd, cn in ble], status={
+                "fw": "1.0.0", "hw": "ESP32-C3", "ip": "192.168.1.62", "uptime": 86400 * 4 + int(now) % 3600, "heap": 151000, "rssi": -58,
+                "interval": 60, "metrics": {"seen": 23}, "link": {}})
+            zb = [(11, "1a62", "0000", -48, 212, 96, "beacon"), (11, "1a62", "3f2c", -71, 148, 41, "data"), (11, "1a62", "a91e", -88, 44, 17, "data"),
+                  (11, "1a62", "7b05", -64, 180, 63, "data"), (20, "d0c5", "0000", -59, 196, 38, "data"), (20, "d0c5", "5e11", -67, 160, 22, "data"),
+                  (25, "face", "00124b0024c1a7f3", -76, 120, 9, "data")]
+            self.live["p-2b0154"].update(seen=now - random.randint(5, 30), frm="192.168.1.63", items=[
+                {"ch": c, "pan": p, "src": a, "rssi": r, "lqi": q, "n": n, "t": ty} for c, p, a, r, q, n, ty in zb], status={
+                "fw": "1.0.0", "hw": "Raspberry Pi 4 + nRF52840 dongle", "os": "Raspberry Pi OS 12", "ip": "192.168.1.63", "uptime": 86400 * 6,
+                "interval": 60, "metrics": dict({"ch%d" % c: 0 for c in range(11, 27)}, ch11=217, ch15=3, ch20=60, ch25=9), "link": {}})
+            lora = [("silo-01", -92, 8.5, 3.94, 17.5, 61, False, 140, 2211), ("gate-02", -104, 3.2, 3.71, 14.2, 70, False, 410, 987),
+                    ("pump-03", -121, -9.5, 3.21, 12.8, 82, False, 1620, 455)]
+            self.live["p-10fa01"].update(seen=now - random.randint(5, 40), frm="192.168.1.64", items=[
+                {"node": n, "rssi": r, "snr": s, "batt": b, "temp": te, "hum": h, "door": d, "age": a, "seq": q}
+                for n, r, s, b, te, h, d, a, q in lora], status={
+                "fw": "1.0.0", "hw": "TTGO LoRa32 (SX1276)", "ip": "192.168.1.64", "uptime": 86400 * 9, "heap": 167000, "rssi": -63,
+                "interval": 60, "metrics": {"nodes": 3, "freq": 868.1, "sf": 9, "bw": 125}, "link": {}})
 
 
 class _ProbeServer(ThreadingHTTPServer):

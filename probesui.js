@@ -41,19 +41,61 @@
   const MET = { gw_ms: ['router', v => v == null ? '✖' : v + ' ms'], gw_ok: null, load: [T('φόρτος', 'load'), v => v], mem_free_mb: [T('ελεύθερη RAM', 'free RAM'), v => v + ' MB'],
     lan_reachable: [T('φτάνει στο LAN', 'reaches LAN'), v => v ? T('ΝΑΙ ⚠', 'YES ⚠') : T('όχι ✔', 'no ✔')], door: [T('πόρτα', 'door'), v => v === 'closed' ? T('κλειστή', 'closed') : v === 'open' ? T('ανοιχτή', 'open') : v] };
 
-  function chips(st) {
+  // ── κατάσταση ανά τύπο αισθητήρα (rack / tester / BLE-Zigbee-LoRa) ──
+  const chip = (x, col) => `<span class="fl-chip"${col ? ` style="color:${col};background:color-mix(in srgb,${col} 14%,transparent)"` : ''}>${x}</span>`;
+  const has = (o, k) => o[k] !== undefined && o[k] !== null && o[k] !== '';
+  const RACK_KEYS = ['volt', 'amp', 'watt', 'kwh', 'freq', 'pf', 'door', 'leak'];
+  const LINK_KEYS = ['up', 'speed', 'duplex', 'poe', 'dhcp_ms', 'gw', 'dns', 'mask', 'vlan', 'lldp_sw', 'lldp_port'];
+  function rackChips(st) {
+    const m = st.metrics || {}, c = [];
+    if (st.temp != null) c.push(chip('🌡 ' + E(st.temp) + '°C', st.temp >= 35 ? 'var(--red)' : st.temp >= 30 ? 'var(--orange)' : ''));
+    if (st.hum != null) c.push(chip('💧 ' + E(st.hum) + '%', st.hum >= 70 ? 'var(--orange)' : ''));
+    if (has(m, 'volt')) c.push(chip('⚡ ' + E(m.volt) + ' V', m.volt < 195 || m.volt > 253 ? 'var(--red)' : 'var(--green)'));
+    if (has(m, 'watt')) c.push(chip(E(m.watt) + ' W' + (has(m, 'amp') ? ' · ' + E(m.amp) + ' A' : '')));
+    if (has(m, 'kwh')) c.push(chip(E(m.kwh) + ' kWh'));
+    if (has(m, 'freq')) c.push(chip(E(m.freq) + ' Hz' + (has(m, 'pf') ? ' · PF ' + E(m.pf) : '')));
+    if (has(m, 'door')) { const open = m.door === true || m.door === 'open'; c.push(chip('🚪 ' + (open ? T('πόρτα ανοιχτή', 'door open') : T('πόρτα κλειστή', 'door closed')), open ? 'var(--orange)' : '')); }
+    if (has(m, 'leak')) c.push(chip(m.leak === true ? '💦 ' + T('ΝΕΡΟ!', 'WATER!') : '💦 ' + T('στεγνό', 'dry'), m.leak === true ? 'var(--red)' : ''));
+    return c.join('');
+  }
+  function linkChips(st) {
+    const l = st.link || {}, m = st.metrics || {}, c = [];
+    if (has(l, 'up')) c.push(chip(l.up ? '🔗 ' + T('link πάνω', 'link up') : '🔗 ' + T('χωρίς link', 'no link'), l.up ? 'var(--green)' : 'var(--red)'));
+    if (has(l, 'speed')) c.push(chip(E(l.speed) + ' Mbps' + (l.duplex ? ' ' + E(l.duplex) : ''), l.duplex === 'half' || l.speed < 100 ? 'var(--orange)' : ''));
+    if (has(l, 'poe')) c.push(chip(l.poe ? 'PoE ✔' : T('χωρίς PoE', 'no PoE'), l.poe ? 'var(--green)' : ''));
+    if (has(l, 'lldp_sw') || has(l, 'lldp_port')) c.push(chip('🔀 ' + E(l.lldp_sw || '?') + (l.lldp_port ? ' · ' + E(l.lldp_port) : '')));
+    if (has(l, 'vlan')) c.push(chip('VLAN ' + E(l.vlan)));
+    if (has(l, 'dhcp_ms')) c.push(chip('DHCP ' + E(l.dhcp_ms) + ' ms', l.dhcp_ms > 3000 ? 'var(--orange)' : ''));
+    if (has(l, 'gw')) c.push(chip('gw ' + E(l.gw) + (has(m, 'gw_ms') ? ' · ' + E(m.gw_ms) + ' ms' : '')));
+    if (has(l, 'mask')) c.push(chip(E(l.mask)));
+    if (has(l, 'dns')) c.push(chip('DNS ' + E(l.dns)));
+    if (has(m, 'inet_ms')) c.push(chip('🌍 ' + E(m.inet_ms) + ' ms'));
+    return c.join('');
+  }
+  const ITEMS = { ble: ['συσκευές Bluetooth', 'Bluetooth devices'], zigbee: ['κόμβοι 802.15.4', '802.15.4 nodes'], lora: ['κόμβοι LoRa', 'LoRa nodes'] };
+  function kindRow(p) {
+    const st = p.status || {};
+    if (p.kind === 'rack') { const c = rackChips(st); return c ? `<div class="fl-chips">${c}</div>` : ''; }
+    if (p.kind === 'field') { const c = linkChips(st); return c ? `<div class="fl-chips">${c}</div>` : ''; }
+    if (ITEMS[p.kind]) return `<div class="fl-chips">${chip(`<b>${E(p.items_n || 0)}</b> ${T(...ITEMS[p.kind])}`, 'var(--cyan)')}<span class="dim" style="font-size:12.5px;align-self:center">→ ${T('δες την καρτέλα', 'see the')} <b>📻 ${T('Ασύρματα IoT', 'Wireless IoT')}</b>${EN() ? ' tab' : ''}</span></div>`;
+    return '';
+  }
+
+  function chips(st, kd) {
     const c = [];
+    const skipM = kd === 'rack' ? RACK_KEYS : kd === 'field' ? ['gw_ms', 'inet_ms'] : kd === 'zigbee' ? Array.from({ length: 16 }, (_, i) => 'ch' + (i + 11)) : [];
+    const own = kd === 'rack';
     if (st.hw) c.push(E(st.hw));
     if (st.ip) c.push('IP ' + E(st.ip));
     if (st.fw) c.push('fw ' + E(st.fw));
     if (st.uptime != null) c.push('⏱ ' + dur(st.uptime));
     if (st.rssi != null) c.push('📶 ' + E(st.rssi) + ' dBm');
-    if (st.temp != null) c.push('🌡 ' + E(st.temp) + '°C');
-    if (st.hum != null) c.push('💧 ' + E(st.hum) + '%');
+    if (st.temp != null && !own) c.push('🌡 ' + E(st.temp) + '°C');
+    if (st.hum != null && !own) c.push('💧 ' + E(st.hum) + '%');
     if (st.batt != null) c.push('🔋 ' + E(st.batt) + '%');
     if (st.heap != null) c.push(T('μνήμη ', 'heap ') + Math.round(st.heap / 1024) + ' KB');
-    for (const [k, v] of Object.entries(st.metrics || {})) { const m = MET[k]; if (m === null) continue; c.push(m ? `${m[0]} ${E(m[1](v))}` : `${E(k)} ${E(v)}`); }
-    for (const [k, v] of Object.entries(st.link || {})) c.push(`${E(k)} ${E(v)}`);
+    for (const [k, v] of Object.entries(st.metrics || {})) { const m = MET[k]; if (m === null || skipM.includes(k)) continue; c.push(m ? `${m[0]} ${E(m[1](v))}` : `${E(k)} ${E(v)}`); }
+    for (const [k, v] of Object.entries(st.link || {})) if (kd !== 'field' || !LINK_KEYS.includes(k)) c.push(`${E(k)} ${E(v)}`);
     return c.map(x => `<span class="fl-chip">${x}</span>`).join('');
   }
 
@@ -64,17 +106,37 @@
       <span class="dim" style="font-size:12px">${E(tr(k.title))} · ${T('τελευταία αναφορά', 'last report')} ${ago(p.seen)}${p.ip ? ' · ' + E(p.ip) : ''}</span>
       <span style="flex:1"></span><button class="b" data-fl="rename" data-id="${E(p.id)}" title="${T('Μετονομασία', 'Rename')}">✏</button><button class="b" data-fl="remove" data-id="${E(p.id)}" title="${T('Αφαίρεση (ακυρώνει το token)', 'Remove (revokes the token)')}">🗑</button></div>
       ${p.state === 'waiting' ? `<div class="dim" style="font-size:12.5px;margin-top:6px">${T('Περάστε τον κωδικό σύζευξης στη συσκευή — θα εμφανιστεί εδώ με την πρώτη αναφορά.', 'Enter the pairing code on the device — it appears here with its first report.')}</div>` : ''}
-      <div class="fl-chips">${chips(p.status || {})}</div>
+      ${kindRow(p)}
+      <div class="fl-chips">${chips(p.status || {}, p.kind)}</div>
       ${(p.events || []).length ? `<div style="margin-top:6px">${p.events.map(e => `<div class="fl-ev"><span class="dim">${ago(e.t)}</span> · <b>${E(e.type)}</b> ${E(tr(e.detail))}</div>`).join('')}</div>` : ''}</div>`;
   }
 
+  // 3 βήματα ανά τύπο: (1) βάλε το λογισμικό, (2) πέρασε τον κωδικό, (3) πού βλέπεις το αποτέλεσμα
+  const esp = (fw, extra) => `<li>${T('Γράψε στο ESP32 το firmware από τον φάκελο', 'Flash the ESP32 with the firmware in')} <code>${E(fw)}</code> ${T('(PlatformIO: <code>pio run -t upload</code> μέσα στον φάκελο — οδηγίες στο README του).', '(PlatformIO: <code>pio run -t upload</code> inside the folder — see its README).')}${extra || ''}</li>
+      <li>${T('Στην πρώτη εκκίνηση ανοίγει Wi-Fi <b>«NetWatch-Setup»</b>: συνδέσου, διάλεξε το Wi-Fi σου και επικόλλησε τον κωδικό σύζευξης (πάτα <b>📋 Αντιγραφή</b> εδώ ή σκάναρε το QR).', 'On first boot it opens the <b>“NetWatch-Setup”</b> Wi-Fi: join it, pick your Wi-Fi and paste the pairing code (press <b>📋 Copy</b> here or scan the QR).')}</li>`;
+  const tab = (ico, el, en) => `<b>${ico} ${T(el, en)}</b>`;
   function steps(kd, code) {
+    const k = kind(kd), fw = k.fw || '', fw2 = k.fw2 || '';
     if (kd === 'pc') return `<ol>
       <li>${T('Στον Pi / υπολογιστή κατέβασε το', 'On the Pi / computer get')} <code>tools/netwatch_probe.py</code> ${T('(ένα αρχείο, χωρίς εξαρτήσεις — Python 3).', '(single file, no dependencies — Python 3).')}</li>
       <li>${T('Πάτα <b>📋 Αντιγραφή</b> εδώ και μετά τρέξε', 'Press <b>📋 Copy</b> here, then run')} <code>python3 netwatch_probe.py pair</code> ${T('— παίρνει μόνο του τον κωδικό από το clipboard (σε άλλο υπολογιστή: σου ζητά να τον επικολλήσεις).', '— it takes the code from the clipboard by itself (on another computer it asks you to paste it).')}</li>
       <li>${T('Για να τρέχει πάντα:', 'To keep it running:')} <code>python3 netwatch_probe.py --systemd</code> ${T('και ακολούθησε τη γραμμή στο τέλος.', 'and follow the last line.')}</li></ol>`;
+    if (kd === 'zigbee') return `<ol>
+      <li>${T('Γράψε στο nRF52840 dongle το firmware <b>nRF Sniffer for 802.15.4</b> της Nordic (με το nRF Connect → Programmer) και βάλ\' το σε Raspberry Pi ή υπολογιστή.', 'Flash the nRF52840 dongle with Nordic’s <b>nRF Sniffer for 802.15.4</b> firmware (nRF Connect → Programmer) and plug it into a Raspberry Pi or computer.')}</li>
+      <li>${T('Εκεί κατέβασε το', 'There, get')} <code>${E(fw)}</code>, ${T('πάτα <b>📋 Αντιγραφή</b> εδώ και τρέξε', 'press <b>📋 Copy</b> here and run')} <code>python3 zigbee_sniff.py pair</code> ${T('(χρειάζεται <code>pip install pyserial</code> σε Windows).', '(needs <code>pip install pyserial</code> on Windows).')}</li>
+      <li>${T('Για να τρέχει πάντα:', 'To keep it running:')} <code>python3 zigbee_sniff.py --systemd</code>. ${T('Κανάλια, δίκτυα και αδύναμα σημεία φαίνονται στην καρτέλα', 'Channels, networks and weak spots appear in the')} ${tab('📻', 'Ασύρματα IoT', 'Wireless IoT')}${EN() ? ' tab' : ''}. ${T('Δεν αποκρυπτογραφεί ούτε κρατά περιεχόμενο.', 'It never decrypts or stores payloads.')}</li></ol>`;
+    if (kd === 'rack') return `<ol>${esp(fw, T(' Καλωδίωση: SHT31 σε I²C, επαφή πόρτας και αισθητήρας νερού σε GPIO, PZEM-004T σε UART (προαιρετικά).', ' Wiring: SHT31 on I²C, door contact and water sensor on GPIOs, PZEM-004T on UART (optional).'))}
+      <li>${T('Στερέωσέ το ψηλά μέσα στο rack, τον αισθητήρα νερού στο πάτωμα. Θερμοκρασία, ρεύμα, πόρτα και διαρροή φαίνονται εδώ· τα σοβαρά γίνονται ειδοποιήσεις.', 'Mount it high inside the rack, the water sensor on the floor. Temperature, power, door and leak show up here; the serious ones become alerts.')}</li></ol>`;
+    if (kd === 'field') return `<ol>${esp(fw, fw2 ? ` ${T('Με Raspberry Pi αντί για ESP32: δες', 'With a Raspberry Pi instead of an ESP32: see')} <code>${E(fw2)}</code>.` : '')}
+      <li>${T('Βάλε το καλώδιο της πρίζας που ελέγχεις: σε δευτερόλεπτα βλέπεις εδώ switch/θύρα (LLDP), VLAN, DHCP, PoE και internet — και στην καρτέλα', 'Plug in the cable of the socket you are testing: in seconds you see switch/port (LLDP), VLAN, DHCP, PoE and internet here — and in the')} ${tab('🔌', 'Πρίζα', 'Socket')}${EN() ? ' tab' : ''}.</li></ol>`;
+    if (kd === 'ble') return `<ol>${esp(fw)}
+      <li>${T('Βάλ\' το σε πρίζα USB κοντά στον χώρο που σε ενδιαφέρει (ένα ανά δωμάτιο δίνει και «πού περίπου»). Συσκευές και άγνωστα trackers φαίνονται στην καρτέλα', 'Power it from USB near the area you care about (one per room also gives a rough “where”). Devices and unknown trackers appear in the')} ${tab('📻', 'Ασύρματα IoT', 'Wireless IoT')}${EN() ? ' tab' : ''}.</li></ol>`;
+    if (kd === 'lora') return `<ol>${esp(fw, fw2 ? ` ${T('Στους κόμβους (αισθητήρες με μπαταρία) γράψε το', 'Flash the nodes (battery sensors) with')} <code>${E(fw2)}</code> ${T('— ίδια συχνότητα/SF με την πύλη.', '— same frequency/SF as the gateway.')}` : '')}
+      <li>${T('Βάλε την πύλη ψηλά, με την κεραία κατακόρυφη. Σήμα, μπαταρία και σιωπηλοί κόμβοι φαίνονται στην καρτέλα', 'Put the gateway up high with the antenna vertical. Signal, battery and silent nodes appear in the')} ${tab('📻', 'Ασύρματα IoT', 'Wireless IoT')}${EN() ? ' tab' : ''}.</li></ol>`;
+    if (fw) return `<ol>${esp(fw)}<li>${T('Η συσκευή εμφανίζεται εδώ με την πρώτη της αναφορά.', 'The device appears here with its first report.')}</li></ol>`;
     return `<ol><li>${T('Το firmware για αυτή τη συσκευή είναι το επόμενο βήμα του NetWatch. Κράτα τον κωδικό — θα τον περάσεις στη σελίδα ρύθμισης του ESP32 (Wi-Fi «NetWatch-Setup»).', 'The firmware for this device is NetWatch’s next step. Keep the code — you will enter it on the ESP32 setup page (Wi-Fi “NetWatch-Setup”).')}</li>
-      <li>${T('Μέχρι τότε μπορείς να δοκιμάσεις με το', 'Until then you can test with')} <code>tools/netwatch_probe.py</code> ${T('σε οποιονδήποτε υπολογιστή.', 'on any computer.')}</li></ol>`;
+      <li>${T('Μέχρι τότε μπορείς να δοκιμάσεις με το', 'Until then you can test with')} <code>tools/netwatch_probe.py</code> ${T('σε οποιονδήποτε υπολογιστή.', 'on any computer.')}</li>
+      <li>${T('Η συσκευή εμφανίζεται εδώ με την πρώτη της αναφορά.', 'The device appears here with its first report.')}</li></ol>`;
   }
 
   function draw() {
@@ -88,7 +150,7 @@
       <div class="dim" style="font-size:12.5px;margin-top:3px">${D.listening ? `🟢 ${T('Θύρα αισθητήρων', 'Sensor port')} HTTPS :${E(D.port)}${(D.urls || []).length ? ' · ' + D.urls.map(E).join(', ') : ''}` : `⚪ ${T('Η θύρα αισθητήρων είναι κλειστή — ανοίγει με την πρώτη σύζευξη', 'The sensor port is closed — it opens with the first pairing')}`}</div>
       ${D.fp ? `<div class="dim" style="font-size:11px;margin-top:2px;word-break:break-all">${T('Αποτύπωμα πιστοποιητικού', 'Certificate fingerprint')} SHA-256: <code>${E(D.fp)}</code></div>` : ''}</div>
       <label style="display:flex;gap:6px;align-items:center;font-size:13px"><input type="checkbox" data-fl="enable"${D.enabled ? ' checked' : ''}${D.demo ? ' disabled' : ''}> ${T('Δέξου αισθητήρες από το LAN', 'Accept sensors from the LAN')}</label></div>
-      ${D.demo ? `<div class="dim" style="font-size:12.5px;margin-top:8px">🧪 ${T('Demo: τρεις φανταστικοί αισθητήρες. Η σύζευξη δουλεύει, αλλά δεν ανοίγει πραγματική θύρα.', 'Demo: three imaginary sensors. Pairing works, but no real port is opened.')}</div>` : ''}
+      ${D.demo ? `<div class="dim" style="font-size:12.5px;margin-top:8px">🧪 ${T('Demo: φανταστικοί αισθητήρες (rack, tester, Bluetooth, Zigbee, LoRa…). Η σύζευξη δουλεύει, αλλά δεν ανοίγει πραγματική θύρα.', 'Demo: imaginary sensors (rack, tester, Bluetooth, Zigbee, LoRa…). Pairing works, but no real port is opened.')}</div>` : ''}
       ${D.error ? `<div style="color:var(--orange);font-size:13px;margin-top:8px">⚠ ${E(tr(D.error))}</div>` : ''}
       <div class="dim" style="font-size:12.5px;margin-top:8px;line-height:1.55">${T('Το NetWatch είναι το <b>κέντρο</b>· ESP32, Raspberry Pi και υπολογιστές γίνονται <b>αισθητήρες</b> σε άλλα δωμάτια, VLAN ή κτίρια. Όλοι μιλούν με τον ίδιο τρόπο: HTTPS με έλεγχο αποτυπώματος και <b>δικό τους token</b> (κρατάω μόνο το hash του — αν χαθεί μια συσκευή, την αφαιρείς και το token της παύει να ισχύει).',
         'NetWatch is the <b>hub</b>; ESP32s, Raspberry Pis and computers become <b>sensors</b> in other rooms, VLANs or buildings. They all talk the same way: HTTPS with fingerprint pinning and <b>their own token</b> (I keep only its hash — if a device is lost, remove it and its token stops working).')}</div></div>`;
@@ -98,7 +160,7 @@
       const can = (D.pairable || []).includes(id);
       h += `<button class="fl-kind${pick === id ? ' on' : ''}" ${can ? `data-fl="pick" data-k="${E(id)}"` : 'disabled'}><div style="display:flex;gap:8px;align-items:center"><span class="fl-ico">${k.icon}</span><b style="font-size:13.5px">${E(tr(k.title))}</b></div>
         <div class="dim" style="font-size:12px;margin-top:4px">${E(tr(k.what))}</div>
-        <div style="font-size:11.5px;margin-top:6px">🛒 ${E(tr(k.hw))} · <b>${E(tr(k.price))}</b></div>
+        <div style="font-size:11.5px;margin-top:6px">🛒 ${E(tr(k.hw))} · <b>${E(tr(k.price))}</b></div>${k.fw && can ? `<div class="dim" style="font-size:11px;margin-top:3px;word-break:break-all">📁 <code>${E(k.fw)}</code>${k.fw2 ? ` + <code>${E(k.fw2)}</code>` : ''}</div>` : ''}
         <div style="margin-top:6px">${k.mqtt ? `<span class="fl-pill" style="--c:var(--cyan)">${T('έτοιμο · μέσω MQTT', 'ready · via MQTT')}</span>` : k.ready ? `<span class="fl-pill" style="--c:var(--green)">${T('έτοιμο', 'ready')}</span>` : `<span class="fl-pill" style="--c:var(--yellow)">${T('firmware σύντομα · η σύζευξη δουλεύει', 'firmware soon · pairing works')}</span>`}</div></button>`;
     }
     h += `</div>`;

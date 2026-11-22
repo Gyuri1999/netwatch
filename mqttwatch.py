@@ -118,6 +118,9 @@ class Guard:
     # ---- εισερχόμενα ----
     def handle(self, topic, payload, retained=False, t=None):
         t = t or time.time()
+        inv = getattr(self.state, "iotinv", None)  # 📦 απογραφή IoT (Zigbee2MQTT, Tasmota, Shelly, ESPHome) από τα ίδια μηνύματα
+        if inv is not None:
+            inv.handle(topic, payload, retained, t)
         if topic.startswith("$SYS/"):
             return self._sys(topic, payload, t)
         dev, pat = device_of(topic), pattern_of(topic)

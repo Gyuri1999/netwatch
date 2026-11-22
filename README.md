@@ -20,6 +20,9 @@
 
 | | |
 |---|---|
+| 🧰 **Field technician kit** | A menu section for on-site work: socket tester (switch/port via LLDP/CDP, VLAN, speed, PoE, DHCP), acceptance tests with a report to sign, customers and monthly maintenance reports, labels with QR, PoE/camera-storage/UPS calculators. Raspberry Pi box with OLED and LTE backup: [`tools/fieldbox`](tools/fieldbox/README.md). |
+| 🏭 **OT, IoT and radio** | Read-only discovery of Modbus TCP, BACnet/IP and KNXnet/IP with alerts on writes; IoT inventory from MQTT (Zigbee2MQTT, Tasmota, Shelly, ESPHome); Bluetooth, Zigbee/Thread and LoRa views; rogue IPv6 RA detection; 802.1X and guest-isolation checks. |
+| 🧩 **More sensors** | ESP32 firmware for a rack sensor, a PoE Ethernet tester, a BLE scanner and a LoRa node + gateway, plus an nRF52840 Zigbee sniffer client. Firmware is compile-checked only, not yet run on real hardware. |
 | 🗺 **Live world map** | Packets fly between your home and each server, coloured by protocol (HTTPS, QUIC, DNS, ICMP, ARP…). Zoom and pan go down to city level, with country labels. |
 | 🏠 **LAN view** | Shows you, the router and every device on the local network. MITM attacks and sweeps show up here. |
 | 🚨 **22 detectors** | Port/UDP scans, NULL/FIN/XMAS stealth scans, brute force, SYN/ICMP flood, ping and ARP sweeps, ARP spoofing, ARP flood, rogue DHCP, DNS spoofing, inbound probes, C2-style ports, **C2 beaconing**, **DNS tunneling**, **DGA domains**, **DNS attacks** (amplification, query flood, NXDOMAIN/random-subdomain flood, DNS rebinding), **new devices**, **threat-intel matches**, **passwords sent in cleartext**. |

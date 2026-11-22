@@ -35,6 +35,18 @@ chmod +x run.sh
 Κάθε ειδοποίηση έχει κωδικό **MITRE ATT&CK** (π.χ. T1046), υπάρχει εξαγωγή **αναφοράς συμβάντος (JSON)**, κουμπί 📸 για εικόνα του χάρτη, και 123 αυτόματα tests (`.venv/bin/python -m pytest`).
 
 ### Νέα
+- **🧰 Τεχνικός πεδίου** (νέα ενότητα στο μενού, για δουλειά σε πελάτες):
+  - **🔌 Tester πρίζας**: βάζεις καλώδιο και βλέπεις switch και θύρα (LLDP/CDP), VLAN, ταχύτητα, PoE, DHCP, internet. Ιστορικό ανά πρίζα και CSV. Για Raspberry Pi με οθόνη OLED και εφεδρική γραμμή LTE: [`tools/fieldbox`](tools/fieldbox/README.md).
+  - **✅ Τεστ αποδοχής**: λίστα ελέγχων ανά πρίζα / AP / κάμερα και αναφορά για υπογραφή από τον πελάτη.
+  - **🏢 Πελάτες**: εγκαταστάσεις, επισκέψεις, μηνιαία αναφορά συντήρησης. Το δίκτυο του πελάτη αναγνωρίζεται από το router του.
+  - **🏷 Ετικέτες & QR**: φύλλα A4 και ταινίες για πρίζες, καλώδια και συσκευές. Το QR ανοίγει τη συσκευή (`/#dev=<ip>`).
+  - **🧮 Υπολογιστές**: PoE budget, δίσκος καμερών, UPS, πτώση τάσης DC, ζεύξη RF.
+  - **🏭 Αυτοματισμοί**: εντοπισμός Modbus TCP, BACnet/IP και KNXnet/IP (μόνο ανάγνωση) και ειδοποίηση όταν κάποιος **γράφει** σε PLC ή ελεγκτή.
+  - **📦 Απογραφή IoT**: Zigbee2MQTT, Tasmota, Shelly, ESPHome από το MQTT: firmware, μπαταρία, σήμα, εκτός δικτύου.
+  - **📻 Ασύρματα IoT**: Bluetooth (και άγνωστα trackers), κανάλια Zigbee/Thread απέναντι στο Wi‑Fi, κόμβοι LoRa.
+  - **🌐 Έλεγχος IPv6**: ψεύτικο Router Advertisement / DHCPv6, συσκευές με δημόσια IPv6.
+  - **🔐 802.1X & guest**: ζητά η θύρα πιστοποίηση; είναι απομονωμένο το Wi‑Fi επισκεπτών;
+- **Νέοι αισθητήρες** (σύζευξη από το 🧩 Οι συσκευές μου): rack με θερμοκρασία/υγρασία/πόρτα/νερό/ρεύμα ([`esp32-rack`](firmware/esp32-rack/README.md)), tester Ethernet με PoE ([`esp32-poe`](firmware/esp32-poe/README.md)), σαρωτής Bluetooth ([`esp32-ble`](firmware/esp32-ble/README.md)), LoRa κόμβος και πύλη ([`esp32-lora-node`](firmware/esp32-lora-node/README.md), [`esp32-lora-gw`](firmware/esp32-lora-gw/README.md)), sniffer Zigbee με nRF52840 ([`tools/zigbee_sniff.py`](tools/zigbee_sniff.py)). Τα firmware έχουν ελεγχθεί μόνο σε compile, όχι σε πραγματικό υλικό.
 - **Beaconing (C2)**: συσκευή που συνδέεται σε server «με ρολόι» → πιθανό malware.
 - **DNS tunneling** και **DGA**: δεδομένα κρυμμένα στο DNS, botnets που ψάχνουν τυχαία domains.
 - **Νέα συσκευή στο Wi‑Fi**: οι συσκευές θυμούνται στο ιστορικό, ειδοποίηση για κάθε άγνωστη.
