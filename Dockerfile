@@ -7,7 +7,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends tcpdump whois i
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
-COPY *.py index.html edu.js wireshark.js infra.js sectools.js privtools.js protocols.js ciscolab.js uiplus.js pentestui.js socui.js worktools.js opstools.js cmdxlate.js navplus.js anontools.js topomap.js sshui.js vlsm.js updateui.js presenceui.js l2guardui.js assessui.js vulnui.js upnpui.js otui.js acceptui.js sitesui.js labelsui.js calcui.js v6ui.js nacui.js iotinvui.js radioui.js fieldui.js probesui.js watchui.js acl.js names.js golive.js alertwhy.js i18n.js academy.html manifest.webmanifest sw.js config.example.yaml VERSION update_signers ./
+COPY *.py index.html edu.js wireshark.js infra.js sectools.js privtools.js protocols.js ciscolab.js uiplus.js pentestui.js socui.js worktools.js opstools.js cmdxlate.js navplus.js anontools.js topomap.js sshui.js vlsm.js updateui.js presenceui.js l2guardui.js assessui.js vulnui.js upnpui.js otui.js acceptui.js sitesui.js labelsui.js calcui.js v6ui.js nacui.js iotinvui.js radioui.js fieldui.js soakui.js remoteui.js probesui.js watchui.js acl.js names.js golive.js alertwhy.js i18n.js academy.html manifest.webmanifest sw.js config.example.yaml VERSION update_signers ./
 COPY academy ./academy
 COPY i18n ./i18n
 COPY samples ./samples
