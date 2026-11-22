@@ -49,7 +49,8 @@ def test_pair_code_and_hash_only_on_disk(tmp_path):
     assert r["qr"].startswith("<svg")
     disk = open(os.path.join(tmp_path, "probes.json")).read()
     assert c["t"] not in disk and probes._h(c["t"]) in disk
-    assert oct(os.stat(os.path.join(tmp_path, "probes.json")).st_mode & 0o777) == "0o600"
+    if os.name != "nt":  # τα Windows δεν έχουν δικαιώματα τύπου Unix
+        assert oct(os.stat(os.path.join(tmp_path, "probes.json")).st_mode & 0o777) == "0o600"
     assert probes.Probes(State(), str(tmp_path), port=0).reg[r["id"]]["name"] == "Pi γραφείο"
 
 

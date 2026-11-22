@@ -20,6 +20,7 @@ import json
 import os
 import re
 import secrets
+import socket
 import ssl
 import threading
 import time
@@ -427,6 +428,12 @@ class Probes:
 class _ProbeServer(ThreadingHTTPServer):
     daemon_threads = True
     allow_reuse_address = False  # macOS/BSD: με SO_REUSEADDR το 0.0.0.0 «μοιράζεται» θύρα με άλλο 127.0.0.1 — όχι
+
+    def server_bind(self):
+        # Windows: χωρίς αυτό, άλλο πρόγραμμα στην ίδια θύρα (π.χ. με SO_REUSEADDR) μπορεί να τη «μοιραστεί» μαζί μας
+        if hasattr(socket, "SO_EXCLUSIVEADDRUSE"):
+            self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
 
 
 def _handler(probes):
