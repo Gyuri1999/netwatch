@@ -164,3 +164,19 @@ def test_export_files_are_checked_and_expire():
     assert len(tm.files) <= topomap.EXPORT_KEEP
     now[0] += topomap.EXPORT_TTL + 1
     assert tm.get_file(r["id"]) is None
+
+
+def test_windows_tracert_parsing():
+    import osint
+    win = ("Tracing route to 1.1.1.1 over a maximum of 6 hops:\n\n"
+           "  1    <1 ms    <1 ms    <1 ms  192.168.1.1\n"
+           "  2     8 ms     9 ms     8 ms  10.0.0.1\n"
+           "  3     *        *        *     Request timed out.\n"
+           "  4    12 ms    11 ms    13 ms  1.1.1.1\n\nTrace complete.")
+    h = osint.parse_tracert(win)
+    assert [x["ip"] for x in h] == ["192.168.1.1", "10.0.0.1", None, "1.1.1.1"]
+    assert h[0]["ms"] == 1.0 and h[1]["ms"] == 8.0 and h[3]["ms"] == 12.0
+    # σωστή εντολή ανά πλατφόρμα
+    import sys
+    cmd = osint.trace_cmd("1.1.1.1", 6)
+    assert cmd[0] == ("tracert" if sys.platform == "win32" else "traceroute")
