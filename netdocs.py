@@ -623,16 +623,21 @@ def to_html(doc, lang=None):
 
 
 # ───────── draw.io / diagrams.net ─────────
+# Επαγγελματικά σύμβολα δικτύου: η έτοιμη βιβλιοθήκη «Networks» του draw.io/diagrams.net (shape=mxgraph.networks.*),
+# με την ετικέτα κάτω από το εικονίδιο — ανοίγει παντού, χωρίς να χρειάζεται να εγκαταστήσει κανείς stencils.
+_NET = "sketch=0;outlineConnect=0;whiteSpace=wrap;fontSize=11;verticalLabelPosition=bottom;verticalAlign=top;align=center;"
 STY = {
-    "cloud": "ellipse;shape=cloud;whiteSpace=wrap;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;",
-    "router": "rounded=1;whiteSpace=wrap;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;",
-    "switch": "rounded=1;whiteSpace=wrap;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;",
-    "ap": "rounded=1;whiteSpace=wrap;fillColor=#fff2cc;strokeColor=#d6b656;",
-    "server": "rounded=1;whiteSpace=wrap;fillColor=#e1d5e7;strokeColor=#9673a6;",
-    "other": "rounded=1;whiteSpace=wrap;dashed=1;fillColor=#f5f5f5;strokeColor=#999999;",
+    "cloud": _NET + "shape=mxgraph.networks.cloud;fillColor=#dae8fc;strokeColor=#6c8ebf;",
+    "router": _NET + "shape=mxgraph.networks.router;fillColor=#f8cecc;strokeColor=#b85450;",
+    "switch": _NET + "shape=mxgraph.networks.switch;fillColor=#d5e8d4;strokeColor=#82b366;",
+    "ap": _NET + "shape=mxgraph.networks.wireless_access_point;fillColor=#fff2cc;strokeColor=#d6b656;",
+    "server": _NET + "shape=mxgraph.networks.server;fillColor=#e1d5e7;strokeColor=#9673a6;",
+    "other": _NET + "shape=mxgraph.networks.pc;fillColor=#f5f5f5;strokeColor=#999999;",
     "group": "swimlane;whiteSpace=wrap;startSize=26;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;collapsible=0;",
-    "host": "rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;",
+    "host": "rounded=1;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#6c8ebf;fontSize=10;align=left;spacingLeft=6;",
     "more": "text;whiteSpace=wrap;align=center;verticalAlign=middle;fontStyle=2;fontColor=#666666;",
+    "title": "rounded=0;whiteSpace=wrap;fillColor=#ffffff;strokeColor=#666666;align=left;verticalAlign=top;"
+             "spacingLeft=10;spacingTop=8;fontSize=11;",
     "edge": "endArrow=none;html=0;rounded=0;fontSize=10;labelBackgroundColor=#ffffff;",
     "edge_guess": "endArrow=none;html=0;dashed=1;rounded=0;strokeColor=#999999;",
 }
@@ -667,7 +672,7 @@ def to_drawio(doc, max_hosts=DRAWIO_MAX):
         ET.SubElement(c, "mxGeometry", {"relative": "1", "as": "geometry"})
         return i
 
-    W, H, GAP = 160, 56, 40
+    W, H, GAP = 110, 78, 70  # εικονίδιο + ετικέτα από κάτω
     devs = doc.get("devices") or []
     routers = [d for d in devs if d["role"] == "router"]
     switches = [d for d in devs if d["role"] in ("switch", "ap")]
@@ -677,26 +682,44 @@ def to_drawio(doc, max_hosts=DRAWIO_MAX):
     ids = {}
 
     def lbl(d):
-        return d["name"] + ("\n" + d["host"] if d.get("host") else "")
+        parts = [d["name"]]
+        if d.get("host"):
+            parts.append(d["host"])
+        extra = d.get("model") or d.get("vendor")  # μοντέλο/κατασκευαστής, αν τα ξέρουμε
+        if extra and extra not in parts:
+            parts.append(extra)
+        return "\n".join(str(p) for p in parts if p)
 
     def row(items, y, style_of):
         tot = len(items) * W + max(0, len(items) - 1) * GAP
-        x0 = max(20, (1200 - tot) // 2)
+        x0 = max(20, (1654 - tot) // 2)
         for k, d in enumerate(items):
             ids[d["name"]] = vertex(lbl(d), STY.get(style_of(d), STY["other"]), x0 + k * (W + GAP), y, W, H)
 
-    cloud = vertex("Internet", STY["cloud"], 1200 // 2 - 70, 20, 140, 80)
-    row(routers, 150, lambda d: "router")
+    # — title block (όπως στα επαγγελματικά «as-built» σχέδια) —
+    c = doc.get("counts") or {}
+    gen = time.strftime("%d/%m/%Y %H:%M", time.localtime(doc.get("generated") or time.time()))
+    tb = "\n".join([
+        _L(lg, "NetWatch — Διάγραμμα δικτύου", "NetWatch — Network diagram"),
+        _L(lg, "Πύλη (gateway): ", "Gateway: ") + (doc.get("gateway") or "—"),
+        _L(lg, "Ημερομηνία: ", "Date: ") + gen,
+        _L(lg, "Συσκευές: ", "Devices: ") + str(c.get("devices") or len(doc.get("hosts") or []))
+        + " · VLAN: " + str(c.get("vlans") or len(doc.get("vlans") or [])),
+    ])
+    vertex(tb, STY["title"], 20, 20, 360, 110)
+
+    cloud = vertex("Internet", STY["cloud"], 1654 // 2 - 55, 30, 110, 78)
+    row(routers, 170, lambda d: "router")
     for r in routers:
         edge(cloud, ids[r["name"]], "WAN")
-    row(switches, 280, lambda d: d["role"])
+    row(switches, 300, lambda d: d["role"])
     # γείτονες LLDP που δεν είναι γνωστές συσκευές (π.χ. AP χωρίς SNMP) → επίσης στη γραμμή 3
     unknown = []
     for l in doc.get("links") or []:
         for side in ("a", "b"):
             if l[side] not in ids and l[side] not in [u["name"] for u in unknown] and l[side] not in [o["name"] for o in others]:
                 unknown.append({"name": l[side], "host": "", "role": "other"})
-    row(others + unknown, 410, lambda d: d.get("role") if d.get("role") in STY else "other")
+    row(others + unknown, 430, lambda d: d.get("role") if d.get("role") in STY else "other")
     linked = set()
     for l in doc.get("links") or []:
         a, b = ids.get(l["a"]), ids.get(l["b"])
@@ -721,7 +744,7 @@ def to_drawio(doc, max_hosts=DRAWIO_MAX):
         groups.setdefault(key, []).append(h)
     vname = {v["id"]: v.get("name") for v in doc.get("vlans") or []}
     COLS, HW, HH, PAD = 4, 140, 46, 12
-    gx, gy, rowh = 20, 560, 0
+    gx, gy, rowh = 20, 590, 0
     for key, members in groups.items():
         m = re.match(r"VLAN (\d+)", key)
         title = key + (f" ({vname[int(m.group(1))]})" if m and vname.get(int(m.group(1))) else "")
@@ -732,7 +755,10 @@ def to_drawio(doc, max_hosts=DRAWIO_MAX):
             gx, gy, rowh = 20, gy + rowh + 30, 0
         g = vertex(title, STY["group"], gx, gy, gw_, gh)
         for k, h in enumerate(members):
-            vertex((h.get("name") or h.get("type") or h.get("mac") or "?") + "\n" + h["ip"], STY["host"],
+            ic = h.get("icon") or ""
+            nm = (ic + " " if ic else "") + (h.get("name") or h.get("type") or h.get("mac") or "?")
+            l2 = h["ip"] + (f" · {h['type']}" if h.get("type") and h.get("name") else "")
+            vertex(nm + "\n" + l2, STY["host"],
                    PAD + (k % cols) * (HW + PAD), 26 + PAD + (k // cols) * (HH + PAD), HW, HH, parent=g)
         sws = [h.get("switch") for h in members if h.get("switch")]
         up = ids.get(max(set(sws), key=sws.count)) if sws else None
