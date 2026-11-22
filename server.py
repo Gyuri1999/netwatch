@@ -76,7 +76,16 @@ def make_handler(state):
                 n = int(self.headers.get("Content-Length") or 0)
                 if n > 15 * 1024 * 1024:
                     return self._json({"error": "Πολύ μεγάλο αρχείο (όριο 15 MB)."}, 413)
-                r = tm.put_file(parse_qs(u.query).get("fmt", [""])[0], self.rfile.read(n))
+                raw = self.rfile.read(n)
+                fmt = parse_qs(u.query).get("fmt", [""])[0]
+                if fmt == "drawio":  # 📐 το XML το φτιάχνει ο server· κατεβαίνει από το /api/topomap/file (ίδιος δρόμος με PDF/PNG/SVG)
+                    import netdocs
+                    lang = parse_qs(u.query).get("lang", ["el"])[0]
+                    lang = lang if lang in netdocs.LANGS else "el"
+                    xml = netdocs.to_drawio(netdocs.build(state, lang)).encode()
+                    r = tm.put_file("drawio", xml)
+                else:
+                    r = tm.put_file(fmt, raw)
                 return self._json(r, 400 if "error" in r else 200)
             try:
                 n = int(self.headers.get("Content-Length") or 0)
@@ -973,6 +982,7 @@ def make_handler(state):
                 self.send_header("Content-Disposition", f'attachment; filename="{netdocs.filename(fmt, doc["generated"])}"')
                 self.send_header("Cache-Control", "no-store")
                 self.send_header("X-Content-Type-Options", "nosniff")
+                self.send_header("Content-Security-Policy", "default-src 'none'; sandbox")  # να κατεβαίνει, όχι να ανοίγει στο WebView
                 self.end_headers()
                 self.wfile.write(body)
                 return

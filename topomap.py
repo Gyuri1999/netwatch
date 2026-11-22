@@ -37,7 +37,8 @@ FAULTS = ("isp", "modem", "switch", "dns", "slow")
 EXPORT_MAX = 15 * 1024 * 1024   # PDF/PNG/SVG που φτιάχνει ο browser — κρατάμε μόνο στη μνήμη, για λίγα λεπτά
 EXPORT_TTL = 300
 EXPORT_KEEP = 4
-EXPORT_TYPES = {"pdf": (b"%PDF-", "application/pdf"), "png": (b"\x89PNG", "image/png"), "svg": (b"<svg", "image/svg+xml")}
+EXPORT_TYPES = {"pdf": (b"%PDF-", "application/pdf"), "png": (b"\x89PNG", "image/png"), "svg": (b"<svg", "image/svg+xml"),
+                "drawio": (b"<?xml", "application/xml; charset=utf-8")}  # draw.io: το XML το φτιάχνει ο server (netdocs)
 
 
 def _L(el, en):
