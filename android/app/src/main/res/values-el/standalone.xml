@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <string name="app_name">NetWatch Mobile</string>
     <string name="standalone_subtitle">Αυτόνομα εργαλεία ασφάλειας δικτύου για το κινητό και το τοπικό σου δίκτυο.</string>
     <string name="standalone_phone_title">📱 Αυτό το κινητό</string>
     <string name="standalone_internet_yes">Σύνδεση Internet: διαθέσιμη</string>

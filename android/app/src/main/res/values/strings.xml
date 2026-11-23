@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">NetWatch</string>
+    <string name="app_name">NetWatch Mobile</string>
     <string name="setup_title">Connect to your NetWatch agent</string>
     <string name="setup_intro">Start NetWatch with --agent on your home server or PC. It prints a link like https://192.168.1.10:8765/?token=… and a SHA-256 fingerprint. Paste the whole link here.</string>
     <string name="setup_hint" translatable="false">https://192.168.1.10:8765/?token=…</string>
