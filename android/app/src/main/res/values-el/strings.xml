@@ -19,4 +19,13 @@
     <string name="channel_desc">Σοβαρές ειδοποιήσεις από τον agent του NetWatch, κάθε 15 λεπτά όσο είσαι στο ίδιο δίκτυο</string>
     <string name="notif_more">και άλλες %1$d</string>
     <string name="paste">Επικόλληση</string>
+    <string name="update_check">Έλεγχος για ενημέρωση</string>
+    <string name="update_title">Υπάρχει ενημέρωση</string>
+    <string name="update_message">Διαθέσιμο το NetWatch %1$s. Να το κατεβάσω και να το εγκαταστήσω;</string>
+    <string name="update_now">Ενημέρωση</string>
+    <string name="update_later">Αργότερα</string>
+    <string name="update_none">Έχεις την πιο πρόσφατη έκδοση.</string>
+    <string name="update_downloading">Κατεβάζω την ενημέρωση…</string>
+    <string name="update_failed">Δεν έγινε η ενημέρωση. Δοκίμασε αργότερα.</string>
+    <string name="update_allow">Επίτρεψε την εγκατάσταση από αυτή την εφαρμογή και ξαναδοκίμασε.</string>
 </resources>

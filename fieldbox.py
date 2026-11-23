@@ -545,10 +545,16 @@ def verdict(r, expect=None):
         return {"level": "warn", "el": "⚠️ " + w["el"] + more + tail, "en": "⚠️ " + w["en"] + more + tail_en,
                 "fix": w["fix"], "fix_en": w["fix_en"], "issues": iss}
     fix = fix_en = ""
+    if link.get("kind") == "wifi":  # δεν δοκιμάστηκε πρίζα: το «Πρίζα ΟΚ» θα ήταν ψέμα
+        return {"level": "warn", "el": "📶 Είσαι σε Wi‑Fi — δεν ελέγχθηκε πρίζα (το δίκτυο απαντά)", "en": "📶 You are on Wi‑Fi — no socket was tested (the network answers)",
+                "fix": "Σύνδεσε καλώδιο Ethernet στην πρίζα που θες να ελέγξεις (ή USB‑Ethernet) και ξαναπάτα Τεστ.",
+                "fix_en": "Plug an Ethernet cable into the socket you want to test (or a USB‑Ethernet adapter) and press Test again.", "issues": iss}
     if (dh or {}).get("err"):
-        fix = "Δεν έγιναν οι έλεγχοι DHCP/LLDP: το NetWatch θέλει root ή CAP_NET_RAW (δες tools/fieldbox/netwatch-fieldbox.service)."
-        fix_en = "The DHCP/LLDP checks did not run: NetWatch needs root or CAP_NET_RAW (see tools/fieldbox/netwatch-fieldbox.service)."
-    elif link.get("carrier") and not nbr and (r.get("nbr_done") or r.get("nbr_done") is None):
+        return {"level": "warn", "el": "⚠️ Μερικός έλεγχος: το δίκτυο απαντά, αλλά DHCP και switch/θύρα δεν ελέγχθηκαν" + tail,
+                "en": "⚠️ Partial test: the network answers, but DHCP and switch/port were not checked" + tail_en,
+                "fix": "Οι έλεγχοι DHCP/LLDP θέλουν δικαιώματα διαχειριστή: τρέξε το NetWatch σε Live (sudo) ή με CAP_NET_RAW (δες tools/fieldbox/netwatch-fieldbox.service).",
+                "fix_en": "The DHCP/LLDP checks need admin rights: run NetWatch in Live (sudo) or with CAP_NET_RAW (see tools/fieldbox/netwatch-fieldbox.service).", "issues": iss}
+    if link.get("carrier") and not nbr and (r.get("nbr_done") or r.get("nbr_done") is None):
         fix = "Το switch δεν έστειλε LLDP/CDP (απλό unmanaged switch ή κλειστό LLDP) — δεν ξέρω θύρα/VLAN. Σε managed switch: lldp run."
         fix_en = "The switch sent no LLDP/CDP (plain unmanaged switch or LLDP off) — port/VLAN unknown. On a managed switch: lldp run."
     return {"level": "ok", "el": "✅ Πρίζα ΟΚ" + tail, "en": "✅ Socket OK" + tail_en, "fix": fix, "fix_en": fix_en, "issues": iss}
@@ -742,7 +748,10 @@ class Net:
                 continue
             o["mac"], o["ip_src"] = r[Ether].src, r[IP].src if r.haslayer(IP) else ""
             o["server"] = o["server"] or o["ip_src"]
-            o["ms"] = max(0, int((float(r.time) - float(getattr(s, "sent_time", None) or r.time)) * 1000))
+            # χρόνος DISCOVER→OFFER μόνο όταν το scapy κράτησε ώρα αποστολής και η διαφορά βγαίνει θετική (αλλιώς «άγνωστο», όχι 0)
+            sent = getattr(s, "sent_time", None)
+            dt = (float(r.time) - float(sent)) * 1000 if sent else None
+            o["ms"] = int(round(dt)) if dt is not None and dt >= 1 else None
             out.append(o)
         return out[:8]
 

@@ -778,6 +778,108 @@ def _sim_http(url):
                     "findings": [], "trusted": True, "trust_error": None}}
 
 
+# =============================== read-only security checks ===============================
+def email_dns_posture(domain, sim=False):
+    """Check SPF and DMARC DNS records. Passive DNS lookups only; no mail is sent."""
+    domain = valid_host(domain).lower()
+    if _ip(domain) is not None or "." not in domain:
+        raise ValueError("Δώσε domain που διαχειρίζεσαι, π.χ. example.com")
+    if sim:
+        root = [{"type": "TXT", "ttl": 300, "data": "v=spf1 include:_spf.example.net -all"}]
+        dmarc = [{"type": "TXT", "ttl": 300, "data": "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"}]
+    else:
+        root = dns_lookup(domain, "TXT", timeout=2).get("answers", [])
+        dmarc = dns_lookup("_dmarc." + domain, "TXT", timeout=2).get("answers", [])
+    spf = [x["data"].strip() for x in root if x.get("type") == "TXT" and x.get("data", "").strip().lower().startswith("v=spf1")]
+    dmarc_records = [x["data"].strip() for x in dmarc if x.get("type") == "TXT" and x.get("data", "").strip().lower().startswith("v=dmarc1")]
+    checks = []
+    if not spf:
+        checks.append({"name": "SPF", "status": "bad", "value": None, "detail": "Δεν βρέθηκε εγγραφή SPF."})
+    elif len(spf) > 1:
+        checks.append({"name": "SPF", "status": "bad", "value": "; ".join(spf), "detail": "Υπάρχουν πολλές εγγραφές SPF· συνδύασέ τες σε μία."})
+    else:
+        ending = re.search(r"(?:^|\s)([+?~-]?all)(?=\s|$)", spf[0], re.I)
+        term = ending.group(1).lower() if ending else ""
+        status = "good" if term == "-all" else "warn" if term in ("~all", "?all") else "bad"
+        detail = {"-all": "Η πολιτική απορρίπτει αποστολείς που δεν έχουν εξουσιοδοτηθεί.",
+                  "~all": "Το soft-fail μόνο επισημαίνει μη εξουσιοδοτημένους αποστολείς.",
+                  "?all": "Η πολιτική δεν δίνει σαφή οδηγία για μη εξουσιοδοτημένους αποστολείς.",
+                  "+all": "Η εγγραφή επιτρέπει σε οποιονδήποτε να στέλνει ως το domain.",
+                  "": "Δεν βρέθηκε τελικός μηχανισμός all στην εγγραφή."}[term]
+        checks.append({"name": "SPF", "status": status, "value": spf[0], "detail": detail})
+    if not dmarc_records:
+        checks.append({"name": "DMARC", "status": "bad", "value": None, "detail": "Δεν βρέθηκε εγγραφή _dmarc." + domain + "."})
+    elif len(dmarc_records) > 1:
+        checks.append({"name": "DMARC", "status": "bad", "value": "; ".join(dmarc_records), "detail": "Βρέθηκαν πολλές εγγραφές DMARC· πρέπει να υπάρχει μία."})
+    else:
+        value = dmarc_records[0]
+        tags = {k.lower(): v.strip().lower() for k, v in re.findall(r"(?:^|;)\s*([a-z]+)\s*=\s*([^;]+)", value, re.I)}
+        policy = tags.get("p", "")
+        status = "good" if policy == "reject" else "warn" if policy in ("quarantine", "none") else "bad"
+        detail = {"reject": "Τα μηνύματα που αποτυγχάνουν DMARC απορρίπτονται.",
+                  "quarantine": "Τα μηνύματα που αποτυγχάνουν DMARC οδηγούνται συνήθως στα ανεπιθύμητα.",
+                  "none": "Το DMARC καταγράφει αποτυχίες, αλλά δεν ζητά ενέργεια από τον παραλήπτη.",
+                  "": "Λείπει έγκυρη πολιτική p= από την εγγραφή."}.get(policy, "Άγνωστη πολιτική DMARC.")
+        if tags.get("pct", "100").isdigit() and int(tags.get("pct", "100")) < 100:
+            detail += " Η πολιτική εφαρμόζεται μόνο σε " + tags["pct"] + "% των μηνυμάτων."
+            if status == "good": status = "warn"
+        checks.append({"name": "DMARC", "status": status, "value": value, "detail": detail})
+    score = sum(1 for x in checks if x["status"] == "good")
+    return {"domain": domain, "checks": checks, "score": score, "of": len(checks),
+            "severity": "high" if any(x["status"] == "bad" for x in checks) else "low" if any(x["status"] == "warn" for x in checks) else "ok",
+            "sim": bool(sim)}
+
+
+WEB_CHECK_PATHS = ("/.git/HEAD", "/.env", "/server-status", "/phpinfo.php", "/backup.zip", "/swagger.json", "/api-docs")
+
+
+def web_exposure_check(url, sim=False, timeout=1.5):
+    """HEAD-only checks for common accidentally exposed files on a private literal IP."""
+    url = str(url or "").strip()
+    if not url or len(url) > 500:
+        raise ValueError("Δώσε τοπική διεύθυνση, π.χ. http://192.168.1.20:8080")
+    if "://" not in url:
+        url = "http://" + url
+    p, port = _check_url(url)
+    if p.username or p.password or p.query or p.fragment:
+        raise ValueError("Χρησιμοποίησε URL χωρίς κωδικούς, query ή fragment")
+    target = _ip(p.hostname)
+    if target is None or not _is_private(target):
+        raise ValueError("Ο έλεγχος δέχεται μόνο ιδιωτική IP (RFC 1918), π.χ. 192.168.1.20")
+    _usable(target)
+    base = (p.path or "/").rstrip("/")
+    if sim:
+        results = [{"path": path, "status": 404, "state": "absent", "length": None, "type": None} for path in WEB_CHECK_PATHS]
+        results[0].update(status=403, state="restricted")
+        results[-2].update(status=200, state="candidate", length=842, type="application/json")
+        return {"url": url, "results": results, "candidates": 1, "sim": True}
+    results = []
+    for item in WEB_CHECK_PATHS:
+        path = (base + item) if base else item
+        conn = None
+        try:
+            if p.scheme == "https":
+                ctx = ssl._create_unverified_context()
+                conn = http.client.HTTPSConnection(p.hostname, port, timeout=timeout, context=ctx)
+            else:
+                conn = http.client.HTTPConnection(p.hostname, port, timeout=timeout)
+            conn.request("HEAD", path, headers={"Host": p.netloc, "User-Agent": UA, "Connection": "close"})
+            response = conn.getresponse()
+            response.read(0)
+            status = int(response.status)
+            state = "candidate" if 200 <= status < 300 else "restricted" if status in (401, 403) else "absent" if status in (404, 410) else "redirect" if 300 <= status < 400 else "head-unsupported" if status in (405, 501) else "other"
+            length = response.getheader("Content-Length")
+            results.append({"path": path, "status": status, "state": state,
+                            "length": int(length) if length and length.isdigit() else None,
+                            "type": (response.getheader("Content-Type") or "")[:100] or None})
+        except (OSError, http.client.HTTPException, ssl.SSLError, TimeoutError) as exc:
+            results.append({"path": path, "status": None, "state": "error", "error": str(exc)[:120]})
+        finally:
+            if conn:
+                conn.close()
+    return {"url": url, "results": results, "candidates": sum(1 for x in results if x["state"] == "candidate"), "sim": False}
+
+
 # =============================== Wake-on-LAN ===============================
 def wol_packet(mac):
     raw, _ = parse_mac(mac)
@@ -1385,7 +1487,8 @@ def _num(v, default, cast=float):
 
 
 TOOL_LABELS = {"ping": "ping", "dns": "ερώτημα DNS", "dnscmp": "σύγκριση DNS", "ports": "έλεγχος θυρών",
-               "http": "έλεγχος HTTP", "wol": "Wake-on-LAN", "names": "ανακάλυψη ονομάτων"}
+               "http": "έλεγχος HTTP", "wol": "Wake-on-LAN", "names": "ανακάλυψη ονομάτων",
+               "maildns": "SPF/DMARC DNS έλεγχος", "webcheck": "web exposure check"}
 
 
 class _OwnTool:
@@ -1423,7 +1526,7 @@ def run_tool(body, sim=False, state=None):
     """Εκτελεί ένα εργαλείο από το JSON του POST /api/netkit."""
     tool = str(body.get("tool") or "")
     if tool not in TOOL_LABELS:
-        raise ValueError("Άγνωστο εργαλείο — ping, dns, dnscmp, ports, http, wol, names")
+        raise ValueError("Άγνωστο εργαλείο — ping, dns, dnscmp, ports, http, wol, names, maildns, webcheck")
     with _OwnTool(None if sim else state, f"{TOOL_LABELS[tool]} (🔴 Pentest → Εργαλεία)"):
         return _run_tool(tool, body, sim, state)
 
@@ -1449,4 +1552,8 @@ def _run_tool(tool, body, sim, state):
         found = discover_names(ips, sim=sim)
         merge_names(state, found)
         return {"hosts": found}
-    raise ValueError("Άγνωστο εργαλείο — ping, dns, dnscmp, ports, http, wol, names")
+    if tool == "maildns":
+        return email_dns_posture(s("domain", 253), sim=sim)
+    if tool == "webcheck":
+        return web_exposure_check(s("url", 500), sim=sim)
+    raise ValueError("Άγνωστο εργαλείο — ping, dns, dnscmp, ports, http, wol, names, maildns, webcheck")

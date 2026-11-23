@@ -573,6 +573,12 @@ class NetState:
                 hu.observe(P, t)
             except Exception:
                 pass
+        wa = getattr(self, "watchers", None)  # 👁 trackers / ACR που «καλούν σπίτι» (παθητικό SNI/DNS)
+        if wa is not None:
+            try:
+                wa.observe(P, t)
+            except Exception:
+                pass
         if P.get("cred"):
             self._cred(P, t)
         if P.get("dns_q"):
@@ -669,7 +675,7 @@ class NetState:
                        key=f"{dst}:{dp}" if benign else None, cooldown=3600 if benign else None, benign=benign)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
-    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "timeline", "hunt", "cases", "configbak", "changecheck", "triage", "handover", "whereis", "expiry", "segcheck", "sitecheck", "topomap", "ssh", "devnames", "updater", "l2guard", "presence", "app_ctl", "npcap", "hygiene", "assess", "vulns", "upnp", "ot", "accept", "sites", "labels", "v6", "nac", "iotinv", "radio", "field", "uplink", "probes", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
+    KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "timeline", "hunt", "cases", "configbak", "changecheck", "triage", "handover", "whereis", "expiry", "segcheck", "sitecheck", "topomap", "ssh", "devnames", "updater", "l2guard", "presence", "app_ctl", "npcap", "hygiene", "assess", "vulns", "upnp", "ot", "accept", "sites", "labels", "v6", "nac", "iotinv", "radio", "field", "uplink", "soak", "remote", "camcheck", "probes", "watchers", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
             "rules", "cfg", "geo_enabled", "rdns_enabled", "feed_token", "origin", "rule_errors", "own_tool", "test_ips")
 
     def reset(self, mode, iface, me_ips, gateway, history, feed, notifier=None):
@@ -1218,10 +1224,11 @@ class NetState:
             if n >= th["count"]:
                 self.alert("Network sweep (ARP)", "med", psrc, pdst,
                            f"ARP ερωτήσεις για {n} IP σε {th['window']}s — κάποιος σκανάρει το LAN", t)
-        if psrc and psrc != "0.0.0.0" and hw and hw != "ff:ff:ff:ff:ff:ff":
+        if psrc and psrc != "0.0.0.0" and hw and hw not in ("ff:ff:ff:ff:ff:ff", "00:00:00:00:00:00"):
             old = self.arp_table.get(psrc)
             trusted = self.arp_first.setdefault(psrc, old or hw)
-            if old and old != hw and hw != trusted:
+            # Αγνόησε: μηδενική MAC (κάρτα που κοιμάται/ξυπνά) και τη ΔΙΚΗ σου IP (δεν είναι MITM — εσύ στέλνεις το ARP σου)
+            if old and old != hw and hw != trusted and psrc not in self.me:
                 gw = psrc == self.gateway
                 others = [i for i in self.mac_ips.get(hw, ()) if i != psrc and self.arp_first.get(i) == hw]
                 actor = others[0] if others else psrc
@@ -1267,7 +1274,7 @@ class NetState:
                    "high": by.get("high", 0), "med": by.get("med", 0), "low": by.get("low", 0),
                    "hosts": len(self.hosts), "pkts": self.total_pkts, "bytes": self.total_bytes,
                    "lan": sum(1 for h in self.hosts.values() if h.get("kind") == "local"),
-                   "last": {k: last[k] for k in ("id", "t", "type", "sev", "actor", "target")} if last else None,
+                   "last": {k: last[k] for k in ("id", "t", "type", "sev", "actor", "target", "detail")} if last else None,
                    "recent": [{k: a.get(k) for k in ("id", "t", "type", "sev", "actor", "target", "maint")} for a in al[:6]]}
         try:
             hs = self.health.status()["targets"] if self.health else []

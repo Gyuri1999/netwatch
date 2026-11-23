@@ -12,7 +12,8 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "io.github.netwatch.android"
+        // Keep the standalone edition installable alongside the older agent companion.
+        applicationId = "io.github.netwatch.mobile"
         minSdk = 29
         targetSdk = 35
         versionCode = buildNumber

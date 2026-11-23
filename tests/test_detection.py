@@ -900,3 +900,17 @@ def test_hunt_longtail_skips_known_resolver(state):
     targets = {f["target"] for f in fs}
     assert "1.1.1.1" not in targets          # resolver → αγνοείται
     assert "93.184.216.34" in targets        # κανονικός άγνωστος server → βγαίνει
+
+
+def test_arp_spoofing_ignores_zero_mac_and_self(state):
+    # μηδενική MAC (κάρτα δικτύου που κοιμάται/ξυπνά) → κανένας συναγερμός
+    c = Clock()
+    feed(state, c, src=GW, dst=ME, proto="ARP", arp=dict(op=2, psrc=GW, pdst=ME, hwsrc="00:00:00:00:00:00"))
+    assert [a for a in state.alerts if a["type"].startswith("ARP spoofing")] == []
+    # αλλαγή MAC στη ΔΙΚΗ σου IP → όχι MITM (εσύ στέλνεις το δικό σου ARP)
+    feed(state, c, src=ME, dst=GW, proto="ARP", arp=dict(op=2, psrc=ME, pdst=GW, hwsrc="aa:bb:cc:dd:ee:01"))
+    feed(state, c, src=ME, dst=GW, proto="ARP", arp=dict(op=2, psrc=ME, pdst=GW, hwsrc="aa:bb:cc:dd:ee:02"), dt=5)
+    assert [a for a in state.alerts if a["type"].startswith("ARP spoofing")] == []
+    # ο router όμως που αλλάζει MAC χτυπά κανονικά (δεν χαλάσαμε την ανίχνευση)
+    feed(state, c, src=GW, dst=ME, proto="ARP", arp=dict(op=2, psrc=GW, pdst=ME, hwsrc="de:ad:be:ef:00:66"), dt=5)
+    assert len([a for a in state.alerts if a["type"].startswith("ARP spoofing")]) == 1

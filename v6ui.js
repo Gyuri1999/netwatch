@@ -61,7 +61,7 @@
     b.setAttribute('data-noi18n', '');
     if (D.error === 'off' || D.error) { b.innerHTML = `<div class="card">${T('Ο έλεγχος IPv6 δεν είναι διαθέσιμος σε αυτή τη λειτουργία (π.χ. online demo ή ανάλυση pcap).', 'The IPv6 check is not available in this mode (e.g. online demo or pcap analysis).')}</div>`; return; }
     const v = D.verdict || {}, c = COL[v.level] || 'var(--dim)';
-    const st = { unknown: ['Έχει το δίκτυο IPv6;', 'Does this network have IPv6?'], off: ['IPv6: κλειστό', 'IPv6: off'], managed: ['IPv6: ανοιχτό και ελεγμένο', 'IPv6: on and managed'], unmanaged: ['IPv6: ανοιχτό, χωρίς έλεγχο', 'IPv6: on, unmanaged'] }[D.status] || ['IPv6', 'IPv6'];
+    const st = { unknown: ['Έχει το δίκτυο IPv6;', 'Does this network have IPv6?'], off: ['IPv6: κλειστό', 'IPv6: off'], ra_only: ['IPv6: χωρίς δημόσιες διευθύνσεις', 'IPv6: no public addresses'], managed: ['IPv6: ανοιχτό και ελεγμένο', 'IPv6: on and managed'], unmanaged: ['IPv6: ανοιχτό, χωρίς έλεγχο', 'IPv6: on, unmanaged'] }[D.status] || ['IPv6', 'IPv6'];
     let h = `<div class="card"><div class="v6-hero"><span class="v6-big">${D.status === 'unknown' ? '🌐' : IC[v.level] || '🌐'}</span><div style="flex:1;min-width:230px">
       <b style="font-size:16px">${T(...st)}</b><div style="font-size:13.5px;margin-top:3px;color:${c}">${E(L(v))}</div>
       <div class="dim" style="font-size:12.5px;margin-top:3px">${T('ενεργός έλεγχος', 'active check')}: ${D.demo ? 'demo' : when(D.checked)}${D.iface ? ' · ' + E(D.iface) : ''}${D.learning ? ' · ' + T('μαθαίνω ποιο είναι το router (10 λεπτά)', 'learning which router is yours (10 min)') : ''}</div></div>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">NetWatch</string>
+    <string name="app_name">NetWatch Mobile</string>
     <string name="setup_title">Connect to your NetWatch agent</string>
     <string name="setup_intro">Start NetWatch with --agent on your home server or PC. It prints a link like https://192.168.1.10:8765/?token=… and a SHA-256 fingerprint. Paste the whole link here.</string>
     <string name="setup_hint" translatable="false">https://192.168.1.10:8765/?token=…</string>
@@ -21,4 +21,61 @@
     <string name="channel_desc">Serious alerts from your NetWatch agent, checked every 15 minutes while you are on the same network</string>
     <string name="notif_more">and %1$d more</string>
     <string name="paste">Paste</string>
+    <string name="standalone_subtitle">Standalone network security tools for this phone and your local network.</string>
+    <string name="standalone_phone_title">📱 This phone</string>
+    <string name="standalone_internet_yes">Internet connection: available</string>
+    <string name="standalone_internet_no">Internet connection: limited or unavailable</string>
+    <string name="standalone_network_title">📶 Current network</string>
+    <string name="standalone_network_none">No active network details are available.</string>
+    <string name="standalone_wifi">Wi-Fi</string>
+    <string name="standalone_cellular">Mobile data</string>
+    <string name="standalone_ethernet">Ethernet</string>
+    <string name="standalone_other">Other network</string>
+    <string name="standalone_network_details">Connection: %1$s\nPhone address: %2$s\nGateway: %3$s\nDNS servers: %4$s</string>
+    <string name="standalone_scan_title">🔎 Find devices</string>
+    <string name="standalone_scan_info">A quick, user-started check of common service ports on your current private Wi-Fi subnet. It does not download data.</string>
+    <string name="standalone_scan_button">Scan my local network</string>
+    <string name="standalone_scan_idle">The scan runs only when you tap the button.</string>
+    <string name="standalone_scan_unsupported">Connect to a private Wi-Fi network with an IPv4 subnet up to 254 addresses to run this scan.</string>
+    <string name="standalone_scan_working">Checking common ports on your local subnet…</string>
+    <string name="standalone_scan_empty">No devices responded on the checked ports. Some devices may block these checks.</string>
+    <string name="standalone_scan_found">Responding devices (%1$d):\n%2$s</string>
+    <string name="standalone_agent_title">🛰 Full NetWatch dashboard</string>
+    <string name="standalone_agent_info">Connect to an optional NetWatch agent for whole-network monitoring, history and alerts.</string>
+    <string name="standalone_agent_button">Connect to an agent</string>
+    <string name="standalone_limit">The standalone checks run on this phone. Android does not let an ordinary app passively capture every device’s traffic on the Wi-Fi network.</string>
+    <string name="standalone_wifi_check_title">🛡 Wi-Fi security check</string>
+    <string name="standalone_wifi_check_info">Checks the current Wi-Fi protection mode, router, DNS servers and Android’s internet validation. Router identity cannot be proven by these checks.</string>
+    <string name="standalone_wifi_check_button">Check this Wi-Fi</string>
+    <string name="standalone_tool_idle">Run a check when you are ready.</string>
+    <string name="standalone_tool_working">Checking…</string>
+    <string name="standalone_tool_error">Could not complete the check: %1$s</string>
+    <string name="standalone_site_title">🌐 Website check</string>
+    <string name="standalone_site_info">Looks up DNS, checks the HTTPS certificate and selected security headers. Sends a HEAD request only and does not follow redirects.</string>
+    <string name="standalone_site_hint">https://example.com</string>
+    <string name="standalone_site_button">Check website</string>
+    <string name="standalone_email_title">✉️ Email domain protection</string>
+    <string name="standalone_email_info">Read-only DNS check for SPF and DMARC. Use a domain you manage; no email is sent.</string>
+    <string name="standalone_email_hint">example.com</string>
+    <string name="standalone_email_button">Check SPF and DMARC</string>
+    <string name="standalone_history_title">🗂 Local scan history</string>
+    <string name="standalone_history_empty">No local scans saved yet. History stays on this phone.</string>
+    <string name="standalone_history_entry">%1$s\nResponded: %2$d · New: %3$d\n%4$s</string>
+    <string name="standalone_export_button">Export report</string>
+    <string name="standalone_clear_button">Clear</string>
+    <string name="standalone_clear_title">Clear local history?</string>
+    <string name="standalone_clear_confirm">This removes saved scan history from this phone.</string>
+    <string name="standalone_export_done">Report exported.</string>
+    <string name="standalone_export_error">Could not export report: %1$s</string>
+    <string name="standalone_notifications">New devices found</string>
+    <string name="standalone_new_devices_title">%1$d new device(s) responded</string>
+    <string name="update_check">Check for updates</string>
+    <string name="update_title">Update available</string>
+    <string name="update_message">NetWatch %1$s is available. Download and install it?</string>
+    <string name="update_now">Update</string>
+    <string name="update_later">Later</string>
+    <string name="update_none">You have the latest version.</string>
+    <string name="update_downloading">Downloading update…</string>
+    <string name="update_failed">Could not update. Try again later.</string>
+    <string name="update_allow">Allow installing from this app, then try again.</string>
 </resources>

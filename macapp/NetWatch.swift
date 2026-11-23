@@ -5,6 +5,7 @@ import AppKit
 import ServiceManagement
 import SwiftUI
 import WebKit
+import UserNotifications
 
 enum Mode: String { case live, demo, pcap }
 
@@ -120,6 +121,7 @@ final class Backend {
                 p.executableURL = venvPython
                 p.arguments = args
                 p.currentDirectoryURL = appDir
+                p.environment = ProcessInfo.processInfo.environment.merging(["NETWATCH_HOST_APP": "1"]) { $1 }
                 let fh = FileHandle(forWritingAtPath: logFile.path)
                 fh?.seekToEndOfFile()
                 p.standardOutput = fh
@@ -331,17 +333,63 @@ final class WebController: NSObject, WKNavigationDelegate, WKUIDelegate, WKDownl
 }
 
 // ---------------- Εφαρμογή ----------------
-final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMenuDelegate, UNUserNotificationCenterDelegate {
     let backend = Backend()
     var web: WebController!
     var item: NSStatusItem!
     var timer: Timer?
     var status: [String: Any] = [:]
     var lastAlertId = 0
+    var lastNotifId = -1   // -1 = δεν έχουμε βάση ακόμη· δεν ειδοποιούμε για όσα υπήρχαν ήδη στην εκκίνηση
     var rates: [(t: Double, pkts: Double, bytes: Double, pps: Double, bps: Double)] = []
+
+    // Native ειδοποιήσεις (δικό μας εικονίδιο + κουμπιά «Άνοιξε» / «Σίγασε»)
+    func setupNotifications() {
+        let c = UNUserNotificationCenter.current()
+        c.delegate = self
+        let open = UNNotificationAction(identifier: "open", title: "Άνοιξε", options: [.foreground])
+        let mute = UNNotificationAction(identifier: "mute", title: "Σίγασε 1 ώρα", options: [])
+        c.setNotificationCategories([UNNotificationCategory(identifier: "nw.alert", actions: [open, mute],
+                                                            intentIdentifiers: [], options: [])])
+        c.requestAuthorization(options: [.alert, .sound]) { _, _ in }
+    }
+
+    func postAlertNotification(_ a: [String: Any]) {
+        let sev = a["sev"] as? String ?? "high"
+        let ic = sev == "high" ? "🔴" : sev == "med" ? "🟠" : "🟡"
+        let n = UNMutableNotificationContent()
+        n.title = "\(ic) NetWatch"
+        n.subtitle = a["type"] as? String ?? "Ειδοποίηση"
+        n.body = String((a["detail"] as? String ?? "").prefix(220))
+        n.sound = .default
+        n.categoryIdentifier = "nw.alert"
+        n.userInfo = ["type": a["type"] as? String ?? "", "actor": a["actor"] as? String ?? ""]
+        let req = UNNotificationRequest(identifier: "nw-\(a["id"] as? Int ?? 0)", content: n, trigger: nil)
+        UNUserNotificationCenter.current().add(req)
+    }
+
+    func userNotificationCenter(_ c: UNUserNotificationCenter, willPresent n: UNNotification,
+                                withCompletionHandler h: @escaping (UNNotificationPresentationOptions) -> Void) {
+        h([.banner, .sound])
+    }
+
+    func userNotificationCenter(_ c: UNUserNotificationCenter, didReceive r: UNNotificationResponse,
+                                withCompletionHandler h: @escaping () -> Void) {
+        let info = r.notification.request.content.userInfo
+        if r.actionIdentifier == "mute", let t = info["type"] as? String, !t.isEmpty {
+            backend.post("api/alerts/mute", ["type": t, "actor": info["actor"] as? String ?? "",
+                                             "minutes": 60, "note": "Από την ειδοποίηση"]) { _ in
+                DispatchQueue.main.async { self.poll() }
+            }
+        } else {
+            DispatchQueue.main.async { self.showWindow(); self.runJS("setView('page');showTab('alerts')", orLoad: "tab=alerts") }
+        }
+        h()
+    }
 
     func applicationDidFinishLaunching(_ n: Notification) {
         buildMainMenu()
+        setupNotifications()
         web = WebController()
         web.window.delegate = self
         item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
@@ -391,6 +439,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         backend.stop(wait: true)
         status = [:]
         lastAlertId = 0
+        lastNotifId = -1
         web.message("Αλλαγή λειτουργίας…")
         showWindow()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.backend.start(m, pcap: pcap) }
@@ -449,7 +498,15 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         var level = high > 0 ? "bad" : med > 0 ? "warn" : "ok"
         if let wl = wifi?["level"] as? String, wl == "bad" || (wl == "warn" && level == "ok") { level = wl }
         setIcon(level: level, count: total)
-        if let last = j["last"] as? [String: Any], let id = last["id"] as? Int { lastAlertId = max(lastAlertId, id) }
+        if let last = j["last"] as? [String: Any], let id = last["id"] as? Int {
+            if lastNotifId < 0 {
+                lastNotifId = id                              // βάση στην εκκίνηση — χωρίς ειδοποίηση για το ιστορικό
+            } else if id > lastNotifId {
+                lastNotifId = id
+                if (last["sev"] as? String) == "high" { postAlertNotification(last) }
+            }
+            lastAlertId = max(lastAlertId, id)
+        }
     }
 
     func setIcon(level: String, count: Int) {
