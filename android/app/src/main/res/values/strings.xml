@@ -21,4 +21,27 @@
     <string name="channel_desc">Serious alerts from your NetWatch agent, checked every 15 minutes while you are on the same network</string>
     <string name="notif_more">and %1$d more</string>
     <string name="paste">Paste</string>
+    <string name="standalone_subtitle">Standalone network security tools for this phone and your local network.</string>
+    <string name="standalone_phone_title">📱 This phone</string>
+    <string name="standalone_internet_yes">Internet connection: available</string>
+    <string name="standalone_internet_no">Internet connection: limited or unavailable</string>
+    <string name="standalone_network_title">📶 Current network</string>
+    <string name="standalone_network_none">No active network details are available.</string>
+    <string name="standalone_wifi">Wi-Fi</string>
+    <string name="standalone_cellular">Mobile data</string>
+    <string name="standalone_ethernet">Ethernet</string>
+    <string name="standalone_other">Other network</string>
+    <string name="standalone_network_details">Connection: %1$s\nPhone address: %2$s\nGateway: %3$s\nDNS servers: %4$s</string>
+    <string name="standalone_scan_title">🔎 Find devices</string>
+    <string name="standalone_scan_info">A quick, user-started check of common service ports on your current private Wi-Fi subnet. It does not download data.</string>
+    <string name="standalone_scan_button">Scan my local network</string>
+    <string name="standalone_scan_idle">The scan runs only when you tap the button.</string>
+    <string name="standalone_scan_unsupported">Connect to a private Wi-Fi network with an IPv4 subnet up to 254 addresses to run this scan.</string>
+    <string name="standalone_scan_working">Checking common ports on your local subnet…</string>
+    <string name="standalone_scan_empty">No devices responded on the checked ports. Some devices may block these checks.</string>
+    <string name="standalone_scan_found">Responding devices (%1$d):\n%2$s</string>
+    <string name="standalone_agent_title">🛰 Full NetWatch dashboard</string>
+    <string name="standalone_agent_info">Connect to an optional NetWatch agent for whole-network monitoring, history and alerts.</string>
+    <string name="standalone_agent_button">Connect to an agent</string>
+    <string name="standalone_limit">The standalone checks run on this phone. Android does not let an ordinary app passively capture every device’s traffic on the Wi-Fi network.</string>
 </resources>
