@@ -5,14 +5,25 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.LinkProperties
 import android.net.NetworkCapabilities
+import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Bundle
-import android.view.Gravity
-import android.view.View
+import android.Manifest
+import android.content.pm.PackageManager
+import android.net.Uri
+import android.text.InputType
 import android.widget.Button
+import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.appcompat.app.AlertDialog
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
 import java.io.IOException
 import java.net.ConnectException
 import java.net.Inet4Address
@@ -21,6 +32,8 @@ import java.net.Socket
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
+import java.text.DateFormat
+import java.util.Date
 import kotlin.concurrent.thread
 
 /** Local-first Android dashboard. The agent remains an optional, separate view. */
@@ -30,7 +43,23 @@ class StandaloneActivity : AppCompatActivity() {
     private lateinit var scanResult: TextView
     private lateinit var scanButton: Button
     private lateinit var internetState: TextView
+    private lateinit var wifiResult: TextView
+    private lateinit var siteResult: TextView
+    private lateinit var siteInput: EditText
+    private lateinit var emailResult: TextView
+    private lateinit var emailInput: EditText
+    private lateinit var historyResult: TextView
+    private val history by lazy { StandaloneHistory(this) }
+    private var pendingNotification: List<String> = emptyList()
     private val worker = Executors.newFixedThreadPool(32)
+
+    private val askNotifications = registerForActivityResult(ActivityResultContracts.RequestPermission()) { allowed ->
+        if (allowed && pendingNotification.isNotEmpty()) showNewDeviceNotification(pendingNotification)
+        pendingNotification = emptyList()
+    }
+    private val exportReport = registerForActivityResult(ActivityResultContracts.CreateDocument("text/plain")) { uri ->
+        if (uri != null) writeReport(uri)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -58,6 +87,51 @@ class StandaloneActivity : AppCompatActivity() {
         netCard.addView(networkCard)
         content.addView(netCard)
 
+        val wifiCard = card()
+        wifiCard.addView(text(getString(R.string.standalone_wifi_check_title), 18f, true))
+        wifiCard.addView(text(getString(R.string.standalone_wifi_check_info), 14f, false))
+        wifiResult = text(getString(R.string.standalone_tool_idle), 14f, false)
+        wifiCard.addView(wifiResult)
+        wifiCard.addView(Button(this).apply {
+            text = getString(R.string.standalone_wifi_check_button)
+            setOnClickListener { checkWifi() }
+        })
+        content.addView(wifiCard)
+
+        val siteCard = card()
+        siteCard.addView(text(getString(R.string.standalone_site_title), 18f, true))
+        siteCard.addView(text(getString(R.string.standalone_site_info), 14f, false))
+        siteInput = EditText(this).apply {
+            hint = getString(R.string.standalone_site_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine(true)
+        }
+        siteCard.addView(siteInput)
+        siteResult = text(getString(R.string.standalone_tool_idle), 14f, false)
+        siteCard.addView(siteResult)
+        siteCard.addView(Button(this).apply {
+            text = getString(R.string.standalone_site_button)
+            setOnClickListener { runTool(siteResult, this) { StandaloneSecurity.inspectSite(siteInput.text.toString()) } }
+        })
+        content.addView(siteCard)
+
+        val emailCard = card()
+        emailCard.addView(text(getString(R.string.standalone_email_title), 18f, true))
+        emailCard.addView(text(getString(R.string.standalone_email_info), 14f, false))
+        emailInput = EditText(this).apply {
+            hint = getString(R.string.standalone_email_hint)
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
+            setSingleLine(true)
+        }
+        emailCard.addView(emailInput)
+        emailResult = text(getString(R.string.standalone_tool_idle), 14f, false)
+        emailCard.addView(emailResult)
+        emailCard.addView(Button(this).apply {
+            text = getString(R.string.standalone_email_button)
+            setOnClickListener { runTool(emailResult, this) { checkEmailDomain(emailInput.text.toString()) } }
+        })
+        content.addView(emailCard)
+
         val scanCard = card()
         scanCard.addView(text(getString(R.string.standalone_scan_title), 18f, true))
         scanCard.addView(text(getString(R.string.standalone_scan_info), 14f, false))
@@ -69,6 +143,22 @@ class StandaloneActivity : AppCompatActivity() {
         scanResult = text(getString(R.string.standalone_scan_idle), 14f, false)
         scanCard.addView(scanResult)
         content.addView(scanCard)
+
+        val historyCard = card()
+        historyCard.addView(text(getString(R.string.standalone_history_title), 18f, true))
+        historyResult = text("", 13f, false)
+        historyCard.addView(historyResult)
+        val historyActions = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = android.view.Gravity.CENTER_VERTICAL }
+        historyActions.addView(Button(this).apply {
+            text = getString(R.string.standalone_export_button)
+            setOnClickListener { exportReport.launch("netwatch-mobile-report.txt") }
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        historyActions.addView(Button(this).apply {
+            text = getString(R.string.standalone_clear_button)
+            setOnClickListener { confirmClearHistory() }
+        }, LinearLayout.LayoutParams(0, -2, 1f))
+        historyCard.addView(historyActions)
+        content.addView(historyCard)
 
         val agentCard = card()
         agentCard.addView(text(getString(R.string.standalone_agent_title), 18f, true))
@@ -91,6 +181,7 @@ class StandaloneActivity : AppCompatActivity() {
         val scroll = ScrollView(this).apply { addView(content) }
         setContentView(scroll)
         refreshNetwork()
+        refreshHistory()
     }
 
     override fun onDestroy() {
@@ -111,6 +202,30 @@ class StandaloneActivity : AppCompatActivity() {
         val validated = caps?.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED) == true
         internetState.text = getString(if (validated) R.string.standalone_internet_yes else R.string.standalone_internet_no)
         networkCard.text = describeNetwork(caps, props)
+    }
+
+    private fun checkWifi() {
+        wifiResult.text = StandaloneSecurity.wifiSummary(
+            getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager,
+            getSystemService(Context.WIFI_SERVICE) as WifiManager
+        )
+    }
+
+    private fun checkEmailDomain(domain: String): String {
+        val cm = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val resolvers = cm.activeNetwork?.let(cm::getLinkProperties)?.dnsServers.orEmpty()
+        return StandaloneSecurity.emailPosture(domain, resolvers)
+    }
+
+    private fun runTool(output: TextView, button: Button, action: () -> String) {
+        button.isEnabled = false
+        output.text = getString(R.string.standalone_tool_working)
+        thread {
+            val result = try { action() } catch (e: Exception) {
+                getString(R.string.standalone_tool_error, e.message ?: e.javaClass.simpleName)
+            }
+            runOnUiThread { output.text = result; button.isEnabled = true }
+        }
     }
 
     private fun describeNetwork(caps: NetworkCapabilities?, props: LinkProperties?): String {
@@ -142,13 +257,76 @@ class StandaloneActivity : AppCompatActivity() {
         scanButton.isEnabled = false
         scanResult.text = getString(R.string.standalone_scan_working)
         thread {
-            val found = scanSubnet(address.address as Inet4Address, address.prefixLength)
+            val found = try { scanSubnet(address.address as Inet4Address, address.prefixLength) }
+                catch (e: Exception) {
+                    runOnUiThread { scanButton.isEnabled = true; scanResult.text = getString(R.string.standalone_tool_error, e.message ?: "scan error") }
+                    return@thread
+                }
+            val gateway = props.routes.firstOrNull { it.isDefaultRoute }?.gateway?.hostAddress ?: "unknown-router"
+            val networkKey = "${address.address.hostAddress}/${address.prefixLength} via $gateway"
+            val record = history.record(networkKey, found)
             runOnUiThread {
                 scanButton.isEnabled = true
                 scanResult.text = if (found.isEmpty()) getString(R.string.standalone_scan_empty)
                     else getString(R.string.standalone_scan_found, found.size, found.joinToString("\n") { "• $it" })
+                refreshHistory()
+                if (record.newDevices.isNotEmpty()) postNewDeviceNotification(record.newDevices)
             }
         }
+    }
+
+    private fun refreshHistory() {
+        if (!::historyResult.isInitialized) return
+        val recent = history.records().take(5)
+        historyResult.text = if (recent.isEmpty()) getString(R.string.standalone_history_empty) else recent.joinToString("\n\n") {
+            getString(R.string.standalone_history_entry,
+                DateFormat.getDateTimeInstance(DateFormat.SHORT, DateFormat.SHORT).format(Date(it.at)),
+                it.devices.size, it.newDevices.size, it.network)
+        }
+    }
+
+    private fun confirmClearHistory() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.standalone_clear_title)
+            .setMessage(R.string.standalone_clear_confirm)
+            .setNegativeButton(android.R.string.cancel, null)
+            .setPositiveButton(R.string.standalone_clear_button) { _, _ -> history.clear(); refreshHistory() }
+            .show()
+    }
+
+    private fun writeReport(uri: Uri) {
+        try {
+            contentResolver.openOutputStream(uri)?.use { it.write(history.report().toByteArray(Charsets.UTF_8)) }
+            Toast.makeText(this, R.string.standalone_export_done, Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(this, getString(R.string.standalone_export_error, e.message ?: "unknown error"), Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun postNewDeviceNotification(hosts: List<String>) {
+        ensureNotificationChannel()
+        if (Build.VERSION.SDK_INT >= 33 && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            pendingNotification = hosts
+            askNotifications.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else showNewDeviceNotification(hosts)
+    }
+
+    private fun ensureNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            val manager = getSystemService(android.app.NotificationManager::class.java)
+            manager.createNotificationChannel(android.app.NotificationChannel("standalone_devices", getString(R.string.standalone_notifications), android.app.NotificationManager.IMPORTANCE_DEFAULT))
+        }
+    }
+
+    private fun showNewDeviceNotification(hosts: List<String>) {
+        val notification = NotificationCompat.Builder(this, "standalone_devices")
+            .setSmallIcon(android.R.drawable.stat_sys_warning)
+            .setContentTitle(getString(R.string.standalone_new_devices_title, hosts.size))
+            .setContentText(hosts.take(4).joinToString(", "))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(hosts.joinToString(", ")))
+            .setAutoCancel(true)
+            .build()
+        try { NotificationManagerCompat.from(this).notify(3101, notification) } catch (_: SecurityException) { }
     }
 
     /** User-triggered TCP reachability check on the current private /24 or smaller subnet. */
