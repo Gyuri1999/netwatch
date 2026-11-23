@@ -14,7 +14,7 @@ import packets
 import techkit
 from concurrent.futures import ThreadPoolExecutor
 
-from core import BRUTE_PORTS, DEFAULT_CONFIG, EXTRA_MITRE, MITRE, PLAIN_PORTS, RISKY_SERVICES, RULES_DIR, SERVICES, SEV, SUSPECT_PORTS, TOR_PORTS, DistinctWindow, Window, app_label, chown_to_user, detect_net, detector_for, dga_score, entropy, ip_kind, local_tor_running, log, mask_user, mitre_for, norm_mac, random_mac, service_port, split_domain
+from core import BRUTE_PORTS, DEFAULT_CONFIG, DNS_RESOLVERS, EXTRA_MITRE, MITRE, PLAIN_PORTS, RISKY_SERVICES, RULES_DIR, SERVICES, SEV, SUSPECT_PORTS, TOR_PORTS, DistinctWindow, Window, app_label, chown_to_user, detect_net, detector_for, dga_score, entropy, ip_kind, local_tor_running, log, mask_user, mitre_for, norm_mac, random_mac, service_port, split_domain
 from storage import History, Intel
 
 
@@ -360,7 +360,9 @@ class NetState:
         if mine:  # η δική σου δοκιμή: φαίνεται (για να δεις τι πιάνει η άμυνα), αλλά δεν είναι συναγερμός
             a["selftest"], mark = mine, False
         self.alerts.appendleft(a)
-        h = self.host(actor, t)
+        # Μερικοί συναγερμοί (DNS flood/amplification/NXDOMAIN) έχουν «δράστη» που δεν είναι IP
+        # (π.χ. "DNS", "3 πηγές", ή πολλές IP μαζί)· μη φτιάχνεις ψεύτικη συσκευή γι' αυτόν.
+        h = self.host(actor, t) if ip_kind(actor) != "other" else None
         if h:
             if mark:
                 h["threat"] = max(h["threat"], SEV[sev])
@@ -407,14 +409,14 @@ class NetState:
 
     # ---------- main pipeline ----------
     def process(self, P):
-        self.pkt_seq = getattr(self, "pkt_seq", 0) + 1
-        P["_id"] = self.pkt_seq  # για να ανοίγει το ίδιο πακέτο από τη λίστα 📦 Πακέτα
-        packets.remember(P, P.pop("_raw", None))
         t, L = P["t"], P["len"]
         src, dst, proto = P["src"], P["dst"], P["proto"]
         sp, dp = P.get("sp"), P.get("dp")
         label = app_label(proto, sp, dp)
         with self.lock:
+            self.pkt_seq = getattr(self, "pkt_seq", 0) + 1
+            P["_id"] = self.pkt_seq  # για να ανοίγει το ίδιο πακέτο από τη λίστα 📦 Πακέτα
+            packets.remember(P, P.pop("_raw", None))
             if self.first_t is None:
                 self.first_t = t
             self.last_t = max(self.last_t, t)
@@ -972,7 +974,7 @@ class NetState:
 
     # --- C2 beaconing: συνδέσεις με «ρολόι» ---
     def _beacon(self, src, dst, dp, t):
-        if dp in (53, 123):
+        if dp in (53, 123) or dst in DNS_RESOLVERS:  # DNS/NTP και γνωστοί resolvers (DoH/DoT) = κανονικό «ρολόι»
             return
         b = self._th("beaconing")
         key = (src, dst, dp)

@@ -17,6 +17,18 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 GEO_FIELDS = ("status,message,country,countryCode,regionName,city,lat,lon,"
               "isp,org,as,asname,proxy,hosting,mobile,query")
 
+# Δημόσιοι DNS resolvers: DoH (443) / DoT (853) / DNS ρωτάνε τακτικά → μοιάζουν με beaconing, αλλά δεν είναι C2
+DNS_RESOLVERS = frozenset((
+    "1.1.1.1", "1.0.0.1", "1.1.1.2", "1.0.0.2", "1.1.1.3", "1.0.0.3",            # Cloudflare (+ families)
+    "8.8.8.8", "8.8.4.4",                                                      # Google
+    "9.9.9.9", "149.112.112.112", "9.9.9.10", "149.112.112.10", "9.9.9.11",    # Quad9
+    "208.67.222.222", "208.67.220.220", "208.67.222.123", "208.67.220.123",    # OpenDNS / Cisco
+    "94.140.14.14", "94.140.15.15", "76.76.2.0", "76.76.10.0",                 # AdGuard, Control D
+    "185.228.168.9", "185.228.169.9", "194.242.2.2", "45.90.28.0", "45.90.30.0",  # CleanBrowsing, Mullvad, NextDNS
+    "2606:4700:4700::1111", "2606:4700:4700::1001", "2001:4860:4860::8888", "2001:4860:4860::8844",
+    "2620:fe::fe", "2620:fe::9",
+))
+
 SERVICES = {
     20: "FTP-data", 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 53: "DNS",
     67: "DHCP", 68: "DHCP", 80: "HTTP", 110: "POP3", 123: "NTP", 137: "NetBIOS",
