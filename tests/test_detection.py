@@ -10,6 +10,7 @@ sys.path.insert(0, os.path.join(ROOT, "tools"))
 
 import capture  # noqa: E402
 import detect  # noqa: E402
+import hunt  # noqa: E402
 import netwatch as nw  # noqa: E402
 
 ME, GW = "192.168.1.50", "192.168.1.1"
@@ -212,6 +213,14 @@ def test_beaconing_detected(state):
         feed(state, c, src=ME, dst=c2, proto="TCP", sp=50000 + i, dp=8443, flags="S", dt=60 + (i % 3) * 0.5)
     a = next(a for a in state.alerts if a["type"].startswith("Beaconing"))
     assert a["actor"] == c2 and a["target"] == ME and a["mitre"]["id"] == "T1071"
+
+
+def test_dns_resolver_is_not_beaconing(state):
+    c = Clock()
+    for dst, dp in (("1.1.1.1", 443), ("8.8.8.8", 853), ("9.9.9.9", 443)):  # DoH/DoT κάθε ~30s, πολύ «ρολόι»
+        for i in range(12):
+            feed(state, c, src=ME, dst=dst, proto="TCP", sp=50000 + i, dp=dp, flags="S", dt=30)
+    assert not any(a["type"].startswith("Beaconing") for a in state.alerts)
 
 
 def test_irregular_browsing_is_not_beaconing(state):
@@ -834,3 +843,60 @@ def test_sweep_from_named_device_is_expected_but_not_from_iot(state, tmp_path):
 def test_sweep_from_unknown_device_still_alerts(state):
     al = _sweep(state, EVIL, "de:ad:be:ef:00:66")
     assert al and not al[0].get("benign")
+
+
+# ---------------- διορθώσεις bug (έλεγχος κώδικα) ----------------
+def test_synthetic_alert_actor_makes_no_fake_host(state):
+    """Bug #1: δράστης που δεν είναι IP (DNS flood/amplification) δεν φτιάχνει ψεύτικη συσκευή."""
+    t = 1_700_000_000.0
+    state.alert("NXDOMAIN flood", "med", "DNS", "example.com", "d", t)
+    state.alert("DNS amplification", "high", "8.8.8.8, 9.9.9.9", "x", "d", t)
+    state.alert("DNS flood", "high", "3 πηγές", "server", "d", t)
+    assert "DNS" not in state.hosts
+    assert "8.8.8.8, 9.9.9.9" not in state.hosts
+    assert "3 πηγές" not in state.hosts
+    # ενώ μια κανονική δημόσια IP εξακολουθεί να φτιάχνει host
+    state.alert("Port scan", "high", "203.0.113.5", ME, "d", t)
+    assert "203.0.113.5" in state.hosts
+
+
+def test_packet_ids_are_unique(state):
+    """Bug #5: κάθε πακέτο παίρνει δικό του _id (η αρίθμηση γίνεται μέσα στο κλείδωμα)."""
+    c = Clock()
+    feed(state, c, src=ME, dst=GW, proto="UDP", sp=5, dp=53)
+    feed(state, c, src=GW, dst=ME, proto="UDP", sp=53, dp=5)
+    ids = [p["_id"] for p in state.recent]
+    assert len(ids) == len(set(ids)) and all(isinstance(i, int) for i in ids)
+
+
+def test_hunt_alerted_matches_whole_token_not_substring(state):
+    """Bug #2: το «ήδη ειδοποιήθηκε» ταιριάζει ολόκληρη IP/domain, όχι substring."""
+    h = hunt.Hunt(state)
+    D = {"alerts": [{"actor": "15.9.1.20", "target": "x", "detail": "κίνηση προς 15.9.1.20"}]}
+    assert h._alerted(D, "15.9.1.20")        # ακριβές
+    assert not h._alerted(D, "5.9.1.2")      # όχι substring μέσα στην 15.9.1.20
+    D2 = {"alerts": [{"actor": "x", "target": "y", "detail": "ρώτησε data.top"}]}
+    assert h._alerted(D2, "data.top")
+    assert not h._alerted(D2, "a.top")       # όχι substring μέσα στο data.top
+
+
+def test_hunt_counts_repeated_dns_queries(state):
+    """Bug #3: το ίδιο domain ρωτημένο πολλές φορές μετριέται σωστά (όχι 1)."""
+    c = Clock()
+    for _ in range(4):
+        feed(state, c, src=ME, dst=GW, proto="UDP", sp=50000, dp=53, dns_q=("rare.example.com",))
+    D = hunt.Hunt(state)._data()
+    assert D["dns"][(ME, "rare.example.com")][0] == 4
+
+
+def test_hunt_longtail_skips_known_resolver(state):
+    """Bug #4: ένας γνωστός DNS resolver (1.1.1.1) δεν βγαίνει ως «σπάνιος προορισμός»."""
+    c = Clock()
+    for _ in range(3):
+        feed(state, c, src="192.168.1.77", dst="1.1.1.1", proto="TCP", sp=50000, dp=443, flags="S")
+        feed(state, c, src="192.168.1.77", dst="93.184.216.34", proto="TCP", sp=50001, dp=443, flags="S")
+    hu = hunt.Hunt(state)
+    fs, _ = hu._h_longtail(hu._data())
+    targets = {f["target"] for f in fs}
+    assert "1.1.1.1" not in targets          # resolver → αγνοείται
+    assert "93.184.216.34" in targets        # κανονικός άγνωστος server → βγαίνει

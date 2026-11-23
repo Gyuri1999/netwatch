@@ -22,10 +22,11 @@ import collections
 import contextlib
 import ipaddress
 import math
+import re
 import threading
 import time
 
-from core import SERVICES, dga_score, entropy, split_domain
+from core import DNS_RESOLVERS, SERVICES, dga_score, entropy, split_domain
 
 MAX_FINDINGS = 25
 BAD_CC = {"CN": "Κίνα", "RU": "Ρωσία", "KP": "Βόρεια Κορέα", "IR": "Ιράν"}
@@ -300,16 +301,22 @@ class Hunt:
             dns = {k: v[:] for k, v in self.dnsq.items()}
             ja4 = {ip: collections.Counter(c) for ip, c in self.ja4.items()}
             ja4s = {ip: {k: sorted(v) for k, v in d.items()} for ip, d in self.ja4_sni.items()}
+        hook_keys = set(dns)  # ό,τι μέτρησε ήδη το observe(): μην το ξαναμετρήσεις από τα recent
         for P in D["recent"]:
             try:
                 for client, name, isnx in ((P.get("src"), (P.get("dns_q") or (None,))[0], False),
                                            (P.get("dst"), P.get("nx"), True)):
-                    if client and name:
-                        k = (client, str(name).lower().rstrip("."))
-                        if k not in dns:
-                            dns[k] = [0, P.get("t", 0), P.get("t", 0), False]
-                            dns[k][0] += 0 if isnx else 1
-                        dns[k][3] = dns[k][3] or isnx
+                    if not (client and name):
+                        continue
+                    k = (client, str(name).lower().rstrip("."))
+                    if k in hook_keys:
+                        continue
+                    pt = P.get("t", 0)
+                    if k not in dns:
+                        dns[k] = [0, pt, pt, False]
+                    dns[k][0] += 0 if isnx else 1
+                    dns[k][2] = max(dns[k][2], pt)
+                    dns[k][3] = dns[k][3] or isnx
             except AttributeError:
                 continue
         D["dns"] = dns
@@ -420,12 +427,19 @@ class Hunt:
         return any(w in n for w in BIG_NAMES)
 
     def _alerted(self, D, *keys):
+        # Ταίριασμα IP/domain με όρια, όχι substring: η "5.9.1.2" δεν πρέπει να «ταιριάζει» μέσα στην
+        # "15.9.1.20", ούτε το "a.top" μέσα στο "data.top".
         keys = [str(k) for k in keys if k]
+        if not keys:
+            return False
+        pats = [re.compile(r"(?<![\w.]){}(?![\w.])".format(re.escape(k))) for k in keys]
         for a in D["alerts"]:
             if a.get("selftest"):
                 continue
-            hay = " ".join(str(a.get(f) or "") for f in ("actor", "target", "detail"))
-            if any(k in hay for k in keys):
+            if any(str(a.get(f) or "") == k for f in ("actor", "target") for k in keys):
+                return True
+            detail = str(a.get("detail") or "")
+            if any(p.search(detail) for p in pats):
                 return True
         return False
 
@@ -477,7 +491,7 @@ class Hunt:
         cc_count = collections.Counter(self._cc(D, peer) for peer in P)
         out = []
         for peer, p in P.items():
-            if len(p["devs"]) != 1 or peer in D["lab"]:
+            if len(p["devs"]) != 1 or peer in D["lab"] or peer in DNS_RESOLVERS:
                 continue
             dev = next(iter(p["devs"]))
             if self._skip(D, dev):
@@ -504,7 +518,7 @@ class Hunt:
         out, n_pairs = [], 0
         for (dev, peer), rows in self._edges(D).items():
             n_pairs += 1
-            if self._skip(D, dev, me=False) or peer in D["lab"] or len(rows) < 6:
+            if self._skip(D, dev, me=False) or peer in D["lab"] or peer in DNS_RESOLVERS or len(rows) < 6:
                 continue
             ts = sorted({r[0] for r in rows})
             gaps = [(b - a) / 60 for a, b in zip(ts, ts[1:])]
@@ -572,7 +586,7 @@ class Hunt:
         min_up = 1_000_000
         # α) ανά δημόσια IP: ό,τι «μπήκε» σε αυτήν = ό,τι ανέβηκε από το σπίτι
         for peer, h in D["hosts"].items():
-            if h["kind"] != "public" or peer in D["lab"]:
+            if h["kind"] != "public" or peer in D["lab"] or peer in DNS_RESOLVERS:
                 continue
             up, down = h["bytes_in"], h["bytes_out"]
             if up < min_up or up / (down + 1) < 3:
@@ -734,7 +748,7 @@ class Hunt:
             cand[(client, q)] = {"n": n, "first": t0, "last": t1, "nx": nx, "src": "dns"}
         # ονόματα που λύθηκαν σε δημόσιες IP που μίλησε μόνο μία συσκευή
         for peer, h in D["hosts"].items():
-            if h["kind"] != "public" or not h["names"]:
+            if h["kind"] != "public" or not h["names"] or peer in DNS_RESOLVERS:
                 continue
             devs = [ip for ip, x in D["hosts"].items() if x["kind"] == "local" and x["victims"].get(peer)]
             if len(devs) == 1:
@@ -796,7 +810,7 @@ class Hunt:
         for peer, p in P.items():
             h = D["hosts"].get(peer) or {}
             cc, intel = self._cc(D, peer), [f.get("name") for f in h.get("intel") or [] if isinstance(f, dict)]
-            if peer in D["lab"] or (cc not in BAD_CC and not intel):
+            if peer in D["lab"] or peer in DNS_RESOLVERS or (cc not in BAD_CC and not intel):
                 continue
             nb = p["bytes"] or (h.get("bytes_in", 0) + h.get("bytes_out", 0))
             pk = h.get("pkts") or sum(p["devs"].values())
