@@ -158,3 +158,27 @@ def test_ready_update_is_applied_at_startup_once(tmp_path):
     # ψεύτικο ready.json που δείχνει έξω από το update/ → αγνοείται και σβήνεται
     _w(str(upd / "ready.json"), json.dumps({"dir": str(bundle)}))
     assert launcher.startup_update(str(bundle), str(upd)) is None and not upd.exists()
+
+
+def test_live_instance_detects_dead_and_alive(tmp_path, monkeypatch):
+    port_file = tmp_path / "port"
+    monkeypatch.setattr(launcher, "PORTFILE", str(port_file))
+    # κανένα αρχείο port → None
+    assert launcher.live_instance(timeout=0.1) is None
+    port_file.write_text("8765")
+    # υπάρχει port αλλά κανείς δεν απαντά → None (μπαγιάτικο· η νέα έκδοση θα ξεκινήσει)
+    def boom(*a, **k):
+        raise OSError("connection refused")
+    monkeypatch.setattr(launcher.urllib.request, "urlopen", boom)
+    assert launcher.live_instance(timeout=0.1) is None
+
+    # απαντά → επιστρέφει το port (η τρέχουσα έκδοση ανοίγει απλώς το παράθυρο)
+    class R:
+        def read(self, *_):
+            return b"{"
+        def __enter__(self):
+            return self
+        def __exit__(self, *a):
+            return False
+    monkeypatch.setattr(launcher.urllib.request, "urlopen", lambda *a, **k: R())
+    assert launcher.live_instance(timeout=0.1) == 8765
