@@ -68,6 +68,7 @@ class StandaloneActivity : AppCompatActivity() {
         content = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             setPadding(pad, pad, pad, pad)
+            setBackgroundColor(0xFF0B1220.toInt())   // σταθερά σκούρο look (ανεξάρτητα light/dark κινητού)
         }
         content.addView(text("NetWatch", 28f, true))
         content.addView(text(getString(R.string.standalone_subtitle), 14f, false).apply {
@@ -172,16 +173,24 @@ class StandaloneActivity : AppCompatActivity() {
         })
         content.addView(agentCard)
 
+        content.addView(Button(this).apply {
+            text = getString(R.string.update_check)
+            setOnClickListener { Updater.check(this@StandaloneActivity, silent = false) }
+            val lp = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(6) }
+            layoutParams = lp
+        })
+
         content.addView(TextView(this).apply {
             text = getString(R.string.standalone_limit)
             textSize = 12f
-            alpha = .72f
+            setTextColor(0xFF9FB0CC.toInt())   // υποσημείωση σε σκούρο φόντο — ευανάγνωστη
             setPadding(dp(4), dp(8), dp(4), dp(12))
         })
         val scroll = ScrollView(this).apply { addView(content) }
         setContentView(scroll)
         refreshNetwork()
         refreshHistory()
+        Updater.check(this, silent = true)   // σιωπηλός έλεγχος· μιλάει μόνο αν υπάρχει νέα έκδοση
     }
 
     override fun onDestroy() {
@@ -386,8 +395,12 @@ class StandaloneActivity : AppCompatActivity() {
 
     private fun card() = LinearLayout(this).apply {
         orientation = LinearLayout.VERTICAL
-        setPadding(dp(14), dp(12), dp(14), dp(12))
-        background = getDrawable(android.R.drawable.dialog_holo_light_frame)
+        setPadding(dp(16), dp(14), dp(16), dp(14))
+        background = android.graphics.drawable.GradientDrawable().apply {
+            cornerRadius = dp(14).toFloat()
+            setColor(0xFF141C2E.toInt())           // σκούρα κάρτα
+            setStroke(dp(1), 0xFF2A3A57.toInt())   // διακριτικό περίγραμμα
+        }
         val lp = LinearLayout.LayoutParams(-1, -2).apply { bottomMargin = dp(12) }
         layoutParams = lp
     }
@@ -396,7 +409,8 @@ class StandaloneActivity : AppCompatActivity() {
         text = value
         textSize = size
         if (bold) setTypeface(typeface, android.graphics.Typeface.BOLD)
-        setPadding(0, dp(3), 0, dp(3))
+        setTextColor(if (bold) 0xFFF2F6FF.toInt() else 0xFFC3D0E6.toInt())  // ανοιχτό κείμενο, ευανάγνωστο σε σκούρο
+        setPadding(0, dp(4), 0, dp(4))
     }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
