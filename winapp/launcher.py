@@ -499,6 +499,8 @@ class App:
         subprocess.Popen(apply_cmd(new), stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                          cwd=SUPPORT, creationflags=0x00000008 | 0x00000200 if IS_WIN else 0)  # DETACHED | NEW_GROUP: ζει μετά από εμάς
         self.quit()
+        # Σιγουριά: να κλείσει γρήγορα η διεργασία ώστε το apply.ps1 να προχωρήσει και να μη «μαντώσει» το mutex single-instance.
+        threading.Timer(4, lambda: os._exit(0)).start()
 
     def check_mode_request(self):
         """Ο πίνακας (κουμπί «Πέρασε σε Live») γράφει mode-request.json· εμείς κάνουμε την αλλαγή, όπως από το μενού."""
@@ -627,19 +629,30 @@ def tail(path, n):
         return ""
 
 
+def live_instance(timeout=1.5):
+    """Αν τρέχει ήδη ΖΩΝΤΑΝΟ NetWatch (το /api/status απαντά) → το port του, αλλιώς None."""
+    try:
+        with open(PORTFILE, encoding="utf-8") as f:
+            port = int(f.read().strip())
+        urllib.request.urlopen(f"http://127.0.0.1:{port}/api/status", timeout=timeout).read(1)
+        return port
+    except Exception:  # noqa: BLE001 — δίκτυο/αρχείο: θεωρούμε ότι δεν τρέχει ζωντανό
+        return None
+
+
 def single_instance():
-    """True αν είμαστε οι πρώτοι. Αλλιώς το NetWatch τρέχει ήδη: ανοίγουμε απλώς το παράθυρό του."""
+    """True αν είμαστε οι πρώτοι. Αλλιώς, μόνο αν τρέχει ΖΩΝΤΑΝΟ παράθυρο το ανοίγουμε και κλείνουμε·
+    αν το mutex έμεινε «μπαγιάτικο» (π.χ. αμέσως μετά από ενημέρωση), ξεκινάμε κανονικά αντί να κλείσουμε σιωπηλά."""
     if not IS_WIN:
         return True
     ctypes.windll.kernel32.CreateMutexW(None, False, "Local\\NetWatchTray")
-    if ctypes.windll.kernel32.GetLastError() != 183:  # ERROR_ALREADY_EXISTS
+    if ctypes.windll.kernel32.GetLastError() != 183:  # ERROR_ALREADY_EXISTS → είμαστε οι πρώτοι
         return True
-    try:
-        with open(PORTFILE, encoding="utf-8") as f:
-            open_window(f"http://127.0.0.1:{int(f.read().strip())}")
-    except (OSError, ValueError):
-        pass
-    return False
+    port = live_instance()
+    if port:
+        open_window(f"http://127.0.0.1:{port}")
+        return False
+    return True  # το mutex υπάρχει αλλά κανένα ζωντανό παράθυρο → ξεκινάμε (αλλιώς «δεν άνοιγε ποτέ» μετά το update)
 
 
 def selftest():
