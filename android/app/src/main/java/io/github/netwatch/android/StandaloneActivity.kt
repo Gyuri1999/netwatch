@@ -104,7 +104,7 @@ class StandaloneActivity : AppCompatActivity() {
         siteInput = EditText(this).apply {
             hint = getString(R.string.standalone_site_hint)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-            singleLine = true
+            setSingleLine(true)
         }
         siteCard.addView(siteInput)
         siteResult = text(getString(R.string.standalone_tool_idle), 14f, false)
@@ -121,7 +121,7 @@ class StandaloneActivity : AppCompatActivity() {
         emailInput = EditText(this).apply {
             hint = getString(R.string.standalone_email_hint)
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_URI
-            singleLine = true
+            setSingleLine(true)
         }
         emailCard.addView(emailInput)
         emailResult = text(getString(R.string.standalone_tool_idle), 14f, false)
