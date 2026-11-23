@@ -199,10 +199,10 @@ class Guard:
                 limit = max(SILENT_MIN, 5 * d["gap"])
                 if now - d["last"] > limit:
                     d["silent"] = True
-                    out.append((dev, int((now - d["last"]) / 60)))
-        for dev, mins in out:
+                    out.append((dev, int((now - d["last"]) / 60), int(d["gap"])))  # gap μέσα στο lock
+        for dev, mins, gap in out:
             self._alert("IoT συσκευή σιώπησε", "med", None,
-                        f"Το «{dev}» έστελνε κάθε ~{int(self.devices[dev]['gap'])}″ και σιωπά εδώ και {mins}′. "
+                        f"Το «{dev}» έστελνε κάθε ~{gap}″ και σιωπά εδώ και {mins}′. "
                         "Κόλλησε, έπεσε το Wi‑Fi του — ή κάποιος το «πετάει» από το δίκτυο (deauth).", now, f"silent:{dev}")
 
     # ---- σύνδεση ----
