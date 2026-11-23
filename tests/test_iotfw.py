@@ -242,3 +242,23 @@ def test_demo_seed_has_devices_and_violation():
     for d in s["devices"]:
         for fmt in iotfw.FMT_IDS:
             assert d["ip"] in fw.rules(d["key"], fmt)["text"]
+
+
+def test_ratelimited_violation_does_not_consume_cooldown():
+    """Bug: rate-limited παραβάσεις (πάνω από 10/ώρα) δεν πρέπει να «καίνε» τον 6ωρο cooldown,
+    αλλιώς σιωπούν 6 ώρες χωρίς να έχουν φανεί ποτέ."""
+    st, fw = make()
+    learn_camera(fw, t=1000.0)
+    fw.set_mode(CAM, "watch", now=2000)
+    key = fw._find(CAM)["key"]
+    for i in range(12):                               # 12 νέοι άγνωστοι προορισμοί στην ίδια ώρα
+        fw.observe(pkt(f"9.9.9.{i + 1}"), 2000 + i)
+    d = fw._find(CAM)
+    alerted = [v for v in d["violations"] if v["alerted"]]
+    limited = [v for v in d["violations"] if not v["alerted"]]
+    assert len(alerted) == iotfw.MAX_ALERTS_HOUR      # ακριβώς 10 ειδοποίησαν
+    assert limited                                    # οι υπόλοιπες κόπηκαν από το rate-limit
+    for v in limited:
+        assert (key, v["dest"]) not in fw._cd         # δεν μπήκαν σε cooldown (το bug fix)
+    for v in alerted:
+        assert (key, v["dest"]) in fw._cd             # όσες ειδοποίησαν, σωστά σε cooldown

@@ -345,13 +345,14 @@ class IotFw:
         if port is not None and port not in COMMON_PORTS:
             sev = _bump(sev)
             reasons.append(f"ασυνήθιστη θύρα {proto}/{port}")
-        self._cd[ck] = t
         v = {"t": round(t, 1), "dest": k, "name": p["name"], "ip": ip, "proto": proto, "port": port,
              "sev": sev, "reasons": reasons, "cc": cc, "country": country, "alerted": False}
         r = [x for x in self._rate.get(d["key"], []) if t - x < 3600]
         if len(r) < MAX_ALERTS_HOUR:
             r.append(t)
             v["alerted"] = True
+            self._cd[ck] = t   # ο 6ωρος cooldown μετράει ΜΟΝΟ όταν όντως ειδοποιήσαμε (αλλιώς rate-limited
+            #                    παραβάσεις θα σιωπούσαν 6 ώρες χωρίς να έχουν φανεί ποτέ)
         self._rate[d["key"]] = r
         d["violations"] = (d["violations"] + [v])[-MAX_VIOL:]
         if not v["alerted"]:

@@ -84,3 +84,14 @@ def test_status_and_sys_info():
     g.handle("a/b/c", b"1")
     s = g.status()
     assert s["info"]["version"] == "mosquitto version 2.0.18" and s["devices"][0]["id"] == "a/b" and s["msgs"][0]["topic"] == "a/b/c"
+
+
+def test_silent_alert_reports_gap():
+    """Bug fix: το tick() πιάνει το gap μέσα στο κλείδωμα· το μήνυμα δείχνει σωστά το διάστημα."""
+    g, st = guard()
+    base = 1_700_000_000.0
+    for i in range(5):
+        g.handle("home/plug/state", b"on", t=base + i * 10)   # κάθε 10″
+    g.tick(now=base + 10_000)
+    silent = [a for a in st.alerts if a["type"] == "IoT συσκευή σιώπησε"]
+    assert silent and "~10" in silent[0]["detail"]
