@@ -7,6 +7,7 @@
 import ipaddress
 import re
 import subprocess
+import sys
 import threading
 import time
 
@@ -117,6 +118,41 @@ def run_lsof():
         return ""
 
 
+# Windows: δεν υπάρχει lsof — οι ενεργές συνδέσεις + η διεργασία τους μέσω PowerShell (Get-NetTCPConnection).
+_WIN_PS = ("Get-NetTCPConnection -State Established -ErrorAction SilentlyContinue | "
+           "ForEach-Object { $p=(Get-Process -Id $_.OwningProcess -ErrorAction SilentlyContinue).ProcessName; "
+           "\"$p`t$($_.OwningProcess)`t$($_.RemoteAddress)`t$($_.RemotePort)\" }")
+
+
+def parse_win_conns(text):
+    """Έξοδος PowerShell (app<TAB>pid<TAB>remoteIP<TAB>remotePort) → [{app,pid,proto,ip,port,local}]."""
+    out = []
+    for line in text.splitlines():
+        parts = line.rstrip().split("\t")
+        if len(parts) != 4:
+            continue
+        app, pid, ip, port = parts
+        ip = ip.strip("[]").split("%")[0]
+        try:
+            a = ipaddress.ip_address(ip)
+        except ValueError:
+            continue
+        if a.is_loopback or a.is_unspecified or a.is_multicast:
+            continue
+        out.append({"app": (app or "?") + (".exe" if app and not app.endswith(".exe") else ""),
+                    "pid": int(pid) if pid.isdigit() else 0, "proto": "TCP", "ip": ip,
+                    "port": int(port) if port.isdigit() else 0, "local": not a.is_global})
+    return out
+
+
+def win_conns():
+    try:
+        import winplat
+        return parse_win_conns(winplat.powershell(_WIN_PS, timeout=12))
+    except Exception:
+        return []
+
+
 DEMO = [  # (app, ip, port, όνομα)
     ("Google Chrome", "142.250.185.78", 443, "www.google.com"),
     ("Google Chrome", "142.250.181.238", 443, "www.google-analytics.com"),
@@ -156,7 +192,8 @@ class Watcher:
         if self.demo:
             conns, nm = demo_conns()
         else:
-            conns, nm = parse_lsof_conns(run_lsof()), self.name_of
+            conns = win_conns() if sys.platform == "win32" else parse_lsof_conns(run_lsof())
+            nm = self.name_of
         apps = summarize(conns, nm)
         cats = {}
         for a in apps:

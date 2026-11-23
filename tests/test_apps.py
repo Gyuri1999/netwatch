@@ -39,3 +39,18 @@ def test_summarize_groups_and_flags():
 def test_demo_watcher():
     v = apps.Watcher(lambda ip: [], demo=True).view()
     assert v["demo"] and v["apps"][0]["trackers"] and v["cats"]["ads"] >= 1
+
+
+def test_windows_connections_parsing():
+    import apps
+    sample = ("chrome\t4321\t142.250.185.78\t443\n"
+              "spotify\t5000\t35.186.224.47\t443\n"
+              "System\t4\t192.168.1.40\t445\n"
+              "\t0\t127.0.0.1\t9000\n"      # loopback → αγνοείται
+              "garbage line\n")
+    c = apps.parse_win_conns(sample)
+    assert [x["ip"] for x in c] == ["142.250.185.78", "35.186.224.47", "192.168.1.40"]
+    assert c[0]["app"] == "chrome.exe" and c[0]["pid"] == 4321 and c[0]["local"] is False
+    assert c[2]["local"] is True
+    # η σύνοψη δέχεται τα ίδια dicts με το lsof path
+    assert apps.summarize(c, lambda ip: None)
