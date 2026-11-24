@@ -84,6 +84,44 @@ def _f(sev, area, title, detail, fix="", source="", ips=()):
     return {"sev": sev, "area": area, "title": title, "detail": detail, "fix": fix, "source": source, "ips": list(ips)[:20]}
 
 
+def _scan_findings(state, lg):
+    """🔴 Από την τελευταία σάρωση Pentest: λογισμικό εκτός υποστήριξης (EOL) και ευπαθείς υπηρεσίες μετράνε στον βαθμό."""
+    try:
+        sv = state.scan_view() if hasattr(state, "scan_view") else None
+    except Exception:  # noqa: BLE001
+        sv = None
+    if not sv or sv.get("status") != "done":
+        return []
+    out, eol_ips, vuln = [], {}, {}
+    for h in sv.get("hosts") or ():
+        ip = h.get("ip")
+        for s in h.get("services") or ():
+            e = s.get("eol")
+            if e:
+                eol_ips.setdefault(e["label"], {"sev": e["sev"], "date": e["date"], "ips": set()})["ips"].add(ip)
+                if SEV.get(e["sev"], 0) > SEV.get(eol_ips[e["label"]]["sev"], 0):
+                    eol_ips[e["label"]]["sev"] = e["sev"]
+            elif s.get("risk") == "high" and s.get("why"):
+                vuln.setdefault((ip, s.get("svc") or s.get("port")), s.get("why"))
+    for label, d in eol_ips.items():
+        out.append(_f(d["sev"], "software",
+                      _L(lg, f"Λογισμικό εκτός υποστήριξης: {label}", f"End-of-life software: {label}"),
+                      _L(lg, f"Δεν παίρνει ενημερώσεις ασφαλείας από {d['date']}. Τα κενά ασφαλείας μένουν ανοιχτά.",
+                         f"No security updates since {d['date']}. Vulnerabilities stay open."),
+                      _L(lg, "Αναβάθμισε ή απομόνωσε τη συσκευή (ξεχωριστό VLAN, κλειστές θύρες προς το Internet).",
+                         "Upgrade or isolate the device (separate VLAN, no ports open to the Internet)."),
+                      source="pentest", ips=sorted(d["ips"])))
+    if vuln:
+        out.append(_f("high", "software",
+                      _L(lg, f"{len(vuln)} ευπαθείς υπηρεσίες στο δίκτυο", f"{len(vuln)} vulnerable services on the network"),
+                      _L(lg, "Η σάρωση βρήκε υπηρεσίες υψηλού κινδύνου (π.χ. FTP, Telnet, SMBv1, βάσεις ανοιχτές).",
+                         "The scan found high-risk services (e.g. FTP, Telnet, SMBv1, exposed databases)."),
+                      _L(lg, "Δες την καρτέλα 🔴 Pentest και τη λίστα διόρθωσης ανά μηχάνημα στην αναφορά.",
+                         "See the 🔴 Pentest tab and the per-host remediation list in the report."),
+                      source="pentest", ips=sorted({ip for ip, _ in vuln})))
+    return out
+
+
 def _audit_findings(state, lg):
     a = _safe(state.audit, None) if hasattr(state, "audit") else None
     if not a:
@@ -292,7 +330,7 @@ def build(state, lang="el", now=None):
     lg = lang if lang in LANGS else "el"
     now = now or time.time()
     findings, audit = _audit_findings(state, lg)
-    findings += _l2_findings(state, lg) + _seg_findings(state, lg) + _cam_findings(state, lg)
+    findings += _l2_findings(state, lg) + _seg_findings(state, lg) + _cam_findings(state, lg) + _scan_findings(state, lg)
     wan, wan_rows = _wan_findings(state, lg)
     findings += wan + _health_findings(state, lg) + _dns_findings(state, lg) + _presence_findings(state, lg)
     findings += _alert_findings(state, lg, now)

@@ -137,3 +137,38 @@ def test_routes():
         assert c in (200, 409)
     finally:
         srv.shutdown()
+
+
+def test_scan_findings_feed_the_score():
+    """EOL και ευπαθείς υπηρεσίες από τη σάρωση γίνονται ευρήματα και ρίχνουν τον βαθμό."""
+    import assess
+
+    class S:
+        mode = "live"
+        me = ["192.168.1.23"]
+        gateway = "192.168.1.1"
+        iface = "en0"
+
+        def scan_view(self):
+            return {"status": "done", "hosts": [
+                {"ip": "192.168.1.61", "services": [
+                    {"port": 3306, "product": "MySQL", "version": "5.1.32", "risk": "high",
+                     "eol": {"sev": "high", "date": "2013-12-31", "label": "MySQL 5.1"}},
+                    {"port": 21, "svc": "FTP", "risk": "high", "why": "FTP χωρίς κρυπτογράφηση"}]},
+                {"ip": "192.168.1.10", "services": [{"port": 445, "svc": "SMB", "risk": "high", "why": "SMBv1"}]}]}
+
+        def __getattr__(self, n):
+            return None
+
+    fs = assess._scan_findings(S(), "el")
+    assert any(f["area"] == "software" and "εκτός υποστήριξης" in f["title"] and f["sev"] == "high" for f in fs)
+    assert any("ευπαθείς υπηρεσίες" in f["title"] and set(f["ips"]) == {"192.168.1.10", "192.168.1.61"} for f in fs)
+
+    class Empty:
+        def scan_view(self):
+            return {"status": "idle"}
+
+        def __getattr__(self, n):
+            return None
+    assert assess._scan_findings(Empty(), "el") == []
+    assert assess._scan_findings(object(), "el") == []
