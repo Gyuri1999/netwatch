@@ -1719,7 +1719,7 @@ function renderQuiz(){const el=$('t-quiz');if(!QZ.q)QZ.q=makeQuestion();const q=
   $('qreset').onclick=()=>{QZ.score=QZ.total=QZ.streak=QZ.best=0;QZ.q=null;QZ.ans=null;saveQZ();renderQuiz()}}
 
 // ================= 🔴 PENTEST =================
-let scanData=null,expo=null,labData=null,ptTarget=null;const cveCache={};
+let scanData=null,expo=null,labData=null,ptTarget=null,ptFullReport=false,ptReportReady=false;const cveCache={};
 let lastBtn=null,lastBtnT=0;document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(b){lastBtn=b;lastBtnT=performance.now()}},true);
 const post=(u,b)=>{const btn=performance.now()-lastBtnT<400&&lastBtn&&lastBtn.isConnected?lastBtn:null;if(btn)btn.classList.add('busy');
   return post0(u,b).then(r=>{if(btn){btn.classList.remove('busy');if(btn.isConnected&&!(r&&r.error))okFlash(btn)}return r},e=>{if(btn)btn.classList.remove('busy');throw e})};
@@ -1728,7 +1728,9 @@ const PT_SUBS=[['scan','🔍 Σάρωση'],['tools','🧰 Εργαλεία'],['
 let ptSub='scan';try{ptSub=localStorage.getItem('nw-ptsub')||'scan'}catch(e){}
 const PTIN={};  // ό,τι έχεις γράψει στα πεδία (μένει όταν ξαναζωγραφίζεται η σελίδα)
 const ptBusy=()=>{const a=document.activeElement;return !!(a&&a.closest&&a.closest('#t-pentest')&&/INPUT|SELECT/.test(a.tagName))};
-function loadScan(){return fetch('/api/scan').then(r=>r.json()).then(j=>{scanData=j;if(ptTarget==null)ptTarget=j.default_target;if(tab==='pentest'&&!ptBusy())drawPentest()})}
+function loadScan(){const prev=scanData&&scanData.status;return fetch('/api/scan').then(r=>r.json()).then(j=>{scanData=j;if(ptTarget==null)ptTarget=j.default_target;
+  if(ptFullReport&&j.status==='done'&&prev!=='done'){ptFullReport=false;ptReportReady=true;try{window.open('/pentest-report','_blank','noopener')}catch(e){}}  // 📋 πλήρης έλεγχος → αναφορά έτοιμη
+  if(tab==='pentest'&&!ptBusy())drawPentest()})}
 function loadLab(){return fetch('/api/lab').then(r=>r.json()).then(j=>{labData=j;if(tab==='pentest'&&!ptBusy())drawPentest()})}
 function renderPentest(){if(!scanData||!labData){$('t-pentest').innerHTML='<div class="empty">φόρτωση…</div>';loadScan();loadLab();return}drawPentest()}
 const riskTag=r=>`<span class="tag ${RISK[r][0]}">${RISK[r][1]}</span>`;
@@ -1756,8 +1758,10 @@ function ptScanHTML(){const sd=scanData,run=sd.status==='running',pr=PTIN.profil
     <select class="f" data-in="profile">${[['quick','⚡ Γρήγορη (~30 θύρες)'],['top1000','📋 Top 1000 θύρες'],['full','🔬 Όλες (1-65535, ≤4 hosts)'],['custom','✏️ Δικές μου θύρες']].map(([v,n])=>`<option value="${v}"${v===pr?' selected':''}>${n}</option>`).join('')}</select>
     ${pr==='custom'?`<input class="f" data-in="ports" value="${esc(PTIN.ports||'')}" placeholder="22,80,443,8000-8100" style="max-width:200px">`:''}
     <label class="sm" title="SNMP, DNS, NTP, mDNS, SSDP — βρίσκει π.χ. SNMP με community «public»"><input type="checkbox" data-in="udp" ${PTIN.udp?'checked':''}> + UDP</label>
-    <button class="b" id="pt-scan" ${run?'disabled':''}>${run?'σαρώνω…':'▶ Σάρωσε'}</button></div>`;
-  if(run)h+=`<div class="sm" style="margin-top:8px">${esc(sd.phase||'')} — ${sd.progress||0}%</div><div class="bar"><i style="width:${sd.progress||0}%;background:var(--red)"></i></div>`;
+    <button class="b" id="pt-scan" ${run?'disabled':''}>${run?'σαρώνω…':'▶ Σάρωσε'}</button>
+    <button class="b" id="pt-full" ${run?'disabled':''} title="Σάρωση top-1000 + UDP, μετά ανοίγει αναφορά με λίστα διόρθωσης ανά μηχάνημα — έτοιμη για παράδοση">📋 Πλήρης έλεγχος & αναφορά</button></div>`;
+  if(run)h+=`<div class="sm" style="margin-top:8px">${esc(sd.phase||'')} — ${sd.progress||0}%${ptFullReport?' · μετά ανοίγει η αναφορά':''}</div><div class="bar"><i style="width:${sd.progress||0}%;background:var(--red)"></i></div>`;
+  if(ptReportReady&&sd.status==='done')h+=`<div class="card" style="border-color:#3ddc9755;background:color-mix(in srgb,#3ddc97 8%,transparent);white-space:normal;margin-top:8px"><b style="color:var(--hi)">✅ Ο έλεγχος τελείωσε.</b> <span class="sm">Η αναφορά (με λίστα διόρθωσης ανά μηχάνημα) άνοιξε σε νέα καρτέλα· αν την μπλόκαρε ο browser:</span> <a class="b" href="/pentest-report" target="_blank" rel="noopener">📋 Άνοιξε την αναφορά</a></div>`;
   if(sd.status==='error')h+=`<div class="sm" style="color:var(--redt);margin-top:6px">${esc(sd.error)}</div>`;
   h+='</div>';
   if(sd.status!=='done')return h;
@@ -1777,8 +1781,10 @@ function ptScanHTML(){const sd=scanData,run=sd.status==='running',pr=PTIN.profil
       <div style="margin-top:6px;display:flex;gap:4px;flex-wrap:wrap"><button class="b" data-qt="ping" data-host="${esc(x.ip)}">📶 Ping</button><button class="b" data-qt="ports" data-host="${esc(x.ip)}">🚪 Θύρες</button>${x.services.some(s=>[80,443,8080,8443,8123,8006].includes(s.port))?`<button class="b" data-qt="http" data-host="${esc(x.services.some(s=>[443,8443,8006].includes(s.port))?'https://':'http://')}${esc(x.ip)}${(()=>{const p=x.services.find(s=>[80,443,8080,8443,8123,8006].includes(s.port)).port;return [80,443].includes(p)?'':':'+p})()}">🌐 HTTP</button>`:''}${x.mac?`<button class="b" data-qt="wol" data-host="${esc(x.mac)}">⏰ WoL</button>`:''}${window.ptActHTML?ptActHTML(x):''}</div></div>`).join('')+'</div>';
   return h+`<div class="sm">Τα αποτελέσματα μπήκαν και στην καρτέλα 🛡 Έλεγχος.</div>`}
 function ptScanBind(el){
-  $('pt-scan').onclick=()=>{const b={target:PTIN.target??ptTarget,profile:PTIN.profile||'quick',udp:!!PTIN.udp};if(b.profile==='custom')b.ports=PTIN.ports||'';ptTarget=b.target;
+  $('pt-scan').onclick=()=>{ptReportReady=false;const b={target:PTIN.target??ptTarget,profile:PTIN.profile||'quick',udp:!!PTIN.udp};if(b.profile==='custom')b.ports=PTIN.ports||'';ptTarget=b.target;
     post('/api/scan',b).then(r=>{if(r.error){scanData={...scanData,status:'error',error:r.error};drawPentest()}else loadScan()})};
+  const full=$('pt-full');if(full)full.onclick=()=>{ptReportReady=false;ptFullReport=true;const b={target:PTIN.target??ptTarget,profile:'top1000',udp:true};ptTarget=b.target;
+    post('/api/scan',b).then(r=>{if(r.error){ptFullReport=false;scanData={...scanData,status:'error',error:r.error};drawPentest()}else loadScan()})};
   el.querySelectorAll('[data-cve]').forEach(b=>b.onclick=()=>{const p=b.dataset.cve,v=b.dataset.ver,k=p+' '+v;if(cveCache[k]&&!cveCache[k].error){delete cveCache[k];drawPentest();return}
     cveCache[k]={loading:true};drawPentest();fetch('/api/cve?product='+encodeURIComponent(p)+'&version='+encodeURIComponent(v)).then(r=>r.json()).then(j=>{cveCache[k]=j;drawPentest()}).catch(e=>{cveCache[k]={error:String(e)};drawPentest()})});
   el.querySelectorAll('[data-qt]').forEach(b=>b.onclick=()=>{const t=b.dataset.qt,v=b.dataset.host;
