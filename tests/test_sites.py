@@ -235,3 +235,39 @@ def test_demo_view_shape():
     assert "Aegean View" in h and "UPnP" in h and "<script" not in h
     import json
     json.dumps(v), json.dumps(d)
+
+
+def test_baseline_and_drift():
+    import sites
+
+    class St:
+        def __init__(self):
+            self.hosts = {"192.168.1.1": {"ip": "192.168.1.1", "kind": "local", "mac": "aa:bb:cc:00:00:01", "names": {"router"}},
+                          "192.168.1.50": {"ip": "192.168.1.50", "kind": "local", "mac": "aa:bb:cc:00:00:02", "names": {"pc"}}}
+            self.gateway = "192.168.1.1"
+            self.me = {"192.168.1.50"}
+            self.alerts = []
+
+        def _dtype(self, h):
+            return {}
+
+        def alert(self, typ, sev, actor, target, detail, t, **kw):
+            self.alerts.append({"typ": typ, "key": kw.get("key"), "cooldown": kw.get("cooldown")})
+
+    st = St()
+    s = sites.Sites(st, None)
+    s.sites["kafe"] = {"id": "kafe", "name": "Καφέ", "fp": {}}
+    assert s.drift("kafe") is None                      # χωρίς baseline
+    assert s.save_baseline("kafe")["count"] == 2
+    assert s.drift("kafe")["ok"] is True                # ίδιο δίκτυο
+    assert s.detail("kafe")["baseline"]["ok"] is True
+    # νέα + χαμένη συσκευή
+    st.hosts["192.168.1.77"] = {"ip": "192.168.1.77", "kind": "local", "mac": "aa:bb:cc:00:00:03", "names": {"kseno"}}
+    del st.hosts["192.168.1.50"]
+    dr = s.drift("kafe")
+    assert [d["ip"] for d in dr["new"]] == ["192.168.1.77"] and [d["ip"] for d in dr["gone"]] == ["192.168.1.50"] and dr["ok"] is False
+    # ειδοποίηση για νέα συσκευή, με κλειδί για dedup + cooldown
+    s.detect = lambda: "kafe"
+    s.check_drift()
+    assert st.alerts and st.alerts[0]["key"] == ("site-drift", "kafe", ("mac", "aa:bb:cc:00:00:03")) and st.alerts[0]["cooldown"] >= 3600
+    assert s.clear_baseline("kafe")["ok"] and s.drift("kafe") is None

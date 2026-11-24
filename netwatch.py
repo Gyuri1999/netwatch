@@ -194,6 +194,12 @@ def main():
     def scan_done(hosts):
         state.scan_result(hosts)
         netkit.merge_names(state, {h["ip"]: h.get("names") or [] for h in hosts})  # ονόματα → χάρτης
+        aj = getattr(state, "autoscan", None)   # ⏰ αν ήταν προγραμματισμένη σάρωση → σύνοψη + ειδοποίηση
+        if aj is not None:
+            try:
+                aj.on_scan_done(hosts)
+            except Exception:  # noqa: BLE001
+                pass
     state.scanner.on_result = scan_done
     state.lab = pentest.Lab(state)
     # 🟣 purple-team καμπάνιες (ATT&CK κάλυψη) και 🔐 έλεγχος TLS/SSH (ιστορικό/αποτελέσματα στο data/ μόνο στο live)
@@ -285,7 +291,9 @@ def main():
     state.hygiene = alerthyg.AlertHygiene(state, path=os.path.join(DATA, "mutes.json") if live else None,
                                           on_save=chown_to_user if live else None)
     import assess
-    state.assess = assess.Assess(state)  # 📋 αναφορά «νέο δίκτυο»
+    state.assess = assess.Assess(state, path=os.path.join(DATA, "assess-history.json") if live else None)  # 📋 αναφορά «νέο δίκτυο» + ιστορικό βαθμού
+    if live:
+        state.assess.on_save = chown_to_user
     import vulnwatch  # 🛡 ευπάθειες για τις συσκευές σου (CISA KEV + EPSS, μία φορά τη μέρα· demo: ενσωματωμένο δείγμα)
     state.vulns = vulnwatch.VulnWatch(state, DATA if live else None, demo=demo)
     if live:

@@ -19,7 +19,9 @@ import csv
 import html
 import io
 import ipaddress
+import json
 import math
+import os
 import threading
 import time
 
@@ -82,6 +84,44 @@ AUDIT_EN = {
 
 def _f(sev, area, title, detail, fix="", source="", ips=()):
     return {"sev": sev, "area": area, "title": title, "detail": detail, "fix": fix, "source": source, "ips": list(ips)[:20]}
+
+
+def _scan_findings(state, lg):
+    """🔴 Από την τελευταία σάρωση Pentest: λογισμικό εκτός υποστήριξης (EOL) και ευπαθείς υπηρεσίες μετράνε στον βαθμό."""
+    try:
+        sv = state.scan_view() if hasattr(state, "scan_view") else None
+    except Exception:  # noqa: BLE001
+        sv = None
+    if not sv or sv.get("status") != "done":
+        return []
+    out, eol_ips, vuln = [], {}, {}
+    for h in sv.get("hosts") or ():
+        ip = h.get("ip")
+        for s in h.get("services") or ():
+            e = s.get("eol")
+            if e:
+                eol_ips.setdefault(e["label"], {"sev": e["sev"], "date": e["date"], "ips": set()})["ips"].add(ip)
+                if SEV.get(e["sev"], 0) > SEV.get(eol_ips[e["label"]]["sev"], 0):
+                    eol_ips[e["label"]]["sev"] = e["sev"]
+            elif s.get("risk") == "high" and s.get("why"):
+                vuln.setdefault((ip, s.get("svc") or s.get("port")), s.get("why"))
+    for label, d in eol_ips.items():
+        out.append(_f(d["sev"], "software",
+                      _L(lg, f"Λογισμικό εκτός υποστήριξης: {label}", f"End-of-life software: {label}"),
+                      _L(lg, f"Δεν παίρνει ενημερώσεις ασφαλείας από {d['date']}. Τα κενά ασφαλείας μένουν ανοιχτά.",
+                         f"No security updates since {d['date']}. Vulnerabilities stay open."),
+                      _L(lg, "Αναβάθμισε ή απομόνωσε τη συσκευή (ξεχωριστό VLAN, κλειστές θύρες προς το Internet).",
+                         "Upgrade or isolate the device (separate VLAN, no ports open to the Internet)."),
+                      source="pentest", ips=sorted(d["ips"])))
+    if vuln:
+        out.append(_f("high", "software",
+                      _L(lg, f"{len(vuln)} ευπαθείς υπηρεσίες στο δίκτυο", f"{len(vuln)} vulnerable services on the network"),
+                      _L(lg, "Η σάρωση βρήκε υπηρεσίες υψηλού κινδύνου (π.χ. FTP, Telnet, SMBv1, βάσεις ανοιχτές).",
+                         "The scan found high-risk services (e.g. FTP, Telnet, SMBv1, exposed databases)."),
+                      _L(lg, "Δες την καρτέλα 🔴 Pentest και τη λίστα διόρθωσης ανά μηχάνημα στην αναφορά.",
+                         "See the 🔴 Pentest tab and the per-host remediation list in the report."),
+                      source="pentest", ips=sorted({ip for ip, _ in vuln})))
+    return out
 
 
 def _audit_findings(state, lg):
@@ -292,7 +332,7 @@ def build(state, lang="el", now=None):
     lg = lang if lang in LANGS else "el"
     now = now or time.time()
     findings, audit = _audit_findings(state, lg)
-    findings += _l2_findings(state, lg) + _seg_findings(state, lg) + _cam_findings(state, lg)
+    findings += _l2_findings(state, lg) + _seg_findings(state, lg) + _cam_findings(state, lg) + _scan_findings(state, lg)
     wan, wan_rows = _wan_findings(state, lg)
     findings += wan + _health_findings(state, lg) + _dns_findings(state, lg) + _presence_findings(state, lg)
     findings += _alert_findings(state, lg, now)
@@ -335,10 +375,53 @@ def build(state, lang="el", now=None):
 
 # ---------------- «Τρέξε τους ελέγχους» ----------------
 class Assess:
-    def __init__(self, state, clock=time.time):
+    def __init__(self, state, clock=time.time, path=None):
         self.state, self.clock = state, clock
         self.lock = threading.Lock()
         self.job = {"state": "idle"}
+        self.path = path            # data/assess-history.json (live)· None → μόνο στη μνήμη
+        self.on_save = None
+        self.hist = []              # [{"day": "YYYY-MM-DD", "t", "score", "grade"}] — ένα δείγμα τη μέρα, έως 180
+        if path and os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    self.hist = [x for x in json.load(f).get("hist", []) if isinstance(x, dict) and x.get("day")][-180:]
+            except (OSError, ValueError):
+                self.hist = []
+        elif getattr(state, "mode", "") == "demo":  # demo: δείξε έναν ενδεικτικό ανοδικό βαθμό στις τελευταίες 12 μέρες
+            now = self.clock()
+            for i, sc in enumerate([41, 44, 44, 52, 58, 57, 63, 66, 71, 70, 78, 83]):
+                g = "F" if sc < 50 else "D" if sc < 65 else "C" if sc < 80 else "B"
+                day = time.strftime("%Y-%m-%d", time.localtime(now - (11 - i) * 86400))
+                self.hist.append({"day": day, "t": now - (11 - i) * 86400, "score": sc, "grade": g})
+
+    def record(self, score, grade, now=None):
+        """Κρατά τον βαθμό A–F στο χρόνο: ένα δείγμα τη μέρα (το τελευταίο κερδίζει). Για το γράφημα «πώς πάω»."""
+        if not isinstance(score, (int, float)):
+            return list(self.hist)
+        now = now or self.clock()
+        day = time.strftime("%Y-%m-%d", time.localtime(now))
+        with self.lock:
+            if self.hist and self.hist[-1].get("day") == day:
+                self.hist[-1] = {"day": day, "t": now, "score": int(score), "grade": grade}
+            else:
+                self.hist.append({"day": day, "t": now, "score": int(score), "grade": grade})
+            del self.hist[:-180]
+            if self.path:
+                try:
+                    tmp = self.path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        json.dump({"hist": self.hist}, f, ensure_ascii=False)
+                    os.replace(tmp, self.path)
+                    if self.on_save:
+                        self.on_save(self.path)
+                except OSError:
+                    pass
+            return list(self.hist)
+
+    def history(self):
+        with self.lock:
+            return list(self.hist)
 
     def run(self, lang="el"):
         with self.lock:

@@ -67,6 +67,22 @@
     h += `<a class="b" href="${API}/visits.csv?id=${encodeURIComponent(S.id)}" target="_blank" rel="noopener">⬇ ${T('Επισκέψεις CSV', 'Visits CSV')}</a>
       ${cur ? '' : `<button class="b" data-si="select">📍 ${T('Είμαι σε αυτόν τον πελάτη', 'I am at this customer')}</button>`}
       ${D.network && D.network.gw_ip ? `<button class="b" data-si="bind" title="${T('Γράφει τη MAC/IP του router αυτού του δικτύου στον πελάτη', 'Stores this network’s router MAC/IP on the customer')}">🔗 ${T('Δέσε το τρέχον δίκτυο', 'Bind current network')}</button>` : ''}</div>`;
+    const bl = S.baseline;
+    h += `<div class="card" style="margin-top:10px;padding:9px 11px;background:rgb(var(--w,255 255 255) / 3%)"><b>🔒 ${T('Εγκεκριμένο δίκτυο', 'Approved network')}</b>`;
+    if (!bl) {
+      h += ` <span class="dim" style="font-size:12.5px">${T('Κλείδωσε τις τωρινές συσκευές ως «εγκεκριμένες». Μετά το NetWatch σε ειδοποιεί όταν εμφανιστεί κάτι καινούργιο σε αυτόν τον πελάτη.', 'Lock the current devices as “approved”. Then NetWatch alerts you when something new appears at this customer.')}</span>
+        <div class="si-row"><button class="b" data-si="baseline"${cur ? '' : ' disabled'}>🔒 ${T('Κλείδωσε τις τωρινές συσκευές', 'Lock the current devices')}</button>${cur ? '' : `<span class="dim" style="font-size:12px">${T('Πρέπει να είσαι στο δίκτυο του πελάτη.', 'You must be on the customer network.')}</span>`}</div>`;
+    } else {
+      const nw = (bl.new || []), gn = (bl.gone || []);
+      h += ` <span class="dim" style="font-size:12.5px">${bl.count} ${T('συσκευές, κλειδώθηκε', 'devices, locked')} ${when(bl.saved)}</span>`;
+      if (bl.ok) h += `<div style="color:var(--green,#3ddc97);font-size:13px;margin-top:4px">✅ ${T('Καμία αλλαγή — ίδιες συσκευές με το εγκεκριμένο.', 'No change — same devices as approved.')}</div>`;
+      else {
+        if (nw.length) h += `<div style="font-size:13px;margin-top:4px"><b style="color:var(--orange)">🆕 ${nw.length} ${T('νέες συσκευές', 'new devices')}:</b> ${nw.map(d => `<span class="tag y" title="${E(d.mac || '')}">${E(d.icon || '')} ${E(d.name || d.vendor || d.ip)} <span class="mono">${E(d.ip)}</span></span>`).join(' ')}</div>`;
+        if (gn.length) h += `<div style="font-size:13px;margin-top:4px"><b class="dim">👻 ${gn.length} ${T('λείπουν', 'missing')}:</b> ${gn.map(d => `<span class="tag" title="${E(d.mac || '')}">${E(d.name || d.ip)} <span class="mono">${E(d.ip)}</span></span>`).join(' ')}</div>`;
+      }
+      h += `<div class="si-row"><button class="b"${cur ? '' : ' disabled'} data-si="baseline" title="${T('Ξανακλείδωσε με τις τωρινές συσκευές', 'Re-lock with the current devices')}">🔄 ${T('Ενημέρωσε το εγκεκριμένο', 'Update the approved set')}</button><button class="b" data-si="baseclear">🗑 ${T('Κατάργηση', 'Remove')}</button></div>`;
+    }
+    h += `</div>`;
     if (open) {
       h += `<div class="si-form" data-form="vend">
         ${F('work', T('Τι έγινε (εργασίες)', 'Work done'), '', { area: 1, wide: 1, max: 2000, ph: T('π.χ. Ενημέρωση firmware router, έλεγχος αντιγράφων, νέα πρίζα στο γραφείο 2', 'e.g. Router firmware update, backup check, new socket in office 2') })}
@@ -167,6 +183,8 @@
     else if (a === 'select') post('select', { id }).then(done);
     else if (a === 'auto') post('select', { id: '' }).then(done);
     else if (a === 'bind') post('bind', { id }).then(done);
+    else if (a === 'baseline') post('baseline', { id }).then(done);
+    else if (a === 'baseclear') { if (confirm(T('Να καταργηθεί το εγκεκριμένο δίκτυο αυτού του πελάτη;', 'Remove the approved network for this customer?'))) post('baseline/clear', { id }).then(done); }
     else if (a === 'vstart') post('visit/start', { id }).then(done);
     else if (a === 'vend') post('visit/end', Object.assign({ id }, vals(formOf('vend')))).then(done);
     else if (a === 'vpast') post('visit/save', Object.assign({ id }, vals(formOf('vpast')))).then(done);

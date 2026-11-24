@@ -41,18 +41,19 @@ def test_supported_and_unknown_return_none():
     assert pentest.eol_check("MySQL", "5.1.0", today=datetime.date(2014, 1, 1))["years"] == 0
 
 
-def test_scan_attaches_eol_finding(monkeypatch):
-    """Μια σάρωση με banner MySQL 5.1.32 πρέπει να βγάλει εύρημα EOL και να ανεβάσει το ρίσκο σε high."""
+def test_enrich_attaches_eol_finding(monkeypatch):
+    """Το _enrich (τρέχει σε demo ΚΑΙ σε πραγματική σάρωση) βάζει εύρημα EOL· το apply_findings ανεβάζει το ρίσκο."""
     s = pentest.LanScanner.__new__(pentest.LanScanner)
-    s.state = {}
     monkeypatch.setattr(s, "_set", lambda **k: None, raising=False)
-    monkeypatch.setattr(s, "_enrich", lambda hosts, udp: None, raising=False)
-    banner = "\x0a\x00\x00\x00\n5.1.32-community"      # ό,τι δίνει ένας MySQL server
-    monkeypatch.setattr(pentest, "scan_ports", lambda cand, ports, **k: {"192.168.1.9": [(3306, banner)]})
-    hosts = s._real("192.168.1.9/32", ["192.168.1.9"], {"192.168.1.9": "aa:bb:cc:dd:ee:ff"}, pentest.SCAN_PORTS, False)
+    import netkit
+    monkeypatch.setattr(netkit, "discover_names", lambda ips, timeout=2, sim=False: {})
+    monkeypatch.setattr(netkit, "mac_vendor", lambda mac: None)
+    monkeypatch.setattr(netkit, "ping", lambda ip, **k: {})
+    hosts = [{"ip": "192.168.1.9", "mac": "aa:bb:cc:dd:ee:ff",
+              "services": [{"port": 3306, "proto": "tcp", "product": "MySQL", "version": "5.1.32", "banner": "5.1.32-community"}]}]
+    s._enrich(hosts, udp=False, sim=False)
     sv = hosts[0]["services"][0]
-    assert sv["product"] == "MySQL" and sv.get("eol") and sv["eol"]["label"].startswith("MySQL 5.1")
+    assert sv.get("eol") and sv["eol"]["label"].startswith("MySQL 5.1")
     assert any(sev in ("high", "med") and "Εκτός υποστήριξης" in msg for sev, msg in sv["findings"])
-    # apply_findings ανεβάζει το ρίσκο του host
     view = pentest.apply_findings({"hosts": hosts})
     assert view["hosts"][0]["risk"] == "high" and "Εκτός υποστήριξης" in view["hosts"][0]["services"][0]["why"]
