@@ -1731,7 +1731,7 @@ function renderQuiz(){const el=$('t-quiz');if(!QZ.q)QZ.q=makeQuestion();const q=
   $('qreset').onclick=()=>{QZ.score=QZ.total=QZ.streak=QZ.best=0;QZ.q=null;QZ.ans=null;saveQZ();renderQuiz()}}
 
 // ================= 🔴 PENTEST =================
-let scanData=null,expo=null,labData=null,ptTarget=null,ptFullReport=false,ptReportReady=false;const cveCache={};
+let scanData=null,expo=null,labData=null,ptTarget=null,ptFullReport=false,ptReportReady=false,autoData=null;const cveCache={};
 let lastBtn=null,lastBtnT=0;document.addEventListener('click',e=>{const b=e.target.closest&&e.target.closest('button');if(b){lastBtn=b;lastBtnT=performance.now()}},true);
 const post=(u,b)=>{const btn=performance.now()-lastBtnT<400&&lastBtn&&lastBtn.isConnected?lastBtn:null;if(btn)btn.classList.add('busy');
   return post0(u,b).then(r=>{if(btn){btn.classList.remove('busy');if(btn.isConnected&&!(r&&r.error))okFlash(btn)}return r},e=>{if(btn)btn.classList.remove('busy');throw e})};
@@ -1744,7 +1744,20 @@ function loadScan(){const prev=scanData&&scanData.status;return fetch('/api/scan
   if(ptFullReport&&j.status==='done'&&prev!=='done'){ptFullReport=false;ptReportReady=true;try{window.open('/pentest-report','_blank','noopener')}catch(e){}}  // 📋 πλήρης έλεγχος → αναφορά έτοιμη
   if(tab==='pentest'&&!ptBusy())drawPentest()})}
 function loadLab(){return fetch('/api/lab').then(r=>r.json()).then(j=>{labData=j;if(tab==='pentest'&&!ptBusy())drawPentest()})}
-function renderPentest(){if(!scanData||!labData){$('t-pentest').innerHTML='<div class="empty">φόρτωση…</div>';loadScan();loadLab();return}drawPentest()}
+function loadAuto(){return fetch('/api/kit/autoscan').then(r=>r.json()).then(j=>{autoData=j&&!j.error?j:null;if(tab==='pentest'&&!ptBusy())drawPentest()}).catch(()=>{})}
+function autoHTML(){const a=autoData;if(!a)return'';const ch=a.channels||{},noch=!(ch.ntfy||ch.telegram||ch.macos);
+  return `<details class="card" style="margin-top:8px"><summary><b>⏰ Αυτόματος έλεγχος & αναφορά</b> ${a.enabled?`<span class="tag g">κάθε ${a.every_days} μέρες, ${String(a.hour).padStart(2,'0')}:00</span>`:'<span class="tag">κλειστό</span>'}${a.last_grade?` · τελευταίος βαθμός ${esc(a.last_grade)}`:''}</summary>
+    <div class="sm" style="margin-top:6px;white-space:normal">Τρέχει μόνο του μια σάρωση κάθε λίγες μέρες και σου στέλνει σύνοψη (βαθμός, ευρήματα) στο κινητό — για το κουτί που αφήνεις στον πελάτη. Η πλήρης αναφορά μένει στο NetWatch.</div>
+    <div class="frow" style="margin-top:6px"><label class="sm" style="flex-direction:row;gap:5px;align-items:center"><input type="checkbox" id="au-en" ${a.enabled?'checked':''}> Ενεργό</label>
+      <label class="sm" style="flex-direction:row;gap:5px;align-items:center">κάθε <input class="f" id="au-days" type="number" min="1" max="90" value="${a.every_days}" style="width:66px"> μέρες</label>
+      <label class="sm" style="flex-direction:row;gap:5px;align-items:center">ώρα <input class="f" id="au-hour" type="number" min="0" max="23" value="${a.hour}" style="width:58px"></label>
+      <select class="f" id="au-prof">${[['quick','γρήγορη'],['top1000','top 1000'],['full','όλες']].map(([v,n])=>`<option value="${v}"${v===a.profile?' selected':''}>${n}</option>`).join('')}</select>
+      <label class="sm" style="flex-direction:row;gap:5px;align-items:center"><input type="checkbox" id="au-udp" ${a.udp?'checked':''}> +UDP</label>
+      <button class="b" id="au-save">💾 Αποθήκευση</button><button class="b" id="au-run" ${a.running?'disabled':''}>▶ Τρέξε τώρα</button></div>
+    ${noch?`<div class="sm" style="color:var(--orange);margin-top:4px">⚠ Δεν έχεις ρυθμίσει ειδοποιήσεις (ntfy/Telegram) — η σύνοψη δεν θα φτάσει στο κινητό. Ρύθμισέ τες στο 🛠 Λειτουργία.</div>`:''}
+    ${a.next_run?`<div class="sm" style="margin-top:4px">Επόμενη: ${fmtT(a.next_run)}${a.last_run?` · τελευταία: ${fmtT(a.last_run)}`:''}</div>`:''}
+    ${a.last_summary?`<div class="sm" style="margin-top:4px;white-space:normal">📄 ${esc(a.last_summary)}</div>`:''}</details>`}
+function renderPentest(){if(!scanData||!labData){$('t-pentest').innerHTML='<div class="empty">φόρτωση…</div>';loadScan();loadLab();loadAuto();return}drawPentest()}
 const riskTag=r=>`<span class="tag ${RISK[r][0]}">${RISK[r][1]}</span>`;
 const sevCol=s=>s>=9?'#ff3b5c':s>=7?'#ff9f43':s>=4?'#ffd23f':'#6d7f99';
 function cveHTML(k){const c=cveCache[k];if(!c)return'';if(c.loading)return'<div class="sm">ψάχνω στο NVD…</div>';if(c.error)return`<div class="sm" style="color:var(--redt)">${esc(c.error)}</div>`;
@@ -1776,6 +1789,7 @@ function ptScanHTML(){const sd=scanData,run=sd.status==='running',pr=PTIN.profil
   if(ptReportReady&&sd.status==='done')h+=`<div class="card" style="border-color:#3ddc9755;background:color-mix(in srgb,#3ddc97 8%,transparent);white-space:normal;margin-top:8px"><b style="color:var(--hi)">✅ Ο έλεγχος τελείωσε.</b> <span class="sm">Η αναφορά (με λίστα διόρθωσης ανά μηχάνημα) άνοιξε σε νέα καρτέλα· αν την μπλόκαρε ο browser:</span> <a class="b" href="/pentest-report" target="_blank" rel="noopener">📋 Άνοιξε την αναφορά</a></div>`;
   if(sd.status==='error')h+=`<div class="sm" style="color:var(--redt);margin-top:6px">${esc(sd.error)}</div>`;
   h+='</div>';
+  h+=autoHTML();
   if(sd.status!=='done')return h;
   const hs=sd.hosts||[],nOpen=hs.reduce((n,x)=>n+x.services.length,0),bad=hs.filter(x=>x.risk==='high').length,d=sd.diff;
   h+=`<div class="kpis"><div><b>${hs.length}</b><span>συσκευές</span></div><div><b>${nOpen}</b><span>ανοιχτές θύρες</span></div><div><b style="color:${bad?'#ff8da0':'#3ddc97'}">${bad}</b><span>υψηλός κίνδυνος</span></div><div><b>${Math.round(sd.finished-sd.started)} s</b><span>${esc(sd.profile||'')} · ${sd.n_ports||'?'} θύρες${sd.udp?' + UDP':''}</span></div>
@@ -1797,6 +1811,8 @@ function ptScanBind(el){
     post('/api/scan',b).then(r=>{if(r.error){scanData={...scanData,status:'error',error:r.error};drawPentest()}else loadScan()})};
   const full=$('pt-full');if(full)full.onclick=()=>{ptReportReady=false;ptFullReport=true;const b={target:PTIN.target??ptTarget,profile:'top1000',udp:true};ptTarget=b.target;
     post('/api/scan',b).then(r=>{if(r.error){ptFullReport=false;scanData={...scanData,status:'error',error:r.error};drawPentest()}else loadScan()})};
+  const aus=$('au-save');if(aus)aus.onclick=()=>{fetch('/api/kit/autoscan/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({enabled:$('au-en').checked,every_days:+$('au-days').value||7,hour:+$('au-hour').value||0,profile:$('au-prof').value,udp:$('au-udp').checked})}).then(r=>r.json()).then(j=>{autoData=j&&!j.error?j:autoData;drawPentest()})};
+  const aur=$('au-run');if(aur)aur.onclick=()=>{aur.disabled=true;fetch('/api/kit/autoscan/run',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'}).then(r=>r.json()).then(j=>{autoData=j&&!j.error?j:autoData;loadScan();drawPentest()})};
   el.querySelectorAll('[data-cve]').forEach(b=>b.onclick=()=>{const p=b.dataset.cve,v=b.dataset.ver,k=p+' '+v;if(cveCache[k]&&!cveCache[k].error){delete cveCache[k];drawPentest();return}
     cveCache[k]={loading:true};drawPentest();fetch('/api/cve?product='+encodeURIComponent(p)+'&version='+encodeURIComponent(v)).then(r=>r.json()).then(j=>{cveCache[k]=j;drawPentest()}).catch(e=>{cveCache[k]={error:String(e)};drawPentest()})});
   el.querySelectorAll('[data-qt]').forEach(b=>b.onclick=()=>{const t=b.dataset.qt,v=b.dataset.host;

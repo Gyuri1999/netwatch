@@ -194,6 +194,12 @@ def main():
     def scan_done(hosts):
         state.scan_result(hosts)
         netkit.merge_names(state, {h["ip"]: h.get("names") or [] for h in hosts})  # ονόματα → χάρτης
+        aj = getattr(state, "autoscan", None)   # ⏰ αν ήταν προγραμματισμένη σάρωση → σύνοψη + ειδοποίηση
+        if aj is not None:
+            try:
+                aj.on_scan_done(hosts)
+            except Exception:  # noqa: BLE001
+                pass
     state.scanner.on_result = scan_done
     state.lab = pentest.Lab(state)
     # 🟣 purple-team καμπάνιες (ATT&CK κάλυψη) και 🔐 έλεγχος TLS/SSH (ιστορικό/αποτελέσματα στο data/ μόνο στο live)
