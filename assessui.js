@@ -80,7 +80,8 @@
     h += `<div class="card"><b>🛠 ${T('Διόρθωσε πρώτα αυτά', 'Fix these first')}</b>`;
     h += (D.fixes || []).length ? `<ol class="as-fix">${D.fixes.map(x => `<li><span class="as-pill" style="--c:${SEVC[x.sev]}">${E(L[x.sev])}</span> <b>${E(x.title)}</b> — ${E(x.fix)}</li>`).join('')}</ol>`
       : `<div style="margin-top:6px">✅ ${T('Τίποτα επείγον.', 'Nothing urgent.')}</div>`;
-    h += `</div>`;
+    h += `<div class="as-row" style="margin-top:8px"><a class="b" data-as="report">📋 ${T('Πλήρης αναφορά + λίστα διόρθωσης ανά μηχάνημα', 'Full report + per-host fix list')}</a>
+      <button class="b" data-as="learn">📚 ${T('Μάθε γιατί (Ακαδημία)', 'Learn why (Academy)')}</button></div></div>`;
 
     const F = (D.findings || []).filter(f => filt === 'all' || f.sev === filt);
     h += `<div class="card"><b>🔎 ${T('Ευρήματα', 'Findings')} (${(D.findings || []).length})</b><div class="as-tabs">`
@@ -121,6 +122,8 @@
     if (f) { filt = f.dataset.asF; draw(); return; }
     const b = e.target.closest('#t-assess [data-as]'); if (!b) return;
     if (b.dataset.as === 'reload') { load(); return; }
+    if (b.dataset.as === 'report') { window.open('/pentest-report?lang=' + LANG(), '_blank', 'noopener'); return; }   // #7: λίστα διόρθωσης ανά μηχάνημα
+    if (b.dataset.as === 'learn') { if (typeof showTab === 'function') showTab('academy'); return; }                   // #6: «μάθε γιατί»
     if (b.dataset.as === 'run') {
       b.disabled = true;
       fetch('/api/assess/run', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lang: LANG() }) })
