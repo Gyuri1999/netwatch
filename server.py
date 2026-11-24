@@ -963,7 +963,8 @@ def make_handler(state):
                 doc = assess.build(state, lang)
                 if u.path == "/api/assess":
                     asr = getattr(state, "assess", None)
-                    return self._json({**doc, "job": asr.view() if asr else {"state": "off"}})
+                    hist = asr.record(doc.get("score"), doc.get("grade")) if asr else []  # 📈 ιστορικό βαθμού A–F στον χρόνο
+                    return self._json({**doc, "job": asr.view() if asr else {"state": "off"}, "history": hist})
                 if u.path == "/assess/report.html":
                     return self._send(200, assess.to_html(doc).encode(), "text/html; charset=utf-8")
                 kind = {"inventory.csv": "inventory", "findings.csv": "findings", "netbox-ip-addresses.csv": "netbox", "report.json": "json"}[u.path.rsplit("/", 1)[1]]

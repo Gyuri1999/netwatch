@@ -285,7 +285,9 @@ def main():
     state.hygiene = alerthyg.AlertHygiene(state, path=os.path.join(DATA, "mutes.json") if live else None,
                                           on_save=chown_to_user if live else None)
     import assess
-    state.assess = assess.Assess(state)  # 📋 αναφορά «νέο δίκτυο»
+    state.assess = assess.Assess(state, path=os.path.join(DATA, "assess-history.json") if live else None)  # 📋 αναφορά «νέο δίκτυο» + ιστορικό βαθμού
+    if live:
+        state.assess.on_save = chown_to_user
     import vulnwatch  # 🛡 ευπάθειες για τις συσκευές σου (CISA KEV + EPSS, μία φορά τη μέρα· demo: ενσωματωμένο δείγμα)
     state.vulns = vulnwatch.VulnWatch(state, DATA if live else None, demo=demo)
     if live:

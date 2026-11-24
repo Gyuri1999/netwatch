@@ -19,7 +19,9 @@ import csv
 import html
 import io
 import ipaddress
+import json
 import math
+import os
 import threading
 import time
 
@@ -373,10 +375,53 @@ def build(state, lang="el", now=None):
 
 # ---------------- «Τρέξε τους ελέγχους» ----------------
 class Assess:
-    def __init__(self, state, clock=time.time):
+    def __init__(self, state, clock=time.time, path=None):
         self.state, self.clock = state, clock
         self.lock = threading.Lock()
         self.job = {"state": "idle"}
+        self.path = path            # data/assess-history.json (live)· None → μόνο στη μνήμη
+        self.on_save = None
+        self.hist = []              # [{"day": "YYYY-MM-DD", "t", "score", "grade"}] — ένα δείγμα τη μέρα, έως 180
+        if path and os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as f:
+                    self.hist = [x for x in json.load(f).get("hist", []) if isinstance(x, dict) and x.get("day")][-180:]
+            except (OSError, ValueError):
+                self.hist = []
+        elif getattr(state, "mode", "") == "demo":  # demo: δείξε έναν ενδεικτικό ανοδικό βαθμό στις τελευταίες 12 μέρες
+            now = self.clock()
+            for i, sc in enumerate([41, 44, 44, 52, 58, 57, 63, 66, 71, 70, 78, 83]):
+                g = "F" if sc < 50 else "D" if sc < 65 else "C" if sc < 80 else "B"
+                day = time.strftime("%Y-%m-%d", time.localtime(now - (11 - i) * 86400))
+                self.hist.append({"day": day, "t": now - (11 - i) * 86400, "score": sc, "grade": g})
+
+    def record(self, score, grade, now=None):
+        """Κρατά τον βαθμό A–F στο χρόνο: ένα δείγμα τη μέρα (το τελευταίο κερδίζει). Για το γράφημα «πώς πάω»."""
+        if not isinstance(score, (int, float)):
+            return list(self.hist)
+        now = now or self.clock()
+        day = time.strftime("%Y-%m-%d", time.localtime(now))
+        with self.lock:
+            if self.hist and self.hist[-1].get("day") == day:
+                self.hist[-1] = {"day": day, "t": now, "score": int(score), "grade": grade}
+            else:
+                self.hist.append({"day": day, "t": now, "score": int(score), "grade": grade})
+            del self.hist[:-180]
+            if self.path:
+                try:
+                    tmp = self.path + ".tmp"
+                    with open(tmp, "w", encoding="utf-8") as f:
+                        json.dump({"hist": self.hist}, f, ensure_ascii=False)
+                    os.replace(tmp, self.path)
+                    if self.on_save:
+                        self.on_save(self.path)
+                except OSError:
+                    pass
+            return list(self.hist)
+
+    def history(self):
+        with self.lock:
+            return list(self.hist)
 
     def run(self, lang="el"):
         with self.lock:

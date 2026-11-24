@@ -9,6 +9,24 @@
   const SEVC = { high: 'var(--red)', med: 'var(--orange)', low: 'var(--yellow)', info: 'var(--cyan)' };
   const SEVL = () => ({ high: T('Υψηλό', 'High'), med: T('Μέτριο', 'Medium'), low: T('Χαμηλό', 'Low'), info: 'Info' });
   const GC = { A: '#3ddc97', B: '#9be15d', C: '#ffd23f', D: '#ff9f43', F: '#ff3b5c' };
+  // 📈 ιστορικό βαθμού A–F στον χρόνο — καθαρό SVG sparkline
+  function trendCard(hist) {
+    hist = (hist || []).filter(x => x && typeof x.score === 'number');
+    if (hist.length < 2) return '';
+    const W = 320, H = 54, n = hist.length, max = 100;
+    const x = i => n === 1 ? 0 : i * (W - 8) / (n - 1) + 4;
+    const y = s => H - 6 - (s / max) * (H - 14);
+    const pts = hist.map((p, i) => `${x(i).toFixed(1)},${y(p.score).toFixed(1)}`).join(' ');
+    const first = hist[0], last = hist[n - 1], diff = last.score - first.score;
+    const arrow = diff > 1 ? `▲ +${diff}` : diff < -1 ? `▼ ${diff}` : '→ 0';
+    const col = diff > 1 ? 'var(--green,#3ddc97)' : diff < -1 ? 'var(--red)' : 'var(--dim)';
+    const dots = hist.map((p, i) => `<circle cx="${x(i).toFixed(1)}" cy="${y(p.score).toFixed(1)}" r="2.4" fill="${GC[p.grade] || 'var(--dim)'}"><title>${E(p.day)} · ${p.grade} (${p.score})</title></circle>`).join('');
+    return `<div class="card" style="margin-top:8px"><b>📈 ${T('Πώς πάει ο βαθμός στον χρόνο', 'How the score trends over time')}</b>
+      <span class="dim" style="font-size:12.5px"> · ${n} ${T('μετρήσεις', 'samples')} · <span style="color:${col};font-weight:700">${arrow}</span> ${T('από την 1η', 'since the first')} (${E(first.grade)}→${E(last.grade)})</span>
+      <svg viewBox="0 0 ${W} ${H}" width="100%" style="max-width:${W}px;margin-top:6px" role="img" aria-label="score trend">
+        <polyline points="${pts}" fill="none" stroke="var(--cyan)" stroke-width="2"/>${dots}</svg>
+      <div class="dim" style="font-size:12px">${T('Ένα σημείο τη μέρα, κάθε φορά που ανοίγεις αυτή την καρτέλα. Διόρθωσε ευρήματα → ανεβαίνει.', 'One point per day, each time you open this tab. Fix findings → it rises.')}</div></div>`;
+  }
   let D = null, poll = null, filt = 'all';
 
   const css = document.createElement('style');
@@ -52,6 +70,7 @@
       <div class="as-kpi"><div><b>${E(S.devices)}</b><span>${T('συσκευές', 'devices')}</span></div><div><b style="color:var(--red)">${E(C.high || 0)}</b><span>${L.high}</span></div>
       <div><b style="color:var(--orange)">${E(C.med || 0)}</b><span>${L.med}</span></div><div><b>${E(C.low || 0)}</b><span>${L.low}</span></div>
       <div><b>${E(S.new_24h)}</b><span>${T('νέες 24ώ', 'new 24h')}</span></div><div><b>${E(S.random_mac)}</b><span>${T('τυχαίες MAC', 'random MACs')}</span></div></div></div>
+      ${trendCard(D.history)}
       <div class="as-row"><button class="b as-go" data-as="run"${running ? ' disabled' : ''}>${running ? '⏳ ' + T('Τρέχουν οι έλεγχοι…', 'Running checks…') : '▶ ' + T('Τρέξε τους ελέγχους', 'Run checks')}</button>
       <button class="b" data-as="reload">🔄 ${T('Ανανέωση', 'Refresh')}</button>
       <a class="b" href="/assess/report.html?lang=${LANG()}" target="_blank" rel="noopener">🖨 ${T('Αναφορά / PDF', 'Report / PDF')}</a></div>

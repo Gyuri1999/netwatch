@@ -172,3 +172,31 @@ def test_scan_findings_feed_the_score():
             return None
     assert assess._scan_findings(Empty(), "el") == []
     assert assess._scan_findings(object(), "el") == []
+
+
+def test_grade_history_one_per_day_and_persists(tmp_path):
+    import assess
+    p = str(tmp_path / "h.json")
+    t = [1_700_000_000.0]
+    a = assess.Assess(object(), clock=lambda: t[0], path=p)
+    a.record(70, "C")
+    a.record(74, "C")                      # ίδια μέρα → αντικαθιστά
+    assert len(a.history()) == 1 and a.history()[-1]["score"] == 74
+    t[0] += 86400
+    a.record(82, "B")                      # νέα μέρα → νέο σημείο
+    assert [x["grade"] for x in a.history()] == ["C", "B"]
+    # επανεκκίνηση: διαβάζει το ιστορικό από τον δίσκο
+    a2 = assess.Assess(object(), clock=lambda: t[0], path=p)
+    assert [x["score"] for x in a2.history()] == [74, 82]
+    assert a2.record("oops", "B") == a2.history()      # μη αριθμός αγνοείται
+    # όριο 180 δειγμάτων
+    for i in range(200):
+        t[0] += 86400
+        a2.record(50 + i % 40, "D")
+    assert len(a2.history()) == 180
+
+
+def test_assess_history_in_memory_without_path():
+    import assess
+    a = assess.Assess(object(), clock=lambda: 1_700_000_000.0)
+    assert a.record(90, "A") and a.history()[-1]["grade"] == "A" and a.path is None
