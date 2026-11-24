@@ -754,7 +754,77 @@ class Sites:
                 return None
             vs = sorted(self.visits.get(sid) or [], key=lambda v: -v["start"])
             months = sorted({time.strftime("%Y-%m", time.localtime(v["start"])) for v in vs} | {time.strftime("%Y-%m", time.localtime(self.clock()))}, reverse=True)
-            return dict(self._summary(s), visit_list=[self._visit_view(v) for v in vs[:200]], months=months[:36], dir=bool(self.site_dir(sid)))
+            d = dict(self._summary(s), visit_list=[self._visit_view(v) for v in vs[:200]], months=months[:36], dir=bool(self.site_dir(sid)))
+        d["baseline"] = self.drift(sid)  # 🔒 εγκεκριμένο δίκτυο + τι άλλαξε (έξω από το lock: διαβάζει state.hosts)
+        return d
+
+    # ── 🔒 baseline «εγκεκριμένου δικτύου» ανά πελάτη ──
+    @staticmethod
+    def _dkey(d):
+        return ("mac", d["mac"]) if d.get("mac") else ("ip", d.get("ip"))
+
+    def save_baseline(self, sid):
+        """«Κλείδωσε» τις τωρινές συσκευές ως το εγκεκριμένο δίκτυο του πελάτη."""
+        devs = [{"ip": x["ip"], "mac": x["mac"], "name": x["name"], "vendor": x["vendor"], "type": x["type"], "icon": x["icon"]} for x in devices(self.state)]
+        with self.lock:
+            if sid not in self.sites:
+                return {"error": "Δεν υπάρχει πελάτης."}
+            self.sites[sid]["baseline"] = {"saved": self.clock(), "devices": devs[:MAX_SNAP_DEVICES]}
+            self._save()
+        return {"ok": True, "count": len(devs)}
+
+    def clear_baseline(self, sid):
+        with self.lock:
+            if sid in self.sites and self.sites[sid].get("baseline"):
+                self.sites[sid].pop("baseline", None)
+                self._save()
+        return {"ok": True}
+
+    def drift(self, sid):
+        """Σύγκριση εγκεκριμένου δικτύου με το τωρινό → {saved, new:[...], gone:[...], ok}. None αν δεν υπάρχει baseline."""
+        with self.lock:
+            s = self.sites.get(sid)
+            base = (s or {}).get("baseline")
+        if not base:
+            return None
+        cur = devices(self.state)
+        bykey_base = {self._dkey(d): d for d in base.get("devices") or ()}
+        bykey_cur = {self._dkey(d): d for d in cur}
+        new = [d for k, d in bykey_cur.items() if k not in bykey_base]
+        gone = [d for k, d in bykey_base.items() if k not in bykey_cur]
+        return {"saved": base.get("saved"), "count": len(base.get("devices") or ()),
+                "new": sorted(new, key=lambda d: d.get("ip") or "")[:40],
+                "gone": sorted(gone, key=lambda d: d.get("ip") or "")[:40], "ok": not new and not gone}
+
+    def check_drift(self, now=None):
+        """Ειδοποίηση όταν εμφανιστεί νέα συσκευή εκτός του εγκεκριμένου δικτύου (τρέχων πελάτης). Μία φορά ανά συσκευή."""
+        now = now or self.clock()
+        cur_sid = self.detect()
+        if not cur_sid:
+            return
+        dr = self.drift(cur_sid)
+        if not dr or not dr["new"]:
+            return
+        st, name = self.state, (self.sites.get(cur_sid) or {}).get("name") or cur_sid
+        if st is None or not hasattr(st, "alert"):
+            return
+        for d in dr["new"]:
+            who = d.get("name") or d.get("vendor") or d.get("ip")
+            st.alert("Νέα συσκευή εκτός εγκεκριμένου δικτύου", "med", d.get("ip") or "?", f"πελάτης {name}",
+                     f"Η συσκευή {who} ({d.get('ip')}{', ' + d['mac'] if d.get('mac') else ''}) δεν υπάρχει στο εγκεκριμένο δίκτυο του πελάτη «{name}». "
+                     "Αν είναι δική σου/εγκεκριμένη, ξανακλείδωσε το baseline· αλλιώς δες ποια είναι.",
+                     now, key=("site-drift", cur_sid, self._dkey(d)), cooldown=6 * 3600, mark=False)
+
+    def run_forever(self):
+        import time as _t
+        _t.sleep(45)
+        while True:
+            try:
+                self.check_drift()
+            except Exception as e:  # noqa: BLE001
+                from core import log
+                log("sites drift:", e)
+            _t.sleep(120)
 
     def view(self):
         with self.lock:
@@ -798,6 +868,12 @@ class Sites:
             return (200, self.view()) if self.delete_site(sid) else (404, {"error": "not found"})
         if sub == "select":
             return (200, self.view()) if self.select(sid) else (404, {"error": "not found"})
+        if sub == "baseline":            # 🔒 κλείδωσε τις τωρινές συσκευές ως εγκεκριμένο δίκτυο
+            r = self.save_baseline(sid)
+            return _err(r["error"]) if r.get("error") else (200, dict(self.view(), site=self.detail(sid)))
+        if sub == "baseline/clear":
+            self.clear_baseline(sid)
+            return 200, dict(self.view(), site=self.detail(sid))
         if sub == "bind":  # «αυτό το δίκτυο είναι αυτός ο πελάτης» → ξαναγράφει το αποτύπωμα
             if sid not in self.sites:
                 return 404, {"error": "not found"}
