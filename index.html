@@ -1306,7 +1306,19 @@ function renderHosts(){
   $('hb').querySelectorAll('tr').forEach(tr=>tr.onclick=()=>select(tr.dataset.ip));
 }
 
+// 🔎 ό,τι βρήκε η σάρωση (CVE/EOL/IoT) φέρνεται και στην κύρια λίστα συσκευών, όχι μόνο στο Pentest
+function scanInfoFor(ip){if(!scanData||!scanData.hosts)return null;return scanData.hosts.find(x=>x.ip===ip)||null}
+function scanBadges(ip){const h=scanInfoFor(ip);if(!h)return '';const b=[];
+  const eol=(h.services||[]).filter(s=>s.eol);
+  if(eol.length)b.push(`<span class="tag r" title="${esc(eol.map(s=>s.eol.label+' — από '+s.eol.date).join(' · '))}">⛔ εκτός υποστήριξης</span>`);
+  if(h.iot)b.push(`<span class="tag" title="${esc((h.iot.advice||[]).map(a=>a[1]).join(' · '))}">${esc(h.iot.icon)} ${esc(h.iot.label)}</span>`);
+  const hi=(h.services||[]).filter(s=>s.risk==='high');
+  if(hi.length&&!eol.length)b.push(`<span class="tag r" title="${esc(hi.map(s=>(s.svc||s.port)+': '+(s.why||'')).join(' · '))}">⚠ ευπαθής υπηρεσία</span>`);
+  const vers=(h.services||[]).filter(s=>s.product&&s.version).length;
+  if(vers&&!eol.length&&!hi.length)b.push(`<span class="tag" title="Πάτα τη συσκευή και δες «Pentest» για γνωστές ευπάθειες (CVE)">🔎 ${vers} εκδόσεις λογισμικού</span>`);
+  return b.length?`<div style="margin-top:3px">${b.join('')}</div>`:''}
 function renderDevs(){
+  if(!scanData)loadScan();
   const el=$('t-devs');const devs=[...S.hosts.values()].filter(h=>h.kind==='local').sort((a,b)=>(b.me-a.me)||(b.gw-a.gw)||((b.bytes_in+b.bytes_out)-(a.bytes_in+a.bytes_out)));
   const unk=window.NAMES_UI?NAMES_UI.unnamed().length:0;
   el.innerHTML=`<div class="sm" style="margin-bottom:8px">Οι συσκευές που φάνηκαν στο τοπικό σου δίκτυο (${devs.length}). Αν δεν αναγνωρίζεις κάποια, έλεγξε τον κατασκευαστή από τη MAC.</div>`+
@@ -1316,7 +1328,7 @@ function renderDevs(){
     if(h.ip.includes(':'))tags.push('<span class="tag">IPv6</span>');
     const pr=Object.keys(h.protos||{}).slice(0,5).join(', ');
     return `<div class="card click" data-sel="${esc(h.ip)}"><div style="display:flex;justify-content:space-between"><b style="color:var(--hi)">${h.dicon?esc(h.dicon)+' ':''}${esc(aliasOf(h)||hname(h)||h.ip)}</b><span class="sm">από ${fmtT(h.first)}</span></div>
-     <div>${esc(h.ip)} ${h.mac?'· '+esc(h.mac):''}</div><div>${tags.join('')}</div>
+     <div>${esc(h.ip)} ${h.mac?'· '+esc(h.mac):''}</div><div>${tags.join('')}</div>${scanBadges(h.ip)}
      <div class="sm">↑ ${fmtB(h.bytes_out)} ↓ ${fmtB(h.bytes_in)} · ${esc(pr)}</div></div>`}).join('');
   const wz=el.querySelector('#nm-wiz');if(wz)wz.onclick=()=>NAMES_UI.wizard();
   bindCommon(el)}
