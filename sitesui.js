@@ -155,7 +155,8 @@
 
   const get = (sub = '') => fetch(API + sub).then(r => r.json());
   const post = (sub, body) => fetch(`${API}/${sub}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body || {}) }).then(r => r.json());
-  const openSite = id => { sel = id; return id ? get('/site?id=' + encodeURIComponent(id)).then(j => { S = j.error ? null : j; draw(); }) : (S = null, draw()); };
+  // επιστρέφει ΠΑΝΤΑ Promise: ο handler «open» κάνει openSite(...).then(...), και στο κλείσιμο (id κενό) δεν έπρεπε να σκάει
+  const openSite = id => { sel = id; if (!id) { S = null; draw(); return Promise.resolve(); } return get('/site?id=' + encodeURIComponent(id)).then(j => { S = j.error ? null : j; draw(); }); };
   function done(j, keep) {
     if (j.error) { msg = EN() ? (j.error_en || j.error) : j.error; draw(); return false; }
     msg = ''; D = j; if (j.site) S = j.site; if (!keep) adding = false;
