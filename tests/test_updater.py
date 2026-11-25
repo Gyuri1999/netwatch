@@ -362,3 +362,13 @@ def test_mac_bundle_from_parent_process(tmp_path, monkeypatch):
     assert updater.mac_bundle(str(here), None, run) is None
     assert updater.mac_bundle(str(tmp_path / "other"), 123, run) is None
     assert updater.mac_bundle(str(here), 123, lambda argv, timeout=0: (0, "/usr/bin/python3\n", "")) is None
+
+
+def test_auto_never_for_local_dev_build(tmp_path):
+    """Το ./macapp/build.sh γράφει DEV_BUILD: η δοκιμαστική έκδοση δεν αντικαθίσταται μόνη της από το release."""
+    u = updater.Updater(here=str(tmp_path), fetch=lambda *a, **k: b"{}")
+    u.kind, u.bundle = "app", str(tmp_path / "NetWatch.app")
+    assert u.auto_ok()
+    (tmp_path / "DEV_BUILD").write_text("local build\n")
+    assert updater.is_dev_build(str(tmp_path))
+    assert not u.auto_ok()

@@ -61,6 +61,12 @@ def newer(a, b):
     return bool(ta and tb and ta > tb)
 
 
+def is_dev_build(here=HERE):
+    """Build από τον κώδικα (./macapp/build.sh στο δικό σου Mac), όχι υπογεγραμμένο release.
+    Δεν το αντικαθιστούμε ποτέ μόνοι μας — αλλιώς οι αλλαγές που δοκιμάζεις θα χάνονταν με την πρώτη ενημέρωση."""
+    return os.path.exists(os.path.join(here, "DEV_BUILD"))
+
+
 def read_version(here=HERE):
     try:
         with open(os.path.join(here, "VERSION"), encoding="utf-8") as f:
@@ -337,8 +343,10 @@ class Updater:
         return self.view()
 
     def auto_ok(self):
-        """Μπορεί αυτή η εγκατάσταση να ενημερώνεται μόνη της; (μόνο υπογεγραμμένα apps, όχι git/docker/αρχεία/demo)"""
+        """Μπορεί αυτή η εγκατάσταση να ενημερώνεται μόνη της; (μόνο υπογεγραμμένα apps, όχι git/docker/αρχεία/demo/dev build)"""
         if self.sim or self.kind not in ("app", "winapp") or not self.bundle:
+            return False
+        if is_dev_build(self.here):  # δοκιμαστικό build: μόνο ειδοποίηση, εγκατάσταση μόνο με κλικ
             return False
         # Mac σε live με κωδικό διαχειριστή (root χωρίς SUDO_UID): το νέο app θα γινόταν του root → μόνο με κλικ
         if hasattr(os, "geteuid") and os.geteuid() == 0 and not os.environ.get("SUDO_UID"):
