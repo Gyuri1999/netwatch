@@ -2973,7 +2973,24 @@ I18N.add({
   "Πολλές ταυτόχρονες συνδέσεις — δοκίμασε ξανά.": "Too many parallel connections — try again.",
   "Άγνωστος host.": "Unknown host.",
   "Το SSH Explorer δεν είναι διαθέσιμο σε αυτή τη λειτουργία.": "SSH Explorer is not available in this mode.",
-  "Δώσε όνομα και τύπο στη συσκευή (π.χ. «TV σαλονιού»). Αποθηκεύεται στο NetWatch και φαίνεται παντού.": "Give the device a name and type (e.g. “Living-room TV”). Saved in NetWatch and shown everywhere."
+  "Δώσε όνομα και τύπο στη συσκευή (π.χ. «TV σαλονιού»). Αποθηκεύεται στο NetWatch και φαίνεται παντού.": "Give the device a name and type (e.g. “Living-room TV”). Saved in NetWatch and shown everywhere.",
+  "🔑 Ξεχασμένα κλειδιά": "🔑 Forgotten secrets",
+  "Ψάχνει κωδικούς Wi‑Fi/MQTT, κλειδιά API και tokens γραμμένους μέσα σε δικό σου project (π.χ. ESP32) — και στο git ιστορικό. Μόνο τοπικά· οι τιμές φαίνονται κρυμμένες.": "Finds Wi‑Fi/MQTT passwords, API keys and tokens written inside your own project (e.g. ESP32) — and in its git history. Local only; values are shown masked.",
+  "Ιδιωτικό κλειδί (SSH/TLS)": "Private key (SSH/TLS)",
+  "Κλειδί AWS": "AWS key",
+  "Token GitHub": "GitHub token",
+  "Κλειδί Anthropic (Claude)": "Anthropic (Claude) key",
+  "Κλειδί OpenAI": "OpenAI key",
+  "Κλειδί Stripe (live)": "Stripe key (live)",
+  "Token Slack": "Slack token",
+  "Token Telegram bot": "Telegram bot token",
+  "Κλειδί Google API": "Google API key",
+  "Κωδικός μέσα σε URL": "Password inside a URL",
+  "Κωδικός σε #define": "Password in a #define",
+  "Κωδικός γραμμένος στον κώδικα": "Password written in the code",
+  "Δώσε τον φάκελο του project, π.χ. ~/smart-city-poles": "Give the project folder, e.g. ~/smart-city-poles",
+  "Δεν βρέθηκε αυτός ο φάκελος": "Folder not found",
+  "Διάλεξε έναν φάκελο project μέσα στον φάκελο χρήστη σου (π.χ. ~/netwatch), όχι όλο το ~ ή αρχεία συστήματος": "Pick a project folder inside your home folder (e.g. ~/netwatch), not all of ~ or system files"
  },
  "patterns": [
   [
