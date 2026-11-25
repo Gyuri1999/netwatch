@@ -18,9 +18,87 @@ let portFile = support.appendingPathComponent("port")
 
 func sh(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
 
-/// Τρέχει μια εντολή ως root μέσω του παραθύρου κωδικού του macOS. Σε ξεχωριστή διεργασία,
-/// ώστε το παράθυρο να μην «παγώνει» την εφαρμογή. Ο κωδικός πάει μόνο στο macOS — εμείς δεν τον βλέπουμε.
+/// Τρέχει μια εντολή ως root. Πρώτα με το παράθυρο Authorization του macOS (δέχεται Touch ID και δείχνει
+/// το εικονίδιό μας)· αν αυτό δεν υπάρχει σε κάποια έκδοση macOS, με το παλιό παράθυρο του osascript.
+/// Ο κωδικός / το δαχτυλικό αποτύπωμα πάει μόνο στο macOS — εμείς δεν το βλέπουμε ποτέ.
+/// Καλείται από νήμα παρασκηνίου: το παράθυρο το δείχνει το macOS, η εφαρμογή δεν «παγώνει».
 func runAsAdmin(_ cmd: String, prompt: String) -> Bool {
+    if let r = runWithTouchID(cmd, prompt: prompt) { return r }
+    return runWithOsascript(cmd, prompt: prompt)
+}
+
+// ---------------- Touch ID (Authorization Services) ----------------
+// Το AuthorizationCopyRights ζητά «δικαιώματα διαχειριστή» από το macOS (SecurityAgent): εκεί ο χρήστης
+// βάζει Touch ID ή κωδικό. Μετά το AuthorizationExecuteWithPrivileges ξεκινά ΑΥΤΟ το πρόγραμμα ως root
+// με τη σημαία rootHelperFlag· εκείνο γίνεται πλήρως root και τρέχει την εντολή με /bin/sh.
+// (Το AuthorizationExecuteWithPrivileges είναι «deprecated» αλλά υπάρχει ακόμα· το βρίσκουμε με dlsym,
+// και αν λείψει ποτέ, γυρνάμε στο osascript.)
+let rootHelperFlag = "--nw-root-helper"
+
+/// Στην αρχή του προγράμματος: αν μας ξεκίνησε το Authorization ως βοηθό, τρέξε την εντολή και τελείωσε.
+/// Χωρίς root (π.χ. αν το τρέξει κάποιος με το χέρι) δεν κάνει τίποτα — δεν υπάρχει setuid bit.
+func runRootHelperIfAsked() {
+    let a = CommandLine.arguments
+    guard a.count >= 2, a[1] == rootHelperFlag else { return }
+    // το AuthorizationExecuteWithPrivileges δίνει euid 0· γινόμαστε και real uid 0,
+    // αλλιώς το bash θα έριχνε μόνο του τα δικαιώματα (ruid ≠ euid)
+    guard a.count == 3, geteuid() == 0, setgid(0) == 0, setuid(0) == 0 else { exit(126) }
+    let argv: [UnsafeMutablePointer<CChar>?] = [strdup("/bin/sh"), strdup("-c"), strdup(a[2]), nil]
+    execv("/bin/sh", argv)
+    exit(127)
+}
+
+/// nil = δεν υπάρχει αυτός ο δρόμος (τότε osascript)· true/false = έγινε / ο χρήστης ακύρωσε ή απέτυχε.
+func runWithTouchID(_ cmd: String, prompt: String) -> Bool? {
+    typealias AEWP = @convention(c) (AuthorizationRef, UnsafePointer<CChar>, AuthorizationFlags,
+                                     UnsafePointer<UnsafeMutablePointer<CChar>?>,
+                                     UnsafeMutablePointer<UnsafeMutablePointer<FILE>?>?) -> OSStatus
+    guard let tool = Bundle.main.executablePath,
+          let lib = dlopen("/System/Library/Frameworks/Security.framework/Security", RTLD_NOW),
+          let sym = dlsym(lib, "AuthorizationExecuteWithPrivileges") else { return nil }
+    let execPriv = unsafeBitCast(sym, to: AEWP.self)
+
+    var authRef: AuthorizationRef?
+    guard AuthorizationCreate(nil, nil, [], &authRef) == errAuthorizationSuccess, let auth = authRef else { return nil }
+    defer { AuthorizationFree(auth, [.destroyRights]) }
+
+    // Το παράθυρο: δικό μας κείμενο + εικονίδιο. Οι C-strings ζουν ως το τέλος της κλήσης.
+    let icon = Bundle.main.path(forResource: "NetWatch", ofType: "icns") ?? ""
+    let cRight = strdup(kAuthorizationRightExecute), cPromptKey = strdup(kAuthorizationEnvironmentPrompt)
+    let cIconKey = strdup(kAuthorizationEnvironmentIcon), cPrompt = strdup(prompt), cIcon = strdup(icon)
+    defer { [cRight, cPromptKey, cIconKey, cPrompt, cIcon].forEach { free($0) } }
+    var right = AuthorizationItem(name: cRight!, valueLength: 0, value: nil, flags: 0)
+    var envItems = [AuthorizationItem(name: cPromptKey!, valueLength: strlen(cPrompt!), value: cPrompt, flags: 0)]
+    if !icon.isEmpty {
+        envItems.append(AuthorizationItem(name: cIconKey!, valueLength: strlen(cIcon!), value: cIcon, flags: 0))
+    }
+    let st: OSStatus = withUnsafeMutablePointer(to: &right) { rp in
+        envItems.withUnsafeMutableBufferPointer { ep in
+            var rights = AuthorizationRights(count: 1, items: rp)
+            var env = AuthorizationEnvironment(count: UInt32(ep.count), items: ep.baseAddress)
+            return AuthorizationCopyRights(auth, &rights, &env, [.interactionAllowed, .extendRights, .preAuthorize], nil)
+        }
+    }
+    if st == errAuthorizationCanceled || st == errAuthorizationDenied { return false }
+    guard st == errAuthorizationSuccess else { return nil }
+
+    // Η εντολή σε υπο-shell, ώστε να μάθουμε τον κωδικό εξόδου της (το AEWP δεν τον δίνει).
+    let full = "(\n\(cmd)\n) </dev/null; echo NW_RC=$?"
+    let args: [UnsafeMutablePointer<CChar>?] = [strdup(rootHelperFlag), strdup(full), nil]
+    defer { args.forEach { free($0) } }
+    var pipe: UnsafeMutablePointer<FILE>?
+    let ex = args.withUnsafeBufferPointer { execPriv(auth, tool, [], $0.baseAddress!, &pipe) }
+    guard ex == errAuthorizationSuccess, let fp = pipe else { return nil }
+    defer { fclose(fp) }
+    var out = ""
+    var line: UnsafeMutablePointer<CChar>?
+    var cap = 0
+    while getline(&line, &cap, fp) > 0 { out += String(cString: line!) }
+    free(line)
+    return out.contains("NW_RC=0")
+}
+
+func runWithOsascript(_ cmd: String, prompt: String) -> Bool {
     let esc = { (s: String) in s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
     let osa = Process()
     osa.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
@@ -949,6 +1027,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 }
 
+runRootHelperIfAsked()   // πρώτα απ' όλα: αν είμαστε ο βοηθός root του Touch ID, δεν ανοίγουμε παράθυρα
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate
