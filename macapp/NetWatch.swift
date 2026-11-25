@@ -27,6 +27,9 @@ final class Backend {
     var onReady: ((Int) -> Void)?
     var onFail: ((String) -> Void)?
     var onStatus: ((String) -> Void)?
+    /// Πριν από το παράθυρο κωδικού του macOS: η δική μας εξήγηση (τρέχει στο main thread).
+    /// false = ο χρήστης δεν θέλει να δώσει κωδικό τώρα (το AppDelegate αποφασίζει τι γίνεται μετά).
+    var askAdmin: (() -> Bool)?
 
     var base: URL? { port.map { URL(string: "http://127.0.0.1:\($0)")! } }
 
@@ -80,6 +83,11 @@ final class Backend {
             case .demo: args.append("--demo")
             case .pcap: args += ["--pcap", pcap ?? "", "--loop"]
             case .live: break
+            }
+            if mode == .live, let ask = self.askAdmin {
+                var go = true
+                DispatchQueue.main.sync { go = ask() }
+                if !go { return }
             }
             DispatchQueue.main.async { self.onStatus?(mode == .live ? "Ζητώ κωδικό διαχειριστή για καταγραφή πακέτων…" : "Ξεκινά το NetWatch…") }
             if mode == .live {
@@ -408,6 +416,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             self?.setIcon(level: "idle", count: 0)
             self?.showWindow()
         }
+        backend.askAdmin = { [weak self] in self?.explainAdmin() ?? true }
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.poll() }
 
         let saved = Mode(rawValue: UserDefaults.standard.string(forKey: "mode") ?? "") ?? .demo
@@ -443,6 +452,35 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         web.message("Αλλαγή λειτουργίας…")
         showWindow()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { self.backend.start(m, pcap: pcap) }
+    }
+
+    /// Δική μας εξήγηση πριν από το παράθυρο κωδικού του macOS (εκείνο δεν αλλάζει όψη και
+    /// στις νέες εκδόσεις αγνοεί το κείμενό μας). true = συνέχισε στο παράθυρο κωδικού.
+    func explainAdmin() -> Bool {
+        let key = "adminExplainerHidden"
+        if UserDefaults.standard.bool(forKey: key) { return true }
+        showWindow()
+        let a = NSAlert()
+        a.messageText = "Χρειάζομαι τον κωδικό του Mac σου"
+        a.informativeText = "Μετά από αυτό, το macOS θα ανοίξει το δικό του παράθυρο κωδικού."
+        if let img = NSImage(systemSymbolName: "lock.shield.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 56, weight: .regular)
+                .applying(NSImage.SymbolConfiguration(hierarchicalColor: .systemBlue))) {
+            a.icon = img
+        }
+        let v = NSHostingView(rootView: AdminExplainer())
+        v.frame.size = v.fittingSize
+        a.accessoryView = v
+        a.addButton(withTitle: "Συνέχεια")
+        a.addButton(withTitle: "Demo χωρίς κωδικό")
+        a.showsSuppressionButton = true
+        a.suppressionButton?.title = "Να μην το ξαναδείξεις"
+        NSApp.activate(ignoringOtherApps: true)
+        let r = a.runModal()
+        if a.suppressionButton?.state == .on { UserDefaults.standard.set(true, forKey: key) }
+        if r == .alertFirstButtonReturn { return true }
+        DispatchQueue.main.async { self.switchMode(.demo) }
+        return false
     }
 
     @objc func goLive() { switchMode(.live) }
@@ -773,6 +811,33 @@ app.run()
 
 
 // ---------------- Κάρτα κατάστασης στο μενού (SwiftUI) ----------------
+/// Τι γράφει η εξήγηση πριν από τον κωδικό: λίγες, μεγάλες, καθαρές γραμμές με εικονίδιο.
+struct AdminExplainer: View {
+    func item(_ ic: String, _ c: Color, _ title: String, _ body: String) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: ic).font(.system(size: 15, weight: .semibold)).foregroundColor(c).frame(width: 22)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.system(size: 12.5, weight: .semibold))
+                Text(body).font(.system(size: 11.5)).foregroundColor(.secondary).fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+    var body: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            item("waveform.path.ecg", .blue, "Για να «ακούω» το δίκτυο",
+                 "Το macOS δίνει την κίνηση του δικτύου μόνο σε διαχειριστή.")
+            item("lock.fill", .green, "Ο κωδικός πάει μόνο στο macOS",
+                 "Το NetWatch δεν τον βλέπει, δεν τον κρατά, δεν τον στέλνει πουθενά.")
+            item("exclamationmark.triangle.fill", .orange, "Θα δεις «Apple could not verify…»",
+                 "Είναι φυσιολογικό: το NetWatch δεν είναι υπογεγραμμένο από την Apple. Ο κώδικας είναι ανοιχτός στο GitHub.")
+            item("key.fill", .purple, "Γράψε τον κωδικό που ξεκλειδώνει το Mac",
+                 "Μετά πάτα «Allow Access».")
+        }
+        .frame(width: 330, alignment: .leading)
+        .padding(.vertical, 4)
+    }
+}
+
 struct CardModel {
     var ready = false, mode = "demo", iface = "", high = 0, med = 0, alerts = 0, lan = 0, hosts = 0
     var pps = 0.0, bps = 0.0, spark: [Double] = [], homelab = "—", homelabDown: [String] = []
