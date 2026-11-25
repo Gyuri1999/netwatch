@@ -66,7 +66,7 @@ func runWithTouchID(_ cmd: String, prompt: String) -> Bool? {
     let icon = Bundle.main.path(forResource: "NetWatch", ofType: "icns") ?? ""
     let cRight = strdup(kAuthorizationRightExecute), cPromptKey = strdup(kAuthorizationEnvironmentPrompt)
     let cIconKey = strdup(kAuthorizationEnvironmentIcon), cPrompt = strdup(prompt), cIcon = strdup(icon)
-    defer { [cRight, cPromptKey, cIconKey, cPrompt, cIcon].forEach { free($0) } }
+    defer { for p in [cRight, cPromptKey, cIconKey, cPrompt, cIcon] { free(p) } }
     var right = AuthorizationItem(name: cRight!, valueLength: 0, value: nil, flags: 0)
     var envItems = [AuthorizationItem(name: cPromptKey!, valueLength: strlen(cPrompt!), value: cPrompt, flags: 0)]
     if !icon.isEmpty {
@@ -85,7 +85,7 @@ func runWithTouchID(_ cmd: String, prompt: String) -> Bool? {
     // Η εντολή σε υπο-shell, ώστε να μάθουμε τον κωδικό εξόδου της (το AEWP δεν τον δίνει).
     let full = "(\n\(cmd)\n) </dev/null; echo NW_RC=$?"
     let args: [UnsafeMutablePointer<CChar>?] = [strdup(rootHelperFlag), strdup(full), nil]
-    defer { args.forEach { free($0) } }
+    defer { for p in args { free(p) } }
     var pipe: UnsafeMutablePointer<FILE>?
     let ex = args.withUnsafeBufferPointer { execPriv(auth, tool, [], $0.baseAddress!, &pipe) }
     guard ex == errAuthorizationSuccess, let fp = pipe else { return nil }
