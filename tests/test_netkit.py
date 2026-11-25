@@ -820,3 +820,118 @@ def test_api_selftest_routes(api):
     assert _post(u, {"ip": "192.168.1.77", "minutes": 5}, {"Content-Type": "application/json", "Origin": "https://evil.example"})[0] == 403
     code, r = _post(u, {"ip": "192.168.1.77", "minutes": 0})
     assert code == 200 and r["test_ips"] == []
+
+
+# ---------------- email: πλαστογράφηση (SPF/DMARC/DKIM) ----------------
+def _mail_lookup(table):
+    """Ψεύτικος resolver: table[(όνομα, τύπος)] = [εγγραφές] ή None (= NXDOMAIN)."""
+    def lookup(name, rtype):
+        key = (name.lower(), rtype)
+        if key in table and table[key] is None:
+            return {"rcode": "NXDOMAIN", "answers": []}
+        return {"rcode": "NOERROR", "answers": [{"type": rtype, "ttl": 60, "data": v} for v in table.get(key, [])]}
+    return lookup
+
+
+def _check(r, name):
+    return next(c for c in r["checks"] if c["name"] == name)
+
+
+def test_txt_chunks_join_without_space():
+    """RFC 7208: τα κομμάτια ≤255 bytes μιας TXT ενώνονται χωρίς κενό (αλλιώς «_spf.goo gle.com»)."""
+    d = netkit._dns_mod()
+    pkt = bytes(d.DNS(id=7, qr=1, qd=d.DNSQR(qname="x.test", qtype=16),
+                      an=[d.DNSRR(rrname="x.test.", type="TXT", ttl=60, rdata=[b"v=spf1 include:_spf.goo", b"gle.com -all"])]))
+    assert netkit.parse_response(pkt)["answers"][0]["data"] == "v=spf1 include:_spf.google.com -all"
+
+
+def test_dns_retries_over_tcp_when_truncated():
+    """Μεγάλη απάντηση (TC=1 στο UDP) → ξανά μέσω TCP, όπως κάθε κανονικός resolver."""
+    import socket
+    import struct
+    import threading
+    d = netkit._dns_mod()
+    tcp = socket.socket()
+    tcp.bind(("127.0.0.1", 0))
+    tcp.listen(1)
+    port = tcp.getsockname()[1]
+    udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    udp.bind(("127.0.0.1", port))
+
+    def serve_udp():
+        data, addr = udp.recvfrom(4096)
+        q = d.DNS(data)
+        udp.sendto(bytes(d.DNS(id=q.id, qr=1, tc=1, qd=q.qd)), addr)
+
+    def serve_tcp():
+        c, _ = tcp.accept()
+        n = struct.unpack("!H", c.recv(2))[0]
+        q = d.DNS(c.recv(n))
+        big = [d.DNSRR(rrname="big.test.", type="TXT", ttl=60, rdata=[f"record-{i}".encode()]) for i in range(40)]
+        out = bytes(d.DNS(id=q.id, qr=1, qd=q.qd, an=big))
+        c.sendall(struct.pack("!H", len(out)) + out)
+        c.close()
+    threading.Thread(target=serve_udp, daemon=True).start()
+    threading.Thread(target=serve_tcp, daemon=True).start()
+    try:
+        r = netkit.dns_lookup("big.test", "TXT", server="127.0.0.1", port=port)
+    finally:
+        udp.close()
+        tcp.close()
+    assert r["truncated"] is False and len(r["answers"]) == 40
+
+
+def test_mail_no_dmarc_is_spoofable_even_with_good_spf():
+    r = netkit.email_dns_posture("shop.test", lookup=_mail_lookup({("shop.test", "TXT"): ["v=spf1 ip4:192.0.2.1 -all"]}))
+    assert _check(r, "SPF")["status"] == "good"
+    assert r["verdict"]["spoofable"] == "yes"
+    assert any("φάκελο" in x for x in r["verdict"]["reasons"])  # το SPF μόνο του δεν αρκεί
+
+
+def test_mail_reject_everywhere_is_not_spoofable():
+    r = netkit.email_dns_posture("bank.test", lookup=_mail_lookup({
+        ("bank.test", "TXT"): ["v=spf1 ip4:192.0.2.1 -all"],
+        ("_dmarc.bank.test", "TXT"): ["v=DMARC1; p=reject; rua=mailto:d@bank.test"],
+        ("bank.test", "MX"): ["10 mx.bank.test"],
+        ("selector1._domainkey.bank.test", "TXT"): ["v=DKIM1; k=rsa; p=MIIB"]}))
+    assert r["verdict"]["spoofable"] == "no" and r["severity"] == "ok"
+    assert _check(r, "DKIM")["value"] == "selector1"
+    assert _check(r, "MX")["status"] == "info"  # το MX δεν μετράει στο σκορ
+    assert r["of"] == len([c for c in r["checks"] if c["status"] != "info"])
+
+
+def test_mail_weak_subdomain_policy_and_missing_reports():
+    r = netkit.email_dns_posture("corp.test", lookup=_mail_lookup({
+        ("corp.test", "TXT"): ["v=spf1 -all"],
+        ("_dmarc.corp.test", "TXT"): ["v=DMARC1; p=reject; sp=none"]}))
+    assert r["verdict"]["spoofable"] == "partly"
+    assert _check(r, "DMARC subdomains (sp=)")["status"] == "warn"
+    assert _check(r, "DMARC αναφορές (rua=)")["status"] == "warn"
+
+
+def test_mail_spf_over_ten_lookups_and_dead_include():
+    table = {("big.test", "TXT"): ["v=spf1 " + " ".join(f"include:s{i}.test" for i in range(12)) + " include:gone.test -all"],
+             ("gone.test", "TXT"): None}
+    for i in range(12):
+        table[(f"s{i}.test", "TXT")] = ["v=spf1 a mx -all"]  # 3 lookups το καθένα (include + a + mx)
+    r = netkit.email_dns_posture("big.test", lookup=_mail_lookup(table))
+    assert _check(r, "SPF όριο lookups")["status"] == "bad" and r["spf_lookups"] > 10
+    table2 = {("ok.test", "TXT"): ["v=spf1 include:_spf.ok.test include:gone.test -all"],
+              ("_spf.ok.test", "TXT"): ["v=spf1 ip4:192.0.2.0/24 -all"], ("gone.test", "TXT"): None}
+    r2 = netkit.email_dns_posture("ok.test", lookup=_mail_lookup(table2))
+    assert r2["spf_lookups"] == 2 and _check(r2, "SPF όριο lookups")["status"] == "good"
+    assert _check(r2, "SPF νεκρά includes")["value"] == "gone.test"
+
+
+def test_mail_spf_loop_does_not_hang():
+    r = netkit.email_dns_posture("loop.test", lookup=_mail_lookup({
+        ("loop.test", "TXT"): ["v=spf1 include:a.loop.test -all"],
+        ("a.loop.test", "TXT"): ["v=spf1 include:loop.test include:a.loop.test -all"]}))
+    assert r["spf_lookups"] <= 5
+
+
+def test_mail_demo_shows_every_kind_of_finding():
+    r = netkit.email_dns_posture("example.com", sim=True)
+    names = {c["name"] for c in r["checks"]}
+    assert {"SPF", "SPF όριο lookups", "SPF νεκρά includes", "DMARC", "DMARC subdomains (sp=)", "MX", "DKIM"} <= names
+    assert r["verdict"]["spoofable"] == "partly" and r["sim"] is True

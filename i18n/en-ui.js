@@ -2974,6 +2974,29 @@ I18N.add({
   "Άγνωστος host.": "Unknown host.",
   "Το SSH Explorer δεν είναι διαθέσιμο σε αυτή τη λειτουργία.": "SSH Explorer is not available in this mode.",
   "Δώσε όνομα και τύπο στη συσκευή (π.χ. «TV σαλονιού»). Αποθηκεύεται στο NetWatch και φαίνεται παντού.": "Give the device a name and type (e.g. “Living-room TV”). Saved in NetWatch and shown everywhere.",
+  "Μπορεί κάποιος να στείλει email «από» το domain σου; Παθητικός έλεγχος DNS: SPF (και όριο 10 lookups, νεκρά includes), DMARC, MX, DKIM. Χρησιμοποίησέ το σε domain που διαχειρίζεσαι.": "Can someone send email “from” your domain? Passive DNS check: SPF (plus the 10-lookup limit and dead includes), DMARC, MX, DKIM. Use it on a domain you manage.",
+  "SPF όριο lookups": "SPF lookup limit",
+  "SPF νεκρά includes": "SPF dead includes",
+  "DMARC subdomains (sp=)": "DMARC subdomains (sp=)",
+  "DMARC αναφορές (rua=)": "DMARC reports (rua=)",
+  "Μέσα στο όριο των 10 ερωτημάτων DNS.": "Within the 10 DNS-lookup limit.",
+  "Αυτά τα includes δεν έχουν πια SPF (ή δεν υπάρχουν). Αν ένα τέτοιο domain έχει λήξει, όποιος το αγοράσει μπορεί να στέλνει email ως εσύ. Αφαίρεσέ τα από το SPF.": "These includes no longer have SPF (or don't exist). If such a domain has expired, whoever buys it can send email as you. Remove them from your SPF.",
+  "Η πολιτική ορίζεται από άλλο domain (redirect=).": "The policy is set by another domain (redirect=).",
+  "Δεν ζητάς αναφορές: δεν θα μάθεις ποτέ αν κάποιος στέλνει email ως εσύ. Πρόσθεσε rua=mailto:…": "You don't request reports: you'll never learn if someone sends email as you. Add rua=mailto:…",
+  "Το domain δεν δέχεται email. Αν ούτε στέλνει, κλείδωσέ το: «v=spf1 -all» και DMARC «p=reject».": "The domain doesn't receive email. If it doesn't send either, lock it down: “v=spf1 -all” and DMARC “p=reject”.",
+  "Null MX: το domain δηλώνει ρητά ότι δεν δέχεται email.": "Null MX: the domain explicitly states it accepts no email.",
+  "Servers που δέχονται email για το domain.": "Servers that accept email for the domain.",
+  "Βρέθηκε κλειδί DKIM (υπογραφή μηνυμάτων).": "DKIM key found (message signing).",
+  "Δεν βρέθηκε DKIM στους συνηθισμένους selectors. Μπορεί να υπάρχει με άλλο όνομα — δες στον πάροχο email σου (Google Workspace, Microsoft 365 κ.λπ.).": "No DKIM found under the common selectors. It may exist under another name — check with your email provider (Google Workspace, Microsoft 365, etc.).",
+  "Κάποιος μπορεί να στείλει email που δείχνει «Από: …@domain σου» και θα φτάσει στα εισερχόμενα.": "Someone can send email showing “From: …@your domain” and it will reach the inbox.",
+  "Λείπει το DMARC.": "DMARC is missing.",
+  "Το DMARC είναι μόνο παρακολούθηση (p=none).": "DMARC is monitoring only (p=none).",
+  "Το DMARC δεν έχει έγκυρη πολιτική.": "DMARC has no valid policy.",
+  "Το SPF μόνο του δεν αρκεί: ελέγχει τον «φάκελο», όχι το «Από:» που βλέπει ο χρήστης.": "SPF alone isn't enough: it checks the “envelope”, not the “From:” the user sees.",
+  "Τα πλαστά μηνύματα δεν μπλοκάρονται πλήρως.": "Spoofed messages aren't fully blocked.",
+  "Τα πλαστά πάνε στα ανεπιθύμητα, δεν απορρίπτονται.": "Spoofed mail goes to spam; it isn't rejected.",
+  "Τα subdomains (π.χ. …@billing.domain) δεν προστατεύονται (sp=none).": "Subdomains (e.g. …@billing.domain) aren't protected (sp=none).",
+  "Τα πλαστά μηνύματα με το domain σου απορρίπτονται από τους παραλήπτες (DMARC p=reject).": "Spoofed messages using your domain are rejected by receivers (DMARC p=reject).",
   "🔑 Ξεχασμένα κλειδιά": "🔑 Forgotten secrets",
   "Ψάχνει κωδικούς Wi‑Fi/MQTT, κλειδιά API και tokens γραμμένους μέσα σε δικό σου project (π.χ. ESP32) — και στο git ιστορικό. Μόνο τοπικά· οι τιμές φαίνονται κρυμμένες.": "Finds Wi‑Fi/MQTT passwords, API keys and tokens written inside your own project (e.g. ESP32) — and in its git history. Local only; values are shown masked.",
   "Ιδιωτικό κλειδί (SSH/TLS)": "Private key (SSH/TLS)",
@@ -6032,6 +6055,18 @@ I18N.add({
   [
    "^Δεν βρέθηκε εγγραφή _dmarc\\.(.+)\\.$",
    "No DMARC record found at _dmarc.$1."
+  ],
+  [
+   "^Το SPF χρειάζεται πάνω από 10 ερωτήματα DNS \\(βρέθηκαν (\\d+)\\+\\)\\. Οι παραλήπτες τότε το θεωρούν σπασμένο \\(PermError\\) και το αγνοούν εντελώς\\. Αφαίρεσε includes που δεν χρησιμοποιείς ή βάλε ip4:/ip6: αντί για a/mx\\.$",
+   "Your SPF needs more than 10 DNS lookups ($1+ found). Receivers then treat it as broken (PermError) and ignore it completely. Remove includes you don't use, or use ip4:/ip6: instead of a/mx."
+  ],
+  [
+   "^Τα subdomains \\(π\\.χ\\. (\\S+)\\) έχουν πιο χαλαρή πολιτική από το κύριο domain\\. Ένας απατεώνας θα διάλεγε ακριβώς αυτά\\.$",
+   "Subdomains (e.g. $1) have a looser policy than the main domain. A scammer would pick exactly those."
+  ],
+  [
+   "^Η πολιτική ισχύει μόνο στο (\\d+)% των μηνυμάτων\\.$",
+   "The policy applies to only $1% of messages."
   ]
  ]
 });
