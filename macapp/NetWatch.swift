@@ -18,6 +18,96 @@ let portFile = support.appendingPathComponent("port")
 
 func sh(_ s: String) -> String { "'" + s.replacingOccurrences(of: "'", with: "'\\''") + "'" }
 
+/// Τρέχει μια εντολή ως root μέσω του παραθύρου κωδικού του macOS. Σε ξεχωριστή διεργασία,
+/// ώστε το παράθυρο να μην «παγώνει» την εφαρμογή. Ο κωδικός πάει μόνο στο macOS — εμείς δεν τον βλέπουμε.
+func runAsAdmin(_ cmd: String, prompt: String) -> Bool {
+    let esc = { (s: String) in s.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\"") }
+    let osa = Process()
+    osa.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
+    osa.arguments = ["-e", "do shell script \"\(esc(cmd))\" with administrator privileges with prompt \"\(esc(prompt))\""]
+    osa.standardOutput = FileHandle.nullDevice
+    osa.standardError = FileHandle.nullDevice
+    guard (try? osa.run()) != nil else { return false }
+    osa.waitUntilExit()
+    return osa.terminationStatus == 0
+}
+
+// ---------------- Live χωρίς κωδικό ----------------
+// Όπως το ChmodBPF του Wireshark: μία φορά (με κωδικό) η ομάδα access_bpf παίρνει ανάγνωση/εγγραφή
+// στις /dev/bpf* και ο χρήστης μπαίνει σε αυτήν. Ένα μικρό LaunchDaemon το ξανακάνει σε κάθε εκκίνηση
+// του Mac (οι άδειες των /dev/bpf* γυρίζουν σε «μόνο root» σε κάθε επανεκκίνηση).
+// Μετά το NetWatch καταγράφει ως ο κανονικός χρήστης — χωρίς sudo και χωρίς κωδικό.
+enum NoPasswordLive {
+    static let label = "io.github.netwatch.chmodbpf"
+    static let dir = "/Library/Application Support/NetWatch"   // του συστήματος (root), ΟΧΙ το ~/Library του χρήστη
+    static let script = dir + "/ChmodBPF"
+    static let plist = "/Library/LaunchDaemons/\(label).plist"
+    static let loginItemsURL = URL(string: "x-apple.systempreferences:com.apple.LoginItems-Settings.extension")!
+
+    static var installed: Bool { FileManager.default.fileExists(atPath: plist) }
+    /// Μπορεί αυτός ο χρήστης να καταγράφει τώρα χωρίς root; (από εμάς ή από το Wireshark)
+    static var ready: Bool {
+        let f = FileManager.default
+        return f.isReadableFile(atPath: "/dev/bpf0") && f.isWritableFile(atPath: "/dev/bpf0")
+    }
+
+    /// Τρέχει ως root σε κάθε εκκίνηση. Κάνει ΜΟΝΟ αυτό: άδεια στην ομάδα access_bpf για τις /dev/bpf*.
+    static let scriptBody = """
+    #!/bin/bash
+    # NetWatch — «Live χωρίς κωδικό». Τρέχει ως root σε κάθε εκκίνηση (LaunchDaemon \(label)).
+    # Δίνει στην ομάδα access_bpf ανάγνωση/εγγραφή στις /dev/bpf* (όπως το ChmodBPF του Wireshark).
+    PATH=/usr/bin:/bin:/usr/sbin:/sbin
+    MAX=$(sysctl -n debug.bpf_maxdevices 2>/dev/null || echo 256)
+    [ "$MAX" -gt 256 ] && MAX=256
+    # Το macOS φτιάχνει νέα /dev/bpfN μόνο όταν χρειαστεί· τα φτιάχνουμε από πριν, αλλιώς ένα καινούργιο
+    # (π.χ. όταν ανοίξει VPN) θα ήταν πάλι «μόνο root».
+    CUR=$(ls -1 /dev/bpf* 2>/dev/null | wc -l | tr -d ' ')
+    while [ "$CUR" -lt "$MAX" ]; do
+      read -r -n 0 < "/dev/bpf$CUR" > /dev/null 2>&1
+      CUR=$((CUR + 1))
+    done
+    chgrp access_bpf /dev/bpf*
+    chmod g+rw /dev/bpf*
+    """
+
+    static let plistBody = """
+    <?xml version="1.0" encoding="UTF-8"?>
+    <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+    <plist version="1.0">
+    <dict>
+      <key>Label</key><string>\(label)</string>
+      <key>Program</key><string>\(script)</string>
+      <key>RunAtLoad</key><true/>
+      <key>AssociatedBundleIdentifiers</key><string>io.github.netwatch</string>
+    </dict>
+    </plist>
+    """
+
+    static func b64(_ s: String) -> String { Data((s + "\n").utf8).base64EncodedString() }
+
+    /// Η ρύθμιση (ως root). Τα αρχεία γράφονται από το ίδιο το root shell (base64 μέσα στην εντολή),
+    /// όχι από αρχείο που θα μπορούσε να αλλάξει κάποιο άλλο πρόγραμμα πριν το αντιγράψουμε.
+    static func installCmd(user: String) -> String {
+        "set -e; [ -L \(sh(dir)) ] && rm -f \(sh(dir)); install -d -o root -g wheel -m 755 \(sh(dir)); rm -f \(sh(script)) \(sh(plist)); "
+        + "echo \(b64(scriptBody)) | base64 -D > \(sh(script)); chown root:wheel \(sh(script)); chmod 755 \(sh(script)); "
+        + "echo \(b64(plistBody)) | base64 -D > \(sh(plist)); chown root:wheel \(sh(plist)); chmod 644 \(sh(plist)); "
+        + "dseditgroup -o read access_bpf >/dev/null 2>&1 || dseditgroup -o create -r 'BPF device access' access_bpf; "
+        + "dseditgroup -o edit -a \(sh(user)) -t user access_bpf; "
+        + "launchctl bootout system/\(label) >/dev/null 2>&1 || true; "
+        + "launchctl bootstrap system \(sh(plist)) >/dev/null 2>&1 || true; "
+        + "/bin/bash \(sh(script))"
+    }
+
+    /// Αναίρεση: σβήνει τη ρύθμιση και (αν δεν τη χρειάζεται το Wireshark) γυρίζει τις /dev/bpf* σε «μόνο root».
+    static func removeCmd(user: String) -> String {
+        "launchctl bootout system/\(label) >/dev/null 2>&1; rm -f \(sh(plist)) \(sh(script)); rmdir \(sh(dir)) 2>/dev/null; "
+        + "if [ ! -e /Library/LaunchDaemons/org.wireshark.ChmodBPF.plist ]; then "
+        + "dseditgroup -o edit -d \(sh(user)) -t user access_bpf >/dev/null 2>&1; chmod g-rw /dev/bpf*; fi; true"
+    }
+}
+
+enum AdminChoice { case setup, once, demo }
+
 // ---------------- Backend ----------------
 final class Backend {
     var mode: Mode = .demo
@@ -28,8 +118,8 @@ final class Backend {
     var onFail: ((String) -> Void)?
     var onStatus: ((String) -> Void)?
     /// Πριν από το παράθυρο κωδικού του macOS: η δική μας εξήγηση (τρέχει στο main thread).
-    /// false = ο χρήστης δεν θέλει να δώσει κωδικό τώρα (το AppDelegate αποφασίζει τι γίνεται μετά).
-    var askAdmin: (() -> Bool)?
+    /// .demo = ο χρήστης δεν θέλει να δώσει κωδικό τώρα (το AppDelegate αποφασίζει τι γίνεται μετά).
+    var askAdmin: (() -> AdminChoice)?
 
     var base: URL? { port.map { URL(string: "http://127.0.0.1:\($0)")! } }
 
@@ -84,13 +174,27 @@ final class Backend {
             case .pcap: args += ["--pcap", pcap ?? "", "--loop"]
             case .live: break
             }
-            if mode == .live, let ask = self.askAdmin {
-                var go = true
-                DispatchQueue.main.sync { go = ask() }
-                if !go { return }
+            // Live ως root μόνο αν ο χρήστης ΔΕΝ μπορεί ήδη να καταγράφει (Live χωρίς κωδικό / Wireshark)
+            var asRoot = mode == .live && !NoPasswordLive.ready
+            if asRoot {
+                var choice = AdminChoice.once
+                if let ask = self.askAdmin { DispatchQueue.main.sync { choice = ask() } }
+                if choice == .demo { return }
+                if choice == .setup {
+                    DispatchQueue.main.async { self.onStatus?("Ρυθμίζω το «Live χωρίς κωδικό» (μία φορά)…") }
+                    guard runAsAdmin(NoPasswordLive.installCmd(user: NSUserName()),
+                                     prompt: "Το NetWatch θα ρυθμίσει το Live ώστε να μη ζητά ξανά κωδικό.") else {
+                        DispatchQueue.main.async { self.onFail?("Η ρύθμιση δεν έγινε (δεν δόθηκε κωδικός) — δοκίμασε ξανά από το Live ή ξεκίνα σε Demo.") }
+                        return
+                    }
+                    asRoot = !NoPasswordLive.ready  // σπάνια: η νέα ομάδα ισχύει από την επόμενη σύνδεση στο Mac
+                    if asRoot {
+                        DispatchQueue.main.async { self.onStatus?("Έτοιμο! Αυτή τη μία φορά ξαναζητείται κωδικός — από την επόμενη σύνδεση στο Mac, όχι.") }
+                    }
+                }
             }
-            DispatchQueue.main.async { self.onStatus?(mode == .live ? "Ζητώ κωδικό διαχειριστή για καταγραφή πακέτων…" : "Ξεκινά το NetWatch…") }
-            if mode == .live {
+            DispatchQueue.main.async { self.onStatus?(asRoot ? "Ζητώ κωδικό διαχειριστή για καταγραφή πακέτων…" : "Ξεκινά το NetWatch…") }
+            if asRoot {
                 // Η καταγραφή πακέτων θέλει root: το macOS ρωτά τον κωδικό στο δικό του παράθυρο.
                 let env = "SUDO_USER=\(sh(NSUserName())) SUDO_UID=\(getuid()) SUDO_GID=\(getgid())"
                 // Μόνο η python πάει στο παρασκήνιο, με ΟΛΑ τα fd της αλλού: αλλιώς το «do shell script»
@@ -102,19 +206,7 @@ final class Backend {
                 let kill = "pkill -f '[M]acOS/Python.*netwatch[.]py' 2>/dev/null; sleep 0.5; "
                 let cmd = kill + "cd \(sh(appDir.path)) || exit 1; \(env) \(sh(venvPython.path)) " + args.map(sh).joined(separator: " ")
                     + " </dev/null >>\(sh(logFile.path)) 2>&1 &"
-                let script = "do shell script \"\(cmd.replacingOccurrences(of: "\\", with: "\\\\").replacingOccurrences(of: "\"", with: "\\\""))\" with administrator privileges with prompt \"Το NetWatch χρειάζεται δικαιώματα διαχειριστή για να «ακούει» την κίνηση του δικτύου.\""
-                // osascript σε ξεχωριστή διεργασία: το παράθυρο κωδικού δεν «παγώνει» ποτέ την εφαρμογή
-                let osa = Process()
-                osa.executableURL = URL(fileURLWithPath: "/usr/bin/osascript")
-                osa.arguments = ["-e", script]
-                osa.standardOutput = FileHandle.nullDevice
-                osa.standardError = FileHandle.nullDevice
-                var ok = false
-                if (try? osa.run()) != nil {
-                    osa.waitUntilExit()
-                    ok = osa.terminationStatus == 0
-                }
-                if !ok {
+                if !runAsAdmin(cmd, prompt: "Το NetWatch χρειάζεται δικαιώματα διαχειριστή για να «ακούει» την κίνηση του δικτύου.") {
                     DispatchQueue.main.async { self.onFail?("Δεν δόθηκαν δικαιώματα διαχειριστή — ξεκίνα σε Demo ή άνοιξε ένα pcap.") }
                     return
                 }
@@ -416,7 +508,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
             self?.setIcon(level: "idle", count: 0)
             self?.showWindow()
         }
-        backend.askAdmin = { [weak self] in self?.explainAdmin() ?? true }
+        backend.askAdmin = { [weak self] in self?.explainAdmin() ?? .once }
         timer = Timer.scheduledTimer(withTimeInterval: 3, repeats: true) { [weak self] _ in self?.poll() }
 
         let saved = Mode(rawValue: UserDefaults.standard.string(forKey: "mode") ?? "") ?? .demo
@@ -455,32 +547,78 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
     }
 
     /// Δική μας εξήγηση πριν από το παράθυρο κωδικού του macOS (εκείνο δεν αλλάζει όψη και
-    /// στις νέες εκδόσεις αγνοεί το κείμενό μας). true = συνέχισε στο παράθυρο κωδικού.
-    func explainAdmin() -> Bool {
+    /// στις νέες εκδόσεις αγνοεί το κείμενό μας). Επιστρέφει τι διάλεξε ο χρήστης.
+    func explainAdmin() -> AdminChoice {
         let key = "adminExplainerHidden"
-        if UserDefaults.standard.bool(forKey: key) { return true }
+        let broken = NoPasswordLive.installed   // υπάρχει η ρύθμιση, αλλά δεν έτρεξε στην εκκίνηση του Mac
+        if UserDefaults.standard.bool(forKey: key) && !broken { return .once }
         showWindow()
         let a = NSAlert()
-        a.messageText = "Χρειάζομαι τον κωδικό του Mac σου"
-        a.informativeText = "Μετά από αυτό, το macOS θα ανοίξει το δικό του παράθυρο κωδικού."
+        a.messageText = broken ? "Το «Live χωρίς κωδικό» δεν ξεκίνησε" : "Χρειάζομαι τον κωδικό του Mac σου"
+        a.informativeText = broken
+            ? "Μάλλον είναι κλειστό στο παρασκήνιο. Ξαναρύθμισέ το και άφησε ανοιχτό το NetWatch στις Ρυθμίσεις → Γενικά → Στοιχεία σύνδεσης."
+            : "Δώσε τον κωδικό μία φορά για πάντα, ή μόνο για αυτή τη φορά."
         if let img = NSImage(systemSymbolName: "lock.shield.fill", accessibilityDescription: nil)?
             .withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 56, weight: .regular)
                 .applying(NSImage.SymbolConfiguration(hierarchicalColor: .systemBlue))) {
             a.icon = img
         }
-        let v = NSHostingView(rootView: AdminExplainer())
+        let v = NSHostingView(rootView: AdminExplainer(broken: broken))
         v.frame.size = v.fittingSize
         a.accessoryView = v
-        a.addButton(withTitle: "Συνέχεια")
+        a.addButton(withTitle: broken ? "Ξαναρύθμισέ το" : "Μία φορά για πάντα")
+        a.addButton(withTitle: "Μόνο αυτή τη φορά")
         a.addButton(withTitle: "Demo χωρίς κωδικό")
-        a.showsSuppressionButton = true
-        a.suppressionButton?.title = "Να μην το ξαναδείξεις"
+        if !broken {
+            a.showsSuppressionButton = true
+            a.suppressionButton?.title = "Να μην το ξαναδείξεις (πάντα «Μόνο αυτή τη φορά»)"
+        }
         NSApp.activate(ignoringOtherApps: true)
         let r = a.runModal()
         if a.suppressionButton?.state == .on { UserDefaults.standard.set(true, forKey: key) }
-        if r == .alertFirstButtonReturn { return true }
-        DispatchQueue.main.async { self.switchMode(.demo) }
-        return false
+        switch r {
+        case .alertFirstButtonReturn:
+            if broken { NSWorkspace.shared.open(NoPasswordLive.loginItemsURL) }
+            return .setup
+        case .alertSecondButtonReturn: return .once
+        default:
+            DispatchQueue.main.async { self.switchMode(.demo) }
+            return .demo
+        }
+    }
+
+    /// Από το μενού: ρύθμιση «Live χωρίς κωδικό» (μία φορά με κωδικό).
+    @objc func setupNoPassword() {
+        DispatchQueue.global().async {
+            let ok = runAsAdmin(NoPasswordLive.installCmd(user: NSUserName()),
+                                prompt: "Το NetWatch θα ρυθμίσει το Live ώστε να μη ζητά ξανά κωδικό.")
+            DispatchQueue.main.async {
+                guard ok else { return }
+                let a = NSAlert()
+                a.messageText = NoPasswordLive.ready ? "Έτοιμο ✓ — το Live δεν θα ζητά πια κωδικό"
+                                                     : "Έγινε — ισχύει από την επόμενη σύνδεση στο Mac"
+                a.informativeText = "Αν το macOS ρωτήσει για «στοιχείο στο παρασκήνιο», άφησέ το ανοιχτό: "
+                    + "ξαναδίνει την άδεια σε κάθε εκκίνηση. Αναίρεση: μενού NetWatch → Λειτουργία."
+                a.runModal()
+                if self.backend.mode == .live && NoPasswordLive.ready { self.switchMode(.live) }  // ξανά, χωρίς root
+            }
+        }
+    }
+
+    /// Από το μενού: αναίρεση της ρύθμισης (θέλει κωδικό, όπως και η ρύθμιση).
+    @objc func removeNoPassword() {
+        let c = NSAlert()
+        c.messageText = "Αναίρεση «Live χωρίς κωδικό»;"
+        c.informativeText = "Το Live θα ζητά ξανά κωδικό σε κάθε εκκίνηση. Για την αναίρεση θα ζητηθεί κωδικός μία φορά."
+        c.addButton(withTitle: "Αναίρεση")
+        c.addButton(withTitle: "Άκυρο")
+        NSApp.activate(ignoringOtherApps: true)
+        guard c.runModal() == .alertFirstButtonReturn else { return }
+        DispatchQueue.global().async {
+            let ok = runAsAdmin(NoPasswordLive.removeCmd(user: NSUserName()),
+                                prompt: "Το NetWatch θα αναιρέσει το «Live χωρίς κωδικό».")
+            DispatchQueue.main.async { if ok && self.backend.mode == .live { self.switchMode(.live) } }
+        }
     }
 
     @objc func goLive() { switchMode(.live) }
@@ -667,9 +805,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSWindowDelegate, NSMe
         add("Demo — προσομοίωση", #selector(goDemo), icon: "theatermasks", on: backend.mode == .demo, to: md)
         add("Αναπαραγωγή pcap…", #selector(openPcap), icon: "play.rectangle", on: backend.mode == .pcap, to: md)
         md.addItem(.separator())
-        let note = NSMenuItem(title: "Το Live ζητά κωδικό διαχειριστή (καταγραφή πακέτων).", action: nil, keyEquivalent: "")
+        let free = NoPasswordLive.ready
+        let note = NSMenuItem(title: free ? "Το Live τρέχει χωρίς κωδικό ✓" : "Το Live ζητά κωδικό διαχειριστή (καταγραφή πακέτων).",
+                              action: nil, keyEquivalent: "")
         note.isEnabled = false
         md.addItem(note)
+        if !free {
+            add("Live χωρίς κωδικό (μία ρύθμιση)…", #selector(setupNoPassword), icon: "key", to: md)
+        }
+        if NoPasswordLive.installed {
+            add("Αναίρεση «Live χωρίς κωδικό»…", #selector(removeNoPassword), icon: "arrow.uturn.backward", to: md)
+        }
 
         let more = sub("Περισσότερα", icon: "ellipsis.circle")
         add("Αναφορά εβδομάδας", ready ? #selector(openReport) : nil, icon: "doc.richtext", to: more).isEnabled = ready
@@ -822,16 +968,19 @@ struct AdminExplainer: View {
             }
         }
     }
+    var broken = false
     var body: some View {
         VStack(alignment: .leading, spacing: 11) {
-            item("waveform.path.ecg", .blue, "Για να «ακούω» το δίκτυο",
-                 "Το macOS δίνει την κίνηση του δικτύου μόνο σε διαχειριστή.")
-            item("lock.fill", .green, "Ο κωδικός πάει μόνο στο macOS",
+            if !broken {
+                item("waveform.path.ecg", .blue, "Για να «ακούω» το δίκτυο",
+                     "Το macOS δίνει την κίνηση του δικτύου μόνο σε διαχειριστή.")
+                item("checkmark.seal.fill", .green, "«Μία φορά για πάντα» — προτείνεται",
+                     "Όπως στο Wireshark: ο λογαριασμός σου παίρνει άδεια να ακούει την κίνηση και δεν ξαναζητάμε κωδικό. Αναιρείται από το μενού.")
+            }
+            item("lock.fill", .mint, "Ο κωδικός πάει μόνο στο macOS",
                  "Το NetWatch δεν τον βλέπει, δεν τον κρατά, δεν τον στέλνει πουθενά.")
             item("exclamationmark.triangle.fill", .orange, "Θα δεις «Apple could not verify…»",
-                 "Είναι φυσιολογικό: το NetWatch δεν είναι υπογεγραμμένο από την Apple. Ο κώδικας είναι ανοιχτός στο GitHub.")
-            item("key.fill", .purple, "Γράψε τον κωδικό που ξεκλειδώνει το Mac",
-                 "Μετά πάτα «Allow Access».")
+                 "Είναι φυσιολογικό: το NetWatch δεν είναι υπογεγραμμένο από την Apple. Γράψε τον κωδικό που ξεκλειδώνει το Mac και πάτα «Allow Access».")
         }
         .frame(width: 330, alignment: .leading)
         .padding(.vertical, 4)

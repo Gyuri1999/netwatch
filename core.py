@@ -239,6 +239,14 @@ def load_config(path=None):
         return deep_merge(DEFAULT_CONFIG, yaml.safe_load(f) or {})
 
 
+def can_capture():
+    """Μπορούμε να πιάνουμε/στέλνουμε πακέτα; Ναι αν είμαστε root, ή (macOS) αν ο χρήστης έχει πρόσβαση
+    στις /dev/bpf* — π.χ. με το «Live χωρίς κωδικό» της εφαρμογής Mac ή το ChmodBPF του Wireshark."""
+    if hasattr(os, "geteuid") and os.geteuid() == 0:
+        return True
+    return sys.platform == "darwin" and os.access("/dev/bpf0", os.R_OK | os.W_OK)
+
+
 def chown_to_user(path):
     """Αν τρέχουμε με sudo, τα αρχεία που φτιάχνουμε να ανήκουν στον κανονικό χρήστη."""
     uid, gid = os.environ.get("SUDO_UID"), os.environ.get("SUDO_GID")
