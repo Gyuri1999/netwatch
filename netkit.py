@@ -330,7 +330,8 @@ def _rr_data(rr):
     data = getattr(rr, "rdata", None)
     if t == "TXT":
         parts = data if isinstance(data, list) else [data]
-        return " ".join(_txt(p) for p in parts if p is not None)
+        # RFC 7208 §3.3 / RFC 6376: τα κομμάτια (≤255 bytes) μιας εγγραφής TXT ενώνονται ΧΩΡΙΣ κενό
+        return "".join(_txt(p) for p in parts if p is not None)
     if isinstance(data, (bytes, bytearray)):
         return _txt(data).rstrip(".")
     return str(data).rstrip(".") if data is not None else ""
@@ -367,6 +368,20 @@ def _query_name(name, rtype):
     if _ip(name) is not None and rtype != "PTR":
         return reverse_name(name), "PTR"  # δόθηκε IP → αντίστροφη αναζήτηση
     return valid_host(name), rtype
+
+
+def _tcp_query(server, port, pkt, timeout):
+    """Ερώτημα DNS μέσω TCP: μήκος 2 bytes + μήνυμα, και το ίδιο στην απάντηση."""
+    with socket.create_connection((server, port), timeout=timeout) as c:
+        c.settimeout(timeout)
+        c.sendall(struct.pack("!H", len(pkt)) + pkt)
+        buf = b""
+        while len(buf) < 2 or len(buf) < 2 + struct.unpack("!H", buf[:2])[0]:
+            chunk = c.recv(65535)
+            if not chunk:
+                raise ValueError("η σύνδεση DNS/TCP έκλεισε")
+            buf += chunk
+    return buf[2:2 + struct.unpack("!H", buf[:2])[0]]
 
 
 def dns_lookup(name, rtype="A", server=None, timeout=2, sim=False, port=53):
@@ -408,8 +423,14 @@ def dns_lookup(name, rtype="A", server=None, timeout=2, sim=False, port=53):
         raise TimeoutError(f"DNS {server}: {e.strerror or e}")
     finally:
         s.close()
-    ms = round((time.monotonic() - t0) * 1000, 1)
     r = parse_response(data)
+    if r["truncated"]:
+        # Η απάντηση δεν χωρούσε σε UDP (π.χ. μεγάλες εγγραφές TXT/SPF): ξαναρωτάμε μέσω TCP (RFC 7766)
+        try:
+            r = parse_response(_tcp_query(server, int(port), build_query(qname, rtype), max(0.2, timeout - (time.monotonic() - t0)) + 1))
+        except (OSError, ValueError, struct.error):
+            pass  # κρατάμε την κομμένη απάντηση (truncated: true)
+    ms = round((time.monotonic() - t0) * 1000, 1)
     return {"name": qname, "type": rtype, "server": server, "ms": ms, "rcode": r["rcode"],
             "truncated": r["truncated"], "answers": [{k: x[k] for k in ("type", "ttl", "data")} for x in r["answers"]]}
 
@@ -779,20 +800,129 @@ def _sim_http(url):
 
 
 # =============================== read-only security checks ===============================
-def email_dns_posture(domain, sim=False):
-    """Check SPF and DMARC DNS records. Passive DNS lookups only; no mail is sent."""
+SPF_MAX_LOOKUPS = 10   # RFC 7208 §4.6.4: πάνω από 10 → PermError, οι παραλήπτες αγνοούν όλο το SPF
+DKIM_SELECTORS = ("google", "selector1", "selector2", "default", "k1", "s1", "s2", "dkim", "mail")
+_SIM_MAIL = {
+    ("example.com", "TXT"): ["v=spf1 include:_spf.example.net include:old-mailer.example -all"],
+    ("_spf.example.net", "TXT"): ["v=spf1 ip4:192.0.2.0/24 -all"],
+    ("old-mailer.example", "TXT"): None,   # «νεκρό» include (NXDOMAIN)
+    ("_dmarc.example.com", "TXT"): ["v=DMARC1; p=quarantine; sp=none; rua=mailto:dmarc@example.com"],
+    ("example.com", "MX"): ["10 mx.example.com"],
+    ("selector1._domainkey.example.com", "TXT"): ["v=DKIM1; k=rsa; p=MIIBIjANBgkq"],
+}
+
+
+def _sim_mail_lookup(name, rtype):
+    """Demo: ίδια λογική με το πραγματικό, απαντήσεις από τον πίνακα _SIM_MAIL. None = NXDOMAIN."""
+    key = (name.lower().rstrip("."), rtype)
+    if key in _SIM_MAIL and _SIM_MAIL[key] is None:
+        return {"rcode": "NXDOMAIN", "answers": []}
+    vals = _SIM_MAIL.get(key) or []
+    return {"rcode": "NOERROR", "answers": [{"type": rtype, "ttl": 300, "data": v} for v in vals]}
+
+
+def _spf_record(lookup, name):
+    """(εγγραφή SPF ή None, rcode) για ένα όνομα."""
+    try:
+        r = lookup(name, "TXT")
+    except (TimeoutError, ValueError) as e:
+        return None, f"error: {e}"
+    recs = [x["data"].strip() for x in r.get("answers", [])
+            if x.get("type") == "TXT" and x.get("data", "").strip().lower().startswith("v=spf1")]
+    return (recs[0] if recs else None), r.get("rcode", "NOERROR")
+
+
+def spf_walk(lookup, domain, record):
+    """Μετρά τα DNS lookups του SPF (include, a, mx, ptr, exists, redirect — αναδρομικά) και βρίσκει
+    «νεκρά» includes. Σταματά λίγο μετά το όριο: δεν χρειάζεται να ξέρουμε ακριβώς το 37, αρκεί «>10»."""
+    count, dead, seen = 0, [], {domain.lower()}
+
+    def walk(rec, depth):
+        nonlocal count
+        for term in rec.split()[1:]:
+            t = term.lstrip("+-~?").lower()
+            mech, _, arg = t.partition(":")
+            if mech.startswith("redirect="):
+                mech, arg = "redirect", t.split("=", 1)[1]
+            if mech in ("a", "mx", "ptr", "exists") or mech.startswith(("a/", "mx/")):
+                count += 1
+            elif mech in ("include", "redirect") and arg:
+                count += 1
+                if count > SPF_MAX_LOOKUPS + 5 or depth > 8 or arg in seen or "%" in arg:
+                    continue  # μακροεντολές (%{…}) δεν αναλύονται εδώ
+                seen.add(arg)
+                sub, rcode = _spf_record(lookup, arg)
+                if sub is None:
+                    if not str(rcode).startswith("error"):
+                        dead.append({"name": arg, "rcode": rcode})
+                    continue
+                walk(sub, depth + 1)
+    walk(record, 0)
+    return count, dead
+
+
+def _dkim_found(lookup, domain):
+    def one(sel):
+        try:
+            r = lookup(f"{sel}._domainkey.{domain}", "TXT")
+        except (TimeoutError, ValueError):
+            return None
+        def is_key(d):
+            d = d.lower().replace(" ", "")
+            return "p=" in d and ("v=dkim1" in d or d.startswith("k="))
+        ok = any(is_key(x.get("data", "")) for x in r.get("answers", []))
+        return sel if ok else None
+    with ThreadPoolExecutor(max_workers=len(DKIM_SELECTORS)) as ex:
+        return [s for s in ex.map(one, DKIM_SELECTORS) if s]
+
+
+def spoof_verdict(dmarc_tags, spf_status):
+    """Μπορεί κάποιος να στείλει email που ΦΑΙΝΕΤΑΙ ότι είναι από το domain (header From);
+    Αυτό το αποφασίζει μόνο το DMARC — το SPF προστατεύει τον «φάκελο» (Return-Path), όχι αυτό που βλέπει ο χρήστης.
+    → {spoofable: yes|partly|no, text, reasons:[…]} (σταθερές προτάσεις, για να μεταφράζονται)"""
+    p = (dmarc_tags or {}).get("p", "")
+    sp = (dmarc_tags or {}).get("sp", p)
+    pct = (dmarc_tags or {}).get("pct", "100")
+    pct = int(pct) if pct.isdigit() else 100
+    if not dmarc_tags or p not in ("reject", "quarantine"):
+        reasons = ["Λείπει το DMARC." if not dmarc_tags else
+                   "Το DMARC είναι μόνο παρακολούθηση (p=none)." if p == "none" else "Το DMARC δεν έχει έγκυρη πολιτική."]
+        if spf_status == "good":
+            reasons.append("Το SPF μόνο του δεν αρκεί: ελέγχει τον «φάκελο», όχι το «Από:» που βλέπει ο χρήστης.")
+        return {"spoofable": "yes", "reasons": reasons,
+                "text": "Κάποιος μπορεί να στείλει email που δείχνει «Από: …@domain σου» και θα φτάσει στα εισερχόμενα."}
+    weak = []
+    if p == "quarantine":
+        weak.append("Τα πλαστά πάνε στα ανεπιθύμητα, δεν απορρίπτονται.")
+    if pct < 100:
+        weak.append(f"Η πολιτική ισχύει μόνο στο {pct}% των μηνυμάτων.")
+    if sp not in ("reject", "quarantine"):
+        weak.append("Τα subdomains (π.χ. …@billing.domain) δεν προστατεύονται (sp=none).")
+    if weak:
+        return {"spoofable": "partly", "reasons": weak, "text": "Τα πλαστά μηνύματα δεν μπλοκάρονται πλήρως."}
+    return {"spoofable": "no", "reasons": [],
+            "text": "Τα πλαστά μηνύματα με το domain σου απορρίπτονται από τους παραλήπτες (DMARC p=reject)."}
+
+
+def email_dns_posture(domain, sim=False, lookup=None):
+    """Πόσο εύκολα πλαστογραφείται email από το domain; SPF (με όριο 10 lookups και «νεκρά» includes),
+    DMARC (p, sp, pct, rua), MX, DKIM σε κοινούς selectors και τελική ετυμηγορία.
+    Μόνο ερωτήματα DNS — δεν στέλνεται κανένα email. `lookup(name, rtype)` για tests."""
     domain = valid_host(domain).lower()
     if _ip(domain) is not None or "." not in domain:
         raise ValueError("Δώσε domain που διαχειρίζεσαι, π.χ. example.com")
-    if sim:
-        root = [{"type": "TXT", "ttl": 300, "data": "v=spf1 include:_spf.example.net -all"}]
-        dmarc = [{"type": "TXT", "ttl": 300, "data": "v=DMARC1; p=quarantine; rua=mailto:dmarc@example.com"}]
-    else:
-        root = dns_lookup(domain, "TXT", timeout=2).get("answers", [])
-        dmarc = dns_lookup("_dmarc." + domain, "TXT", timeout=2).get("answers", [])
+    if lookup is None:
+        lookup = _sim_mail_lookup if sim else (lambda n, t: dns_lookup(n, t, timeout=2))
+
+    def answers(name, rtype):
+        try:
+            return lookup(name, rtype).get("answers", [])
+        except (TimeoutError, ValueError):
+            return []
+    root, dmarc = answers(domain, "TXT"), answers("_dmarc." + domain, "TXT")
     spf = [x["data"].strip() for x in root if x.get("type") == "TXT" and x.get("data", "").strip().lower().startswith("v=spf1")]
     dmarc_records = [x["data"].strip() for x in dmarc if x.get("type") == "TXT" and x.get("data", "").strip().lower().startswith("v=dmarc1")]
-    checks = []
+    checks, lookups, tags = [], None, {}
     if not spf:
         checks.append({"name": "SPF", "status": "bad", "value": None, "detail": "Δεν βρέθηκε εγγραφή SPF."})
     elif len(spf) > 1:
@@ -806,7 +936,23 @@ def email_dns_posture(domain, sim=False):
                   "?all": "Η πολιτική δεν δίνει σαφή οδηγία για μη εξουσιοδοτημένους αποστολείς.",
                   "+all": "Η εγγραφή επιτρέπει σε οποιονδήποτε να στέλνει ως το domain.",
                   "": "Δεν βρέθηκε τελικός μηχανισμός all στην εγγραφή."}[term]
+        if not term and re.search(r"(?:^|\s)redirect=", spf[0], re.I):
+            status, detail = "good", "Η πολιτική ορίζεται από άλλο domain (redirect=)."
         checks.append({"name": "SPF", "status": status, "value": spf[0], "detail": detail})
+        lookups, dead = spf_walk(lookup, domain, spf[0])
+        if lookups > SPF_MAX_LOOKUPS:
+            checks.append({"name": "SPF όριο lookups", "status": "bad", "value": f"{lookups}+ / {SPF_MAX_LOOKUPS}",
+                           "detail": f"Το SPF χρειάζεται πάνω από {SPF_MAX_LOOKUPS} ερωτήματα DNS (βρέθηκαν {lookups}+). "
+                                     "Οι παραλήπτες τότε το θεωρούν σπασμένο (PermError) και το αγνοούν εντελώς. "
+                                     "Αφαίρεσε includes που δεν χρησιμοποιείς ή βάλε ip4:/ip6: αντί για a/mx."})
+        else:
+            checks.append({"name": "SPF όριο lookups", "status": "good", "value": f"{lookups} / {SPF_MAX_LOOKUPS}",
+                           "detail": f"Μέσα στο όριο των {SPF_MAX_LOOKUPS} ερωτημάτων DNS."})
+        if dead:
+            names = ", ".join(d["name"] for d in dead)
+            checks.append({"name": "SPF νεκρά includes", "status": "bad", "value": names,
+                           "detail": "Αυτά τα includes δεν έχουν πια SPF (ή δεν υπάρχουν). Αν ένα τέτοιο domain έχει λήξει, "
+                                     "όποιος το αγοράσει μπορεί να στέλνει email ως εσύ. Αφαίρεσέ τα από το SPF."})
     if not dmarc_records:
         checks.append({"name": "DMARC", "status": "bad", "value": None, "detail": "Δεν βρέθηκε εγγραφή _dmarc." + domain + "."})
     elif len(dmarc_records) > 1:
@@ -824,10 +970,34 @@ def email_dns_posture(domain, sim=False):
             detail += " Η πολιτική εφαρμόζεται μόνο σε " + tags["pct"] + "% των μηνυμάτων."
             if status == "good": status = "warn"
         checks.append({"name": "DMARC", "status": status, "value": value, "detail": detail})
-    score = sum(1 for x in checks if x["status"] == "good")
-    return {"domain": domain, "checks": checks, "score": score, "of": len(checks),
-            "severity": "high" if any(x["status"] == "bad" for x in checks) else "low" if any(x["status"] == "warn" for x in checks) else "ok",
-            "sim": bool(sim)}
+        sp = tags.get("sp")
+        if sp is not None and policy in ("reject", "quarantine") and sp not in ("reject", "quarantine"):
+            checks.append({"name": "DMARC subdomains (sp=)", "status": "warn", "value": "sp=" + sp,
+                           "detail": "Τα subdomains (π.χ. billing." + domain + ") έχουν πιο χαλαρή πολιτική από το κύριο domain. "
+                                     "Ένας απατεώνας θα διάλεγε ακριβώς αυτά."})
+        if "rua" not in tags:
+            checks.append({"name": "DMARC αναφορές (rua=)", "status": "warn", "value": None,
+                           "detail": "Δεν ζητάς αναφορές: δεν θα μάθεις ποτέ αν κάποιος στέλνει email ως εσύ. Πρόσθεσε rua=mailto:…"})
+    mx = [x["data"] for x in answers(domain, "MX") if x.get("type") == "MX"]
+    if not mx:
+        checks.append({"name": "MX", "status": "info", "value": None,
+                       "detail": "Το domain δεν δέχεται email. Αν ούτε στέλνει, κλείδωσέ το: «v=spf1 -all» και DMARC «p=reject»."})
+    elif any(m.strip() in ("0 .", "0") for m in mx):
+        checks.append({"name": "MX", "status": "info", "value": "; ".join(mx),
+                       "detail": "Null MX: το domain δηλώνει ρητά ότι δεν δέχεται email."})
+    else:
+        checks.append({"name": "MX", "status": "info", "value": "; ".join(mx), "detail": "Servers που δέχονται email για το domain."})
+    dkim = _dkim_found(lookup, domain)
+    checks.append({"name": "DKIM", "status": "good" if dkim else "info", "value": ", ".join(dkim) or None,
+                   "detail": "Βρέθηκε κλειδί DKIM (υπογραφή μηνυμάτων)." if dkim else
+                             "Δεν βρέθηκε DKIM στους συνηθισμένους selectors. Μπορεί να υπάρχει με άλλο όνομα — "
+                             "δες στον πάροχο email σου (Google Workspace, Microsoft 365 κ.λπ.)."})
+    rated = [x for x in checks if x["status"] != "info"]
+    spf_status = next((x["status"] for x in checks if x["name"] == "SPF"), "bad")
+    return {"domain": domain, "checks": checks, "score": sum(1 for x in rated if x["status"] == "good"), "of": len(rated),
+            "severity": "high" if any(x["status"] == "bad" for x in rated) else "low" if any(x["status"] == "warn" for x in rated) else "ok",
+            "verdict": spoof_verdict(tags if dmarc_records and len(dmarc_records) == 1 else {}, spf_status),
+            "spf_lookups": lookups, "sim": bool(sim)}
 
 
 WEB_CHECK_PATHS = ("/.git/HEAD", "/.env", "/server-status", "/phpinfo.php", "/backup.zip", "/swagger.json", "/api-docs")
