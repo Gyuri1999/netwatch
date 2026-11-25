@@ -34,10 +34,23 @@ iconutil -c icns "$ICONSET" -o "$OUT/Contents/Resources/NetWatch.icns"
 echo "▸ αρχεία NetWatch"
 cp macapp/Info.plist "$OUT/Contents/Info.plist"
 VER=$(cat VERSION 2>/dev/null || echo 1.0.0)
+DEV=""
+if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
+  # Τοπικό build: το αρχείο VERSION το γράφει σωστά μόνο το CI (από το tag) — εδώ παίρνουμε το πιο πρόσφατο tag.
+  # Και σήμα DEV_BUILD: ο updater δεν το αντικαθιστά μόνος του με το release (αλλιώς χάνονται οι αλλαγές που δοκιμάζεις).
+  TAG=$(git describe --tags --abbrev=0 2>/dev/null || true); TAG=${TAG#v}
+  [[ "$TAG" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] && VER=$TAG
+  DEV="τοπικό build $(git rev-parse --short HEAD 2>/dev/null || echo '?') ($(git branch --show-current 2>/dev/null || echo '?'))"
+fi
 plutil -replace CFBundleShortVersionString -string "$VER" "$OUT/Contents/Info.plist"
 rsync -a --exclude '__pycache__' --exclude '*.md' ./*.py \
   index.html edu.js wireshark.js infra.js sectools.js privtools.js protocols.js ciscolab.js uiplus.js pentestui.js socui.js worktools.js opstools.js cmdxlate.js navplus.js anontools.js topomap.js sshui.js vlsm.js updateui.js presenceui.js l2guardui.js assessui.js vulnui.js upnpui.js otui.js acceptui.js sitesui.js labelsui.js calcui.js v6ui.js nacui.js iotinvui.js radioui.js fieldui.js soakui.js remoteui.js camcheckui.js probesui.js watchui.js acl.js names.js golive.js alertwhy.js i18n.js i18n academy academy.html manifest.webmanifest sw.js config.example.yaml requirements.txt VERSION update_signers rules ctf samples "$OUT/Contents/Resources/netwatch/"
 rm -f "$OUT/Contents/Resources/netwatch/rules/local.yaml"
+if [ -n "$DEV" ]; then
+  echo "$VER" > "$OUT/Contents/Resources/netwatch/VERSION"
+  echo "$DEV" > "$OUT/Contents/Resources/netwatch/DEV_BUILD"
+  echo "▸ δοκιμαστικό build v$VER — $DEV (χωρίς αυτόματη ενημέρωση)"
+fi
 
 echo "▸ υπογραφή (ad-hoc)"
 codesign --force --deep --sign - "$OUT" >/dev/null
