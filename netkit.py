@@ -1658,7 +1658,7 @@ def _num(v, default, cast=float):
 
 TOOL_LABELS = {"ping": "ping", "dns": "ερώτημα DNS", "dnscmp": "σύγκριση DNS", "ports": "έλεγχος θυρών",
                "http": "έλεγχος HTTP", "wol": "Wake-on-LAN", "names": "ανακάλυψη ονομάτων",
-               "maildns": "SPF/DMARC DNS έλεγχος", "webcheck": "web exposure check"}
+               "maildns": "SPF/DMARC DNS έλεγχος", "webcheck": "web exposure check", "secrets": "ξεχασμένα κλειδιά"}
 
 
 class _OwnTool:
@@ -1696,7 +1696,7 @@ def run_tool(body, sim=False, state=None):
     """Εκτελεί ένα εργαλείο από το JSON του POST /api/netkit."""
     tool = str(body.get("tool") or "")
     if tool not in TOOL_LABELS:
-        raise ValueError("Άγνωστο εργαλείο — ping, dns, dnscmp, ports, http, wol, names, maildns, webcheck")
+        raise ValueError("Άγνωστο εργαλείο — ping, dns, dnscmp, ports, http, wol, names, maildns, webcheck, secrets")
     with _OwnTool(None if sim else state, f"{TOOL_LABELS[tool]} (🔴 Pentest → Εργαλεία)"):
         return _run_tool(tool, body, sim, state)
 
@@ -1726,4 +1726,7 @@ def _run_tool(tool, body, sim, state):
         return email_dns_posture(s("domain", 253), sim=sim)
     if tool == "webcheck":
         return web_exposure_check(s("url", 500), sim=sim)
-    raise ValueError("Άγνωστο εργαλείο — ping, dns, dnscmp, ports, http, wol, names, maildns, webcheck")
+    if tool == "secrets":
+        import secretscan
+        return secretscan.scan(s("path", 1000), sim=sim, history=body.get("history", True) is not False)
+    raise ValueError("Άγνωστο εργαλείο — ping, dns, dnscmp, ports, http, wol, names, maildns, webcheck, secrets")

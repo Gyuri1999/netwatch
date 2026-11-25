@@ -2996,7 +2996,24 @@ I18N.add({
   "Τα πλαστά μηνύματα δεν μπλοκάρονται πλήρως.": "Spoofed messages aren't fully blocked.",
   "Τα πλαστά πάνε στα ανεπιθύμητα, δεν απορρίπτονται.": "Spoofed mail goes to spam; it isn't rejected.",
   "Τα subdomains (π.χ. …@billing.domain) δεν προστατεύονται (sp=none).": "Subdomains (e.g. …@billing.domain) aren't protected (sp=none).",
-  "Τα πλαστά μηνύματα με το domain σου απορρίπτονται από τους παραλήπτες (DMARC p=reject).": "Spoofed messages using your domain are rejected by receivers (DMARC p=reject)."
+  "Τα πλαστά μηνύματα με το domain σου απορρίπτονται από τους παραλήπτες (DMARC p=reject).": "Spoofed messages using your domain are rejected by receivers (DMARC p=reject).",
+  "🔑 Ξεχασμένα κλειδιά": "🔑 Forgotten secrets",
+  "Ψάχνει κωδικούς Wi‑Fi/MQTT, κλειδιά API και tokens γραμμένους μέσα σε δικό σου project (π.χ. ESP32) — και στο git ιστορικό. Μόνο τοπικά· οι τιμές φαίνονται κρυμμένες.": "Finds Wi‑Fi/MQTT passwords, API keys and tokens written inside your own project (e.g. ESP32) — and in its git history. Local only; values are shown masked.",
+  "Ιδιωτικό κλειδί (SSH/TLS)": "Private key (SSH/TLS)",
+  "Κλειδί AWS": "AWS key",
+  "Token GitHub": "GitHub token",
+  "Κλειδί Anthropic (Claude)": "Anthropic (Claude) key",
+  "Κλειδί OpenAI": "OpenAI key",
+  "Κλειδί Stripe (live)": "Stripe key (live)",
+  "Token Slack": "Slack token",
+  "Token Telegram bot": "Telegram bot token",
+  "Κλειδί Google API": "Google API key",
+  "Κωδικός μέσα σε URL": "Password inside a URL",
+  "Κωδικός σε #define": "Password in a #define",
+  "Κωδικός γραμμένος στον κώδικα": "Password written in the code",
+  "Δώσε τον φάκελο του project, π.χ. ~/smart-city-poles": "Give the project folder, e.g. ~/smart-city-poles",
+  "Δεν βρέθηκε αυτός ο φάκελος": "Folder not found",
+  "Διάλεξε έναν φάκελο project μέσα στον φάκελο χρήστη σου (π.χ. ~/netwatch), όχι όλο το ~ ή αρχεία συστήματος": "Pick a project folder inside your home folder (e.g. ~/netwatch), not all of ~ or system files"
  },
  "patterns": [
   [
