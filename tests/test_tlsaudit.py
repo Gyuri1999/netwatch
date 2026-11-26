@@ -131,8 +131,9 @@ def test_cert_key_info_parser():
 def test_private_only_targets():
     assert tlsaudit.parse_target("192.168.1.1:443") == ("192.168.1.1", 443)
     assert tlsaudit.parse_target(" 10.0.0.5:22 ") == ("10.0.0.5", 22)
+    assert tlsaudit.parse_target("192.168.1.1") == ("192.168.1.1", 443)  # σκέτη IP → HTTPS
     for bad in ("8.8.8.8:443", "127.0.0.1:22", "169.254.1.1:22", "192.168.1.0/24:443", "router:443",
-                "192.168.1.1", "192.168.1.1:0", "192.168.1.1:70000", "224.0.0.1:443"):
+                "8.8.8.8", "192.168.1.1:0", "192.168.1.1:70000", "224.0.0.1:443"):
         with pytest.raises(ValueError):
             tlsaudit.parse_target(bad)
     a = tlsaudit.TlsAudit(sim=False, scan=lambda: None)
