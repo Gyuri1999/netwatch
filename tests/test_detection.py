@@ -802,6 +802,23 @@ def test_declared_test_device(state):
     assert state.selftest_status()["test_ips"] == []
 
 
+def test_own_scan_touching_a_suspect_port_is_your_test(state):
+    """Βρέθηκε live: η σάρωση του NetWatch ρωτά τη θύρα 4444 κάθε συσκευής → «συνδέθηκες σε θύρα Metasploit».
+    «Δράστης» της ειδοποίησης είναι η άλλη συσκευή, αλλά το πακέτο το έστειλε η δική μας σάρωση."""
+    state.note_own_tool("η σάρωση του NetWatch (🔴 Pentest)", seconds=60)
+    feed(state, Clock(), src=ME, dst=GW, proto="TCP", sp=50000, dp=4444, flags="S")
+    a = next(x for x in state.alerts if x["type"] == "Ύποπτη εξερχόμενη θύρα")
+    assert a["actor"] == GW and a["selftest"] == "η σάρωση του NetWatch (🔴 Pentest)"
+    assert state.status()["alerts"] == 0 and state.hosts[GW]["threat"] == 0   # ούτε συναγερμός, ούτε «κόκκινη» συσκευή
+
+
+def test_real_connection_to_a_suspect_port_still_alerts(state):
+    """Χωρίς δική σου σάρωση, η ίδια κίνηση παραμένει κανονική ειδοποίηση."""
+    feed(state, Clock(), src=ME, dst=GW, proto="TCP", sp=50000, dp=4444, flags="S")
+    a = next(x for x in state.alerts if x["type"] == "Ύποπτη εξερχόμενη θύρα")
+    assert "selftest" not in a and state.status()["alerts"] == 1
+
+
 def test_someone_else_is_not_your_test(state):
     state.note_own_tool("σάρωση", seconds=60)  # εσύ σαρώνεις — αλλά η επίθεση έρχεται από άλλον
     state.test_from("192.168.1.77", 30)
