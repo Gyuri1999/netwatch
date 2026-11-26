@@ -29,3 +29,10 @@ def test_readmes_link_to_both():
     for name in ("README.md", "README.el.md"):
         s = _read(name)
         assert "(SECURITY.md)" in s and "(CHANGELOG.md)" in s, name
+
+
+def test_app_does_not_claim_that_nothing_leaves_the_computer():
+    """Η εφαρμογή στέλνει δημόσιες IP για γεωεντοπισμό και ελέγχει για ενημέρωση: το λέμε, δεν γράφουμε «τίποτα δεν φεύγει»."""
+    s = _read("golive.js")
+    assert "Τίποτα δεν φεύγει από τον υπολογιστή σου" not in s and "Nothing leaves your computer" not in s
+    assert "γεωεντοπισμός" in s and "geolocation" in s and "ούτε κωδικούς" in s
