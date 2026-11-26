@@ -90,3 +90,36 @@ def test_app_mode_route_only_with_windows_launcher(api, tmp_path):
     assert code == 200 and r["ok"]
     with open(tmp_path / "mode-request.json", encoding="utf-8") as f:
         assert json.load(f)["mode"] == "live-admin"
+
+
+# ---------------- 🔒 κεφαλίδες ασφαλείας σε κάθε απάντηση ----------------
+def _headers(url):
+    try:
+        with urllib.request.urlopen(url, timeout=10) as r:
+            return r.status, {k.lower(): v for k, v in r.headers.items()}
+    except urllib.error.HTTPError as e:
+        return e.code, {k.lower(): v for k, v in e.headers.items()}
+
+
+def test_every_response_carries_security_headers(api):
+    _, base = api
+    for path in ("/", "/api/status", "/api/does-not-exist"):       # σελίδα, JSON και 404
+        code, h = _headers(base + path)
+        assert h["x-content-type-options"] == "nosniff", path
+        assert h["x-frame-options"] == "SAMEORIGIN" and "frame-ancestors 'self'" in h["content-security-policy"], path
+        assert h["referrer-policy"] == "no-referrer" and "camera=()" in h["permissions-policy"], path
+
+
+def test_server_header_does_not_leak_python_version(api):
+    _, base = api
+    _, h = _headers(base + "/api/status")
+    assert h["server"].startswith("NetWatch") and "Python" not in h["server"] and "BaseHTTP" not in h["server"]
+
+
+def test_headers_are_not_duplicated_across_requests(api):
+    """Η ίδια κεφαλίδα μία φορά ανά απάντηση, και στο 2ο αίτημα (όχι «κολλημένη» κατάσταση από το 1ο)."""
+    _, base = api
+    for _ in range(2):
+        with urllib.request.urlopen(base + "/api/status", timeout=10) as r:
+            assert len(r.headers.get_all("X-Content-Type-Options")) == 1
+            assert len(r.headers.get_all("Content-Security-Policy")) == 1
