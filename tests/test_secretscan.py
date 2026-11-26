@@ -52,7 +52,8 @@ def test_finds_esp32_style_secrets_and_masks_them(home):
 def test_placeholders_and_env_lookups_are_ignored(home):
     p = _project(home, {"a.ino": 'password = "your_password";\npwd = "changeme";\ntoken = "${TOKEN}";\n'
                                  'api_key = os.getenv("KEY");\nsecret = "xxxxxxxx";\npassword = "change-me-long-random";\n'
-                                 'password = "μακρύς-τυχαίος-κωδικός";\n#define WIFI_PASS "********"\n'})
+                                 'password = "μακρύς-τυχαίος-κωδικός";\n#define WIFI_PASS "********"\n'
+                                 'smtp_password = "app-password";\npassword = "your-app-password"\n'})
     assert secretscan.scan(str(p), history=False)["findings"] == []
 
 
