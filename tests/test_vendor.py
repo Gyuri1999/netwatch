@@ -73,3 +73,8 @@ def test_server_serves_only_the_known_vendor_files(base):
         with pytest.raises(urllib.error.HTTPError) as e:
             urllib.request.urlopen(f"{base}/vendor/{bad}", timeout=10)
         assert e.value.code == 404, bad
+
+
+def test_git_never_rewrites_vendor_line_endings():
+    """Στα Windows το git άλλαζε τα τέλη γραμμής του d3.min.js στο checkout → άλλο αρχείο από το δημοσιευμένο."""
+    assert "vendor/** -text" in _read(".gitattributes")
