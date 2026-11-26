@@ -486,12 +486,14 @@ def grade_tls(info):
 
 # ---------------- στόχοι ----------------
 def parse_target(s):
-    """'192.168.1.1:443' → ('192.168.1.1', 443). Μόνο ιδιωτικές IPv4 (pentest.check_target)."""
+    """'192.168.1.1:443' → ('192.168.1.1', 443). Σκέτη IP → θύρα 443. Μόνο ιδιωτικές IPv4 (pentest.check_target)."""
     import pentest
     s = str(s or "").strip()
+    if re.fullmatch(r"\d{1,3}(?:\.\d{1,3}){3}", s):
+        s += ":443"  # σκέτη IP: το πιο συνηθισμένο, η σελίδα HTTPS
     m = re.fullmatch(r"(\d{1,3}(?:\.\d{1,3}){3}):(\d{1,5})", s)
     if not m:
-        raise ValueError(f"Μη έγκυρος στόχος «{s[:40]}» — γράψε ip:θύρα, π.χ. 192.168.1.1:443")
+        raise ValueError(f"Μη έγκυρος στόχος «{s[:40]}» — γράψε ip ή ip:θύρα, π.χ. 192.168.1.1:443")
     ip, port = m.group(1), int(m.group(2))
     if not 1 <= port <= 65535:
         raise ValueError(f"Μη έγκυρη θύρα στο «{s[:40]}»")
