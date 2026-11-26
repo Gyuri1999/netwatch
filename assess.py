@@ -166,6 +166,13 @@ def _l2_findings(state, lg):
         lvl = c.get("level")
         if lvl not in ("bad", "warn"):
             continue
+        if c.get("inconclusive"):  # δεν πήραμε απάντηση: δεν είναι επίθεση, απλώς ο έλεγχος δεν βγήκε
+            what = {"dhcp": "DHCP", "arp": "ARP"}.get(c.get("id"), "L2")
+            out.append(_f("low", "L2", _L(lg, f"Ο έλεγχος {what} δεν ολοκληρώθηκε", f"{what} check was inconclusive"),
+                          c.get(lg) or c.get("el") or "",
+                          _L(lg, "Δεν σημαίνει επίθεση. Ξανατρέξε τον έλεγχο· αν ξανασυμβεί, δες αν ο router απαντά σε ping.",
+                             "This is not an attack. Run the check again; if it repeats, see whether the router answers ping."), "l2guard"))
+            continue
         title = {"dhcp": ("Rogue DHCP server", "Rogue DHCP server"), "arp": ("ARP spoofing / αλλαγή MAC router", "ARP spoofing / router MAC change")}
         out.append(_f("high" if lvl == "bad" else "med", "L2", _L(lg, *title.get(c.get("id"), ("Έλεγχος L2", "L2 check"))),
                       c.get(lg) or c.get("el") or "",
