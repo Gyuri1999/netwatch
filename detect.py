@@ -1086,6 +1086,8 @@ class NetState:
     def _nxdomain_flood(self, server, qname, t):
         th = self._th("nxdomain_flood")
         q = qname.lower().rstrip(".")
+        if q.endswith((".in-addr.arpa", ".ip6.arpa")):
+            return  # αντίστροφες αναζητήσεις (IP → όνομα): τις κάνει κάθε σάρωση/λίστα συσκευών, συνήθως «δεν υπάρχει»
         dq = self.w_nxflood.add(server, q, t)
         if len(dq) < th["count"]:
             return

@@ -123,6 +123,13 @@ def test_nxdomain_flood_many_domains(state):
     assert a and a[0]["type"] == "NXDOMAIN flood" and a[0]["target"] == GW
 
 
+def test_reverse_lookups_of_a_scan_are_not_a_flood(state):
+    c = Clock()
+    for i in range(220):  # το scan / ο κατάλογος συσκευών ρωτά το όνομα κάθε IP (PTR) → NXDOMAIN
+        answer(state, c, GW, ME, i, sp=40000 + i, nx=f"{i % 254 + 1}.1.168.192.in-addr.arpa")
+    assert not alerts(state, "NXDOMAIN flood")
+
+
 def test_few_nxdomains_are_fine(state):
     c = Clock()
     for i in range(40):
