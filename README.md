@@ -271,6 +271,11 @@ The sample capture is generated reproducibly by [`tools/make_sample_pcap.py`](to
 
 Only monitor and scan networks you own or are authorised to test. The monitor is passive and never sends packets to the hosts it observes. Only the 🔴 Pentest tab is active, and only when you press *Scan*. It refuses anything outside private address ranges. The web exposure check sends HEAD requests only to a fixed set of paths on a private literal IP; it never downloads response bodies or follows redirects. The SPF/DMARC check makes DNS lookups for the domain you enter and never sends email. The purple-team lab never touches the network: its attack packets are injected straight into the detection engine. The state-changing endpoints (`POST /api/scan`, `/api/lab`, `/api/exposure`) only accept JSON from the NetWatch page itself, which protects them against CSRF and DNS rebinding. Geolocation sends public destination IPs, never packet contents, to ip-api.com; turn this off with `--no-geo`. Blocklists are downloaded and no data about your traffic is sent. AbuseIPDB and Telegram are only contacted if you configure them. The exposure check sends your public IP to internetdb.shodan.io, and the CVE button sends a product name and version to the NVD. Both happen only when you click.
 
+## Security and changes
+
+* [SECURITY.md](SECURITY.md): how to report a security problem, and what NetWatch sends out.
+* [CHANGELOG.md](CHANGELOG.md): what changed in each release.
+
 ## License
 
 [MIT](LICENSE)
