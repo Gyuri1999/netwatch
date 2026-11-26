@@ -193,8 +193,9 @@ body.rail-mini #rail button.np-h{display:flex}
   }
   function paintAttn() {
     const el = document.getElementById('t-home'); if (!el || !AT.html) return;
-    let box = el.querySelector(':scope > .np-wrap');
-    if (!box) { box = document.createElement('div'); box.className = 'np-wrap'; el.prepend(box); }
+    const host = el.querySelector('[data-attn-slot]') || el;  // απλή Αρχική: μέσα στα «Περισσότερα»· αλλιώς πάνω-πάνω όπως πριν
+    let box = host.querySelector(':scope > .np-wrap');
+    if (!box) { box = document.createElement('div'); box.className = 'np-wrap'; host.prepend(box); }
     if (box._h !== AT.html) { box.innerHTML = AT.html; box._h = AT.html; box.querySelectorAll('[data-go]').forEach(x => x.onclick = () => showTab(x.dataset.go)); }
   }
   window.NP_refreshAttn = () => { AT.t = 0; loadAttn(); };
