@@ -290,9 +290,11 @@ class Net:
 
     def solicit(self, iface, timeout=3.0):
         """Ένα Router Solicitation (RFC 4861 §4.1) στο ff02::2 → λίστα πλαισίων (bytes) με όσα ICMPv6 ήρθαν. Θέλει root."""
-        from scapy.all import AsyncSniffer, Ether, ICMPv6ND_RS, ICMPv6NDOptSrcLLAddr, IPv6, conf, get_if_hwaddr, sendp
+        from scapy.all import AsyncSniffer, Ether, ICMPv6ND_RS, ICMPv6NDOptSrcLLAddr, IPv6, conf, sendp
+
+        from core import require_real_mac
         iface = iface or conf.iface
-        mac = get_if_hwaddr(iface)
+        mac = require_real_mac(iface)
         # (το AsyncSniffer των νεότερων scapy δεν δέχεται timeout= — σταματάμε εμείς μετά από `timeout` δευτερόλεπτα)
         sn = AsyncSniffer(iface=iface, filter="icmp6", store=True)
         sn.start()

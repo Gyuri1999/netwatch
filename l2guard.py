@@ -28,9 +28,11 @@ class ScapyProber:
     """Τα πραγματικά πακέτα (χρειάζεται root, όπως η καταγραφή)."""
 
     def dhcp_discover(self, iface, timeout=4.0):
-        from scapy.all import BOOTP, DHCP, IP, UDP, Ether, conf, get_if_hwaddr, srp
+        from scapy.all import BOOTP, DHCP, IP, UDP, Ether, conf, srp
+
+        from core import require_real_mac
         conf.checkIPaddr = False
-        mac = get_if_hwaddr(iface)
+        mac = require_real_mac(iface)
         xid = random.randint(1, 0xFFFFFFFF)
         pkt = (Ether(dst="ff:ff:ff:ff:ff:ff", src=mac) / IP(src="0.0.0.0", dst="255.255.255.255") / UDP(sport=68, dport=67)
                / BOOTP(chaddr=bytes.fromhex(mac.replace(":", "")) + b"\x00" * 10, xid=xid, flags=0x8000)
@@ -50,8 +52,8 @@ class ScapyProber:
         return out
 
     def arp_who_has(self, iface, ip, timeout=2.0):
-        from scapy.all import ARP, Ether, srp
-        ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=ip), iface=iface, multi=True, timeout=timeout, verbose=0)
+        from core import arp_request
+        ans = arp_request(ip, iface=iface, timeout=timeout, multi=True)
         return sorted({_norm(r.hwsrc) for _, r in ans if r.psrc == ip})
 
     def arp_cache(self):

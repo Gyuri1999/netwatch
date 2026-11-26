@@ -248,6 +248,90 @@ def can_capture():
     return sys.platform == "darwin" and os.access("/dev/bpf0", os.R_OK | os.W_OK)
 
 
+# ---------------- η ΠΡΑΓΜΑΤΙΚΗ MAC μας (για πακέτα που στέλνουμε εμείς) ----------------
+# Το macOS κρύβει τη MAC από εφαρμογές χωρίς άδεια «Τοπικού δικτύου» και δίνει 02:00:00:00:00:00. Αν στείλουμε ARP
+# με αυτή, ο router μαθαίνει «η IP σου είναι στη 02:00:…» και για λίγα δευτερόλεπτα δεν σου απαντά κανείς (ουσιαστικά
+# ARP spoofing στον εαυτό μας). Γι' αυτό: ποτέ πακέτο με ψεύτικη MAC — ή η αληθινή, ή τίποτα.
+PLACEHOLDER_MACS = {"02:00:00:00:00:00", "00:00:00:00:00:00", "ff:ff:ff:ff:ff:ff"}
+_real_mac_cache = {}
+
+
+def _norm_mac(m):
+    parts = str(m or "").lower().replace("-", ":").split(":")
+    if len(parts) != 6 or not all(re.fullmatch(r"[0-9a-f]{1,2}", x) for x in parts):
+        return None
+    mac = ":".join(x.zfill(2) for x in parts)
+    return None if mac in PLACEHOLDER_MACS or int(parts[0], 16) & 1 else mac
+
+
+def _mac_from_own_frame(iface, gw, timeout=1.5):
+    """Στέλνει ΕΝΑ UDP datagram στη θύρα 9 (discard) του router και διαβάζει τη MAC αποστολέα από το πλαίσιο που
+    βγήκε στην κάρτα (η καταγραφή βλέπει την αληθινή MAC, όχι την «κρυμμένη»)."""
+    import socket
+    from scapy.all import AsyncSniffer, Ether
+    sn = AsyncSniffer(iface=iface, filter=f"udp and dst host {gw} and dst port 9", store=True, count=1)
+    sn.start()
+    time.sleep(0.3)
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_DGRAM) as s:
+            s.sendto(b"netwatch-mac", (gw, 9))
+        sn.join(timeout)
+    except OSError:
+        pass
+    finally:
+        if getattr(sn, "running", False):
+            try:
+                sn.stop()
+            except Exception:  # noqa: BLE001
+                pass
+    pkts = list(getattr(sn, "results", None) or [])
+    return _norm_mac(pkts[0][Ether].src) if pkts and pkts[0].haslayer(Ether) else None
+
+
+def real_mac(iface=None, gw=None):
+    """Η αληθινή MAC της κάρτας ή None. Δεν επιστρέφει ποτέ τη «κρυμμένη» 02:00:00:00:00:00."""
+    from scapy.all import conf, get_if_hwaddr
+    iface = iface or conf.iface
+    key = str(iface)
+    if key in _real_mac_cache:
+        return _real_mac_cache[key]
+    try:
+        mac = _norm_mac(get_if_hwaddr(iface))
+    except Exception:  # noqa: BLE001
+        mac = None
+    if not mac:
+        try:
+            gw = gw or conf.route.route("0.0.0.0")[2]
+            if gw and gw != "0.0.0.0" and ipaddress.ip_address(gw).is_private:  # ενεργά πακέτα μόνο σε ιδιωτικές IP
+                mac = _mac_from_own_frame(iface, gw)
+        except Exception:  # noqa: BLE001
+            mac = None
+    if mac:
+        _real_mac_cache[key] = mac
+    return mac
+
+
+def arp_request(pdst, iface=None, timeout=2.0, retry=0, multi=False):
+    """ARP «ποιος έχει…;» με τη ΣΩΣΤΗ MAC αποστολέα → λίστα απαντήσεων (scapy). Αν δεν ξέρουμε την αληθινή MAC
+    μας, δεν στέλνουμε τίποτα (RuntimeError) — καλύτερα καμία ανακάλυψη παρά «δηλητηριασμένος» router."""
+    from scapy.all import ARP, Ether, conf, srp
+    iface = iface or conf.iface
+    mac = real_mac(iface)
+    if not mac:
+        raise RuntimeError("δεν βρέθηκε η πραγματική MAC της κάρτας (macOS: άδεια «Τοπικό δίκτυο») — δεν στέλνω ARP")
+    ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff", src=mac) / ARP(pdst=pdst, hwsrc=mac), iface=iface, timeout=timeout,
+                 retry=retry, multi=multi, verbose=0)
+    return ans
+
+
+def require_real_mac(iface=None):
+    """Για DHCP/EAPOL/IPv6: η αληθινή MAC ή σφάλμα με εξήγηση (ποτέ πακέτο με ψεύτικη)."""
+    mac = real_mac(iface)
+    if not mac:
+        raise RuntimeError("δεν βρέθηκε η πραγματική MAC της κάρτας (macOS: άδεια «Τοπικό δίκτυο») — δεν στέλνω πακέτα")
+    return mac
+
+
 def chown_to_user(path):
     """Αν τρέχουμε με sudo, τα αρχεία που φτιάχνουμε να ανήκουν στον κανονικό χρήστη."""
     uid, gid = os.environ.get("SUDO_UID"), os.environ.get("SUDO_GID")

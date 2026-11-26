@@ -170,9 +170,11 @@ class Net:
 
     def eapol(self, iface, timeout=5.0, identity=None):
         """EAPOL-Start και ό,τι EAPOL απαντηθεί (λίστα πλαισίων bytes). Θέλει root, όπως η σύλληψη."""
-        from scapy.all import AsyncSniffer, Ether, conf, get_if_hwaddr, sendp
+        from scapy.all import AsyncSniffer, Ether, conf, sendp
+
+        from core import require_real_mac
         iface = iface or conf.iface
-        mac = _norm(get_if_hwaddr(iface))
+        mac = _norm(require_real_mac(iface))
         got, answered = [], []
 
         def cb(p):
