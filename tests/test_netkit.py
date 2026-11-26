@@ -851,12 +851,20 @@ def test_dns_retries_over_tcp_when_truncated():
     import struct
     import threading
     d = netkit._dns_mod()
-    tcp = socket.socket()
-    tcp.bind(("127.0.0.1", 0))
+    for _ in range(20):  # ίδια θύρα σε TCP και UDP· στα Windows μερικές θύρες είναι δεσμευμένες (WinError 10013)
+        tcp = socket.socket()
+        tcp.bind(("127.0.0.1", 0))
+        port = tcp.getsockname()[1]
+        udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        try:
+            udp.bind(("127.0.0.1", port))
+            break
+        except OSError:
+            udp.close()
+            tcp.close()
+    else:
+        pytest.skip("δεν βρέθηκε ελεύθερη ίδια θύρα TCP+UDP")
     tcp.listen(1)
-    port = tcp.getsockname()[1]
-    udp = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    udp.bind(("127.0.0.1", port))
 
     def serve_udp():
         data, addr = udp.recvfrom(4096)
