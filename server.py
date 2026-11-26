@@ -20,6 +20,31 @@ from demo import DEMO_SHODAN
 # ---------------- web server ----------------
 def make_handler(state):
     class H(BaseHTTPRequestHandler):
+        # 🔒 Κεφαλίδες ασφαλείας σε ΚΑΘΕ απάντηση (όσες δεν έβαλε ήδη το ίδιο το endpoint, π.χ. οι λήψεις αρχείων):
+        #  • nosniff: ο browser δεν «μαντεύει» τύπο αρχείου  • SAMEORIGIN/frame-ancestors: καμία ξένη σελίδα δεν μας βάζει σε iframe
+        #    (clickjacking)  • no-referrer: τα links προς Shodan/VirusTotal κ.λπ. δεν λένε από πού ήρθες
+        #  • Permissions-Policy: η σελίδα δεν ζητά ποτέ κάμερα/μικρόφωνο/τοποθεσία
+        SEC_HEADERS = (("X-Content-Type-Options", "nosniff"), ("X-Frame-Options", "SAMEORIGIN"),
+                       ("Content-Security-Policy", "frame-ancestors 'self'"), ("Referrer-Policy", "no-referrer"),
+                       ("Cross-Origin-Opener-Policy", "same-origin"),
+                       ("Permissions-Policy", "camera=(), microphone=(), geolocation=(), payment=(), usb=()"))
+
+        def version_string(self):
+            return "NetWatch"  # όχι «BaseHTTP/0.6 Python/3.x»: δεν λέμε σε κανέναν ποια έκδοση Python τρέχει
+
+        def send_header(self, keyword, value):
+            sent = self.__dict__.setdefault("_hdr_sent", set())
+            sent.add(keyword.lower())
+            super().send_header(keyword, value)
+
+        def end_headers(self):
+            sent = self.__dict__.get("_hdr_sent", set())
+            for k, v in self.SEC_HEADERS:
+                if k.lower() not in sent:
+                    super().send_header(k, v)
+            self.__dict__["_hdr_sent"] = set()  # η ίδια σύνδεση μπορεί να εξυπηρετήσει κι άλλο αίτημα (keep-alive)
+            super().end_headers()
+
         def log_message(self, *a):
             pass
 
