@@ -5,6 +5,12 @@ What changed in each NetWatch release, newest first. Every release with its down
 
 ## Unreleased
 
+Nothing yet.
+
+## 1.17.1 — 2026-11-26
+
+Security and reliability. No new features.
+
 ### Security
 - The map libraries (d3, topojson) and the world map now ship with the app instead of being loaded from a CDN.
   The map works with no Internet, and the page no longer loads code or data from a third party. (#57)
@@ -15,6 +21,10 @@ What changed in each NetWatch release, newest first. Every release with its down
 - NetWatch's own LAN scan no longer raises "suspicious outbound port 4444 (Metasploit)" for every device. (#58)
 - When the connection to the server is lost, the page says so and shows "Offline" instead of "All good"
   over old data. It reconnects on its own. (#59)
+- The Demo/Live dialog no longer says "nothing leaves your computer". It names what NetWatch sends out. (#61)
+
+### Added
+- `CHANGELOG.md` and `SECURITY.md`. (#60)
 
 ## 1.17.0 — 2026-11-26
 
