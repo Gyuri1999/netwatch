@@ -712,10 +712,14 @@ html.nomo .badge.live{animation:none!important}
     <div class="tab" id="t-devs"></div>
     <div class="tab" id="t-stats"></div>
     <div class="tab feed" id="t-feed">
+      <div class="seg" id="feed-seg" role="tablist" style="margin-bottom:8px"><button data-fv="live" class="on" role="tab">📦 Ζωντανά πακέτα</button><button data-fv="guide" role="tab">🦈 Οδηγός φίλτρων</button></div>
+      <div id="feed-guide" hidden><div id="t-ws"></div></div>
+      <div id="feed-live">
       <div class="frow" style="margin-bottom:6px"><input class="f" id="fflt" spellcheck="false" autocomplete="off" placeholder="🦈 φίλτρο Wireshark, π.χ. tcp.port == 443 && ip.addr == 192.168.1.0/24"><button class="b" id="fflt-x" title="Καθάρισε το φίλτρο">✕</button><button class="b" id="fflt-ws" title="Σημειώσεις Wireshark">🦈</button></div>
       <div class="sm" id="fflt-st" style="margin:-2px 0 6px"></div>
       <div class="sm" style="margin-bottom:6px">Κάνε κλικ σε ένα πακέτο για να σου εξηγήσω τι κάνει. <label><input type="checkbox" id="fpause"> παύση</label> <label><input type="checkbox" id="fbad"> μόνο επιθέσεις</label></div>
       <table><thead><tr><th>ώρα</th><th>proto</th><th>από → προς</th><th>len</th></tr></thead><tbody id="fb"></tbody></table>
+      </div>
     </div>
     <div class="tab" id="t-det"><div class="empty">Κάνε κλικ σε έναν κόμβο στον χάρτη ή σε μια γραμμή για αναλυτικά στοιχεία (OSINT).</div></div>
     <div class="tab" id="t-learn"></div>
@@ -734,7 +738,6 @@ html.nomo .badge.live{animation:none!important}
     <div class="tab" id="t-audit"></div>
     <div class="tab" id="t-quiz"></div>
     <div class="tab" id="t-pentest"></div>
-    <div class="tab" id="t-ws"></div>
     <div class="tab" id="t-rules"></div>
     <div class="tab" id="t-ctf"></div>
     <div class="tab" id="t-wifi"></div>
@@ -1085,8 +1088,8 @@ let tab='home';
 // Ενότητες σε κάρτες: μία σειρά καρτελών + μενού «☰ Ενότητες» (και πλέγμα στην Αρχική)
 const SECTIONS=[
   ['🛡 Προστασία',[['alerts','⚠ Επιθέσεις','τι ύποπτο έγινε, με απλά λόγια'],['vulns','🛡 Ευπάθειες συσκευών','ευπάθειες που ήδη εκμεταλλεύονται, για τις συσκευές σου (CISA KEV)'],['upnp','🔓 Θύρες router (UPnP)','θύρες που άνοιξαν μόνες τους προς το Internet'],['watch','👁 Ποιος σε κοιτάζει','trackers & ACR που «καλούν σπίτι» — π.χ. τι μαθαίνει για σένα η TV'],['cases','🗂 Υποθέσεις','διαλογή ειδοποιήσεων σαν SOC: έρευνα, σημειώσεις, ψευδώς θετικά'],['shift','🔁 Παράδοση βάρδιας','σύνοψη για τον επόμενο: τι έγινε, τι εκκρεμεί'],['wifi','☕ Wi‑Fi','είμαι ασφαλής σε αυτό το δίκτυο;'],['priv','🕵 Ανωνυμία','Tor, VPN, διαρροές'],['audit','🛡 Έλεγχος','βαθμός ασφάλειας του σπιτιού'],['honey','🍯 Παγίδα','ψεύτικες θύρες που πιάνουν όποιον ψάχνει'],['block','🚫 Μπλοκ','IP που έκοψες με το τείχος'],['iot','🔌 IoT μου','ESP32 & Raspberry Pi: πόσο ασφαλή είναι'],['iotfw','🧱 Τείχος IoT','κάθε συσκευή μιλά μόνο με όσους πρέπει · κανόνες για τον router'],['sensor','📡 Αισθητήρες','ESP32 που φυλάνε τον αέρα (deauth, evil twin)'],['mqtt','📨 MQTT','ο broker σου: ποιος μπαίνει, τι στέλνει'],['pb','⚡ Αντιδράσεις','αυτόματα: όταν γίνει Χ, κάνε Υ']]],
-  ['🌐 Το δίκτυό μου',[['devs','📟 Συσκευές','ποιος είναι συνδεδεμένος'],['fleet','🧩 Οι συσκευές μου','αισθητήρες ESP32, Raspberry Pi και υπολογιστές — σύζευξη με QR'],['avail','📈 Διαθεσιμότητα','πόσο % ήταν online κάθε συσκευή και πότε «έπεσε»'],['tm','⏱ Μηχανή του χρόνου','γύρνα το δίκτυο σε οποιοδήποτε λεπτό του 24ώρου'],['hosts','🌍 Προορισμοί','πού μιλάει ο υπολογιστής'],['apps','📱 Εφαρμογές','ποια app μιλάει με ποιον · trackers'],['stats','📊 Στατιστικά','πρωτόκολλα, κίνηση, MITRE'],['feed','📦 Πακέτα','ζωντανά πακέτα & στρώματα OSI'],['det','🔎 Λεπτομέρειες','όλα για μία IP'],['hist','🕓 Ιστορικό','παλιές ειδοποιήσεις & συσκευές'],['health','🔎 Homelab','είναι όλα πάνω; πόσο αργούν;']]],
-  ['🔴 Εργαλεία',[['pentest','🔴 Pentest','σάρωση, εργαλεία τεχνικού, CVE, lab'],['vlab','🎯 IoT Lab','χάκαρε (νόμιμα) μια ευάλωτη κάμερα στον υπολογιστή σου'],['purple','🟣 Purple team','με πιάνει το NetWatch; κάλυψη MITRE ATT&CK'],['hunt','🏹 Κυνήγι απειλών','ψάξε ενεργά ό,τι έμεινε κάτω από τα όρια'],['tlsa','🔐 TLS / SSH','βαθμός A–F για τα HTTPS/SSH των συσκευών σου'],['seg','🧱 Διαχωρισμός VLAN','είναι όντως απομονωμένα guest/IoT από το LAN σου;'],['l2g','🛡 Rogue DHCP / ARP','υπάρχει ψεύτικος router ή DHCP στο δίκτυό μου; + DHCP snooping/DAI'],['ws','🦈 Wireshark','φίλτρα, tshark, συντομεύσεις — δοκίμασέ τα ζωντανά'],['rules','🧩 Κανόνες','γράψε δικούς σου ανιχνευτές'],['ctf','🚩 CTF','ασκήσεις ανάλυσης κίνησης']]],
+  ['🌐 Το δίκτυό μου',[['devs','📟 Συσκευές','ποιος είναι συνδεδεμένος'],['fleet','🧩 Οι συσκευές μου','αισθητήρες ESP32, Raspberry Pi και υπολογιστές — σύζευξη με QR'],['avail','📈 Διαθεσιμότητα','πόσο % ήταν online κάθε συσκευή και πότε «έπεσε»'],['tm','⏱ Μηχανή του χρόνου','γύρνα το δίκτυο σε οποιοδήποτε λεπτό του 24ώρου'],['hosts','🌍 Προορισμοί','πού μιλάει ο υπολογιστής'],['apps','📱 Εφαρμογές','ποια app μιλάει με ποιον · trackers'],['stats','📊 Στατιστικά','πρωτόκολλα, κίνηση, MITRE'],['feed','📦 Πακέτα','ζωντανά πακέτα, φίλτρα Wireshark & οδηγός φίλτρων'],['det','🔎 Λεπτομέρειες','όλα για μία IP'],['hist','🕓 Ιστορικό','παλιές ειδοποιήσεις & συσκευές'],['health','🔎 Homelab','είναι όλα πάνω; πόσο αργούν;']]],
+  ['🔴 Εργαλεία',[['pentest','🔴 Pentest','σάρωση, εργαλεία τεχνικού, CVE, lab'],['vlab','🎯 IoT Lab','χάκαρε (νόμιμα) μια ευάλωτη κάμερα στον υπολογιστή σου'],['purple','🟣 Purple team','με πιάνει το NetWatch; κάλυψη MITRE ATT&CK'],['hunt','🏹 Κυνήγι απειλών','ψάξε ενεργά ό,τι έμεινε κάτω από τα όρια'],['tlsa','🔐 TLS / SSH','βαθμός A–F για τα HTTPS/SSH των συσκευών σου'],['seg','🧱 Διαχωρισμός VLAN','είναι όντως απομονωμένα guest/IoT από το LAN σου;'],['l2g','🛡 Rogue DHCP / ARP','υπάρχει ψεύτικος router ή DHCP στο δίκτυό μου; + DHCP snooping/DAI'],['rules','🧩 Κανόνες','γράψε δικούς σου ανιχνευτές'],['ctf','🚩 CTF','ασκήσεις ανάλυσης κίνησης']]],
   ['🏗 Υποδομή',[['assess','📋 Αναφορά «νέο δίκτυο»','βαθμός, τι να διορθώσεις πρώτα, απογραφή — PDF, CSV, NetBox'],['tri','🔎 Φταίει το δίκτυο;','έλεγχος με ένα κλικ + έτοιμο κείμενο για ticket'],['topo','🗺 Διάγραμμα δικτύου','σχέδιο του δικτύου με ένα κουμπί — και πού είναι η βλάβη'],['ssh','🖥 SSH Explorer','αρχεία & υγεία του Raspberry Pi σου — μόνο κλειδί, μόνο ανάγνωση'],['upd','🔄 Ενημερώσεις','νέα έκδοση από GitHub — εγκατάσταση με κλικ και έλεγχο υπογραφής'],['chg','📸 Πριν / Μετά','φωτογραφία του δικτύου πριν και μετά από μια αλλαγή'],['cfg','📑 Αντίγραφα ρυθμίσεων','backup των configs των switches/routers και τι άλλαξε'],['where','🔌 Πού είναι συνδεδεμένο;','MAC/IP → switch → θύρα → VLAN'],['docs','📘 Τεκμηρίωση','αυτόματη τεκμηρίωση σε Markdown, PDF και draw.io'],['expiry','⏰ Λήξεις','πιστοποιητικά, domains, άδειες, εγγυήσεις'],['field','📱 Field mode','τα 5 εργαλεία του τεχνικού στο κινητό'],['flows','🌊 Ροές','NetFlow / sFlow από τον router: η κίνηση όλων των συσκευών'],['snmp','🔌 Θύρες & SNMP','κίνηση ανά θύρα, σφάλματα, CPU/RAM, τοπολογία LLDP'],['syslog','📜 Syslog','τα logs του router, του Proxmox και των ESP32, με αναζήτηση'],['ipam','🗂 IPAM','διευθύνσεις, DHCP, συγκρούσεις IP, απογραφή συσκευών'],['lat','📈 Καθυστέρηση','SmokePing: ping, jitter και απώλειες στον χρόνο'],['speed','🚀 Ταχύτητα & Wi‑Fi','τεστ ταχύτητας, iperf3 και ποιο κανάλι Wi‑Fi να βάλεις'],['ops','🛠 Λειτουργία','συντήρηση, ειδοποιήσεις, Prometheus, tokens, pcap']]],
   ['🧰 Τεχνικός πεδίου',[['sock','🔌 Tester πρίζας','βάλε καλώδιο: switch, θύρα, VLAN, PoE, DHCP, internet — και εφεδρική γραμμή LTE'],['soak','📅 Παρακολούθηση 7 ημερών','άφησε το κουτί στον πελάτη: διακοπές, ώρες αιχμής, αναφορά ποιότητας'],['remote','🛰 Απομακρυσμένη πρόσβαση','δες το κουτί από το γραφείο με WireGuard, χωρίς port forwarding'],['camcheck','📷 Παράδοση καμερών','διπλές IP, λάθος subnet, ώρα, απώλειες, ροή χωρίς κωδικό — πριν φύγεις'],['accept','✅ Τεστ αποδοχής','λίστα ελέγχων ανά πρίζα / AP / κάμερα και αναφορά για υπογραφή'],['sites','🏢 Πελάτες','εγκαταστάσεις, επισκέψεις, μηνιαία αναφορά συντήρησης'],['labels','🏷 Ετικέτες & QR','ετικέτες για πρίζες, καλώδια και συσκευές'],['calc','🧮 Υπολογιστές','PoE budget, δίσκος καμερών, UPS, πτώση τάσης, ζεύξη'],['ot','🏭 Αυτοματισμοί (Modbus/BACnet/KNX)','PLC, inverter, μετρητές, κλιματισμός — και ποιος γράφει σε αυτά'],['iotinv','📦 Απογραφή IoT','Zigbee2MQTT, Tasmota, Shelly, ESPHome: firmware, μπαταρία, σήμα'],['radio','📻 Ασύρματα IoT','Bluetooth, Zigbee/Thread, LoRa — τι εκπέμπει γύρω σου'],['v6','🌐 Έλεγχος IPv6','ψεύτικος router (RA), συσκευές με δημόσια IPv6'],['nac','🔐 802.1X & guest','ζητά η θύρα πιστοποίηση; είναι απομονωμένο το Wi‑Fi επισκεπτών;']]],
   ['🔒 Ασφάλεια & ιδιωτικότητα',[['tor','🧅 Tor','το κύκλωμα των 3 κόμβων, ζωντανά'],['vpnm','🔒 VPN','WireGuard/Tailscale & kill-switch'],['dnsf','🔐 DNS','Pi-hole/AdGuard & κρυπτογραφημένο DNS ανά συσκευή'],['cams','📹 Κάμερες','έλεγχος έκθεσης — δικό σου δίκτυο, read-only'],['siem','📥 SIEM','ειδοποιήσεις Suricata & Zeek'],['ct','🔏 Πιστοποιητικά','Certificate Transparency για τα domains σου'],['trk','📡 Trackers','ποια συσκευή στέλνει σε διαφημίσεις/τηλεμετρία']]],
@@ -1100,13 +1103,13 @@ const SECT_DESC={home:'τα βήματα με τη σειρά και η εικό
 // Κάθε επόμενη προβολή περιέχει και τις προηγούμενες. Τίποτα δεν σβήνεται· μόνο το πλαϊνό μενού μικραίνει.
 const VIEW_ADD={
   home:['alerts','vulns','upnp','wifi','audit','devs','assess','tri','upd','speed'],
-  student:['feed','ws','academy','proto','cli','vlsm','acl','quiz','pentest','purple','vlab','l2g','iot','mqtt','ssh'],
+  student:['feed','academy','proto','cli','vlsm','acl','quiz','pentest','purple','vlab','l2g','iot','mqtt','ssh'],
   tech:['fleet','avail','hosts','stats','hist','health','tlsa','seg','hunt','rules','topo','chg','cfg','where','docs','expiry','field','flows','snmp','syslog','ipam','lat','ops',
         'sock','soak','remote','camcheck','accept','sites','labels','calc','ot','iotinv','radio','v6','nac','cams','dnsf']};
 const VIEW_ORDER=['home','student','tech','all'],VIEW_NAME={home:['🏠','Σπίτι'],student:['🎓','Μαθητής'],tech:['🧰','Τεχνικός'],all:['🔧','Όλα']};
 const VIEW_TIP={home:'Τα βασικά για το σπίτι: επιθέσεις, συσκευές, Wi‑Fi, έλεγχοι',student:'Σπίτι + πακέτα, Ακαδημία, Cisco Lab, εργαστήρια (CCNA / IoT)',tech:'Μαθητής + υποδομή και εργαλεία τεχνικού πεδίου',all:'Όλες οι οθόνες'};
 function viewSet(v){if(v==='all'||!VIEW_ADD[v])return null;const st=new Set();for(const k of VIEW_ORDER){if(k==='all')break;VIEW_ADD[k].forEach(t=>st.add(t));if(k===v)break}return st}
-let VIEWM='';try{VIEWM=localStorage.getItem('nw-view')||''}catch(e){}
+let VIEWM='';try{VIEWM=localStorage.getItem('nw-menuview')||''}catch(e){}  // (όχι «nw-view»: εκεί η εφαρμογή θυμάται την τελευταία οθόνη)
 if(!VIEW_NAME[VIEWM]){let m='';try{m=localStorage.getItem('nw-mode')||''}catch(e){}VIEWM=m==='tech'?'tech':'student'}
 const ALL_TABS=SECTIONS.flatMap(([,l])=>l.map(([t])=>t));
 const inView=t=>{const st=viewSet(VIEWM);return!st||st.has(t)||t===tab};  // η οθόνη που έχεις ανοιχτή φαίνεται πάντα
@@ -1224,7 +1227,7 @@ function railHTML(){const it=(t,ic,lb)=>`<button data-r="${t}" title="${esc(lb)}
     '<button class="mini" id="rail-mini" title="Σμίκρυνση/άνοιγμα μενού">'+ico('collapse')+'</button>'}
 function buildRail(){$('rail').innerHTML=railHTML();
   $('rail').querySelectorAll('[data-r]').forEach(b=>b.onclick=()=>{const t=b.dataset.r;vt(()=>{if(t!=='map'&&t!=='lan')setView('page');showTab(t)});document.body.classList.remove('rail-open')});
-  $('rail').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{VIEWM=b.dataset.view;try{localStorage.setItem('nw-view',VIEWM)}catch(e){}buildRail()});
+  $('rail').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{VIEWM=b.dataset.view;try{localStorage.setItem('nw-menuview',VIEWM)}catch(e){}buildRail()});
   $('rail-mini').onclick=()=>{const m=document.body.classList.toggle('rail-mini');$('rail-mini').innerHTML=ico(m?'expand':'collapse');try{localStorage.setItem('nw-railmini',m?'1':'0')}catch(e){}};
   if(document.body.classList.contains('rail-mini'))$('rail-mini').innerHTML=ico('expand');
   const rk=view==='page'?tab:view;$('rail').querySelectorAll('[data-r]').forEach(b=>b.classList.toggle('on',b.dataset.r===rk));setAC(S.unread||0)}
@@ -1243,7 +1246,12 @@ function setAC(n){S.unread=n;for(const id of['ac','rac']){const e=$(id);if(e){e.
 document.querySelectorAll('nav > button[data-t]').forEach(b=>b.onclick=()=>showTab(b.dataset.t));
 // μετάβαση με View Transitions (μόνο για κλικ του χρήστη στο μενού· οι υπόλοιπες κλήσεις μένουν σύγχρονες)
 function vt(fn){if(document.startViewTransition&&!reduceMo()&&!document.hidden)try{document.startViewTransition(fn);return}catch(e){}fn()}
+let FEEDV='live';  // καρτέλα μέσα στα 📦 Πακέτα: live = ζωντανά, guide = οδηγός φίλτρων (πρώην οθόνη 🦈 Wireshark)
+function feedView(v){FEEDV=v==='guide'?'guide':'live';$('feed-live').hidden=FEEDV!=='live';$('feed-guide').hidden=FEEDV!=='guide';
+  $('feed-seg').querySelectorAll('[data-fv]').forEach(b=>{b.classList.toggle('on',b.dataset.fv===FEEDV);b.setAttribute('aria-selected',b.dataset.fv===FEEDV)});
+  if(FEEDV==='guide')renderWs()}
 function showTab(t){
+  if(t==='ws'){FEEDV='guide';t='feed';$('t-ws').dataset.drawn=''}  // παλιοί σύνδεσμοι/⌘K: άνοιξε τον οδηγό μέσα στα Πακέτα (και ξανασχεδίασέ τον)
   if(t==='map'||t==='lan'){setView(t);t=SIDE.includes(tab)?tab:'alerts'}
   else if(view!=='page'&&!SIDE.includes(t))setView('page');
   tab=t;document.querySelectorAll('nav [data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
@@ -1441,7 +1449,7 @@ function layersHTML(p){const L=[],pi=portInfo(p.dp)||portInfo(p.sp);
   L.push(['2','Ζεύξη δεδομένων',p.p==='ARP'?'ARP πάνω σε Ethernet/Wi‑Fi':'Ethernet / Wi‑Fi (MAC)',p.p==='ARP'?'Το ARP ζει εδώ: λέει ποια MAC έχει μια IP μέσα στο LAN — χωρίς καμία πιστοποίηση, γι’ αυτό γίνεται ARP spoofing.':'Οι διευθύνσεις MAC ισχύουν μόνο μέχρι το επόμενο «βήμα» (συνήθως τον router).','#ff9f43']);
   L.push(['1','Φυσικό','ραδιοκύματα ή καλώδιο',`${p.l} bytes ταξιδεύουν ως bits.`,'#6d7f99']);
   return `<div style="margin-top:8px"><div class="sm" style="margin-bottom:3px">📚 Τα στρώματα του πακέτου (μοντέλο OSI) — κάθε στρώμα «τυλίγει» το από πάνω:</div>${L.map(([n,name,val,info,c])=>`<div style="border-left:3px solid ${c};background:${c}14;padding:3px 8px;margin:2px 0;border-radius:3px"><b style="color:${c}">L${n} ${name}</b> <code>${esc(val)}</code><div class="sm">${esc(info)}</div></div>`).join('')}</div>`}
-function renderFeed(){if($('fpause').checked&&S.feedEx==null)return;
+function renderFeed(){if($('feed-live').hidden!==(FEEDV!=='live'))feedView(FEEDV);if(FEEDV==='guide'&&!$('t-ws').dataset.drawn)drawWs();if($('fpause').checked&&S.feedEx==null)return;
   let list=S.feed;if($('fbad').checked)list=list.filter(p=>p.x);
   const F=window.WS?WS.compile($('fflt').value):{ok:true},fi=$('fflt');fi.classList.toggle('ok',!!(F.ok&&F.fn));fi.classList.toggle('bad',!F.ok);
   if(F.ok&&F.fn){const n=list.length;list=list.filter(F.fn);$('fflt-st').textContent=`🦈 ${list.length} από ${n} πακέτα ταιριάζουν`}
@@ -1454,8 +1462,9 @@ function renderFeed(){if($('fpause').checked&&S.feedEx==null)return;
 $('fpause').onchange=()=>{if(!$('fpause').checked)S.feedEx=null;renderFeed()};
 try{$('fflt').value=localStorage.getItem('nw-wsf')||''}catch(e){}
 $('fflt').oninput=()=>{try{localStorage.setItem('nw-wsf',$('fflt').value)}catch(e){}S.feedEx=null;renderFeed()};
-$('fflt-x').onclick=()=>{$('fflt').value='';$('fflt').oninput()};$('fflt-ws').onclick=()=>{setView('page');showTab('ws')};
-function setFeedFilter(f){$('fflt').value=f;$('fflt').oninput();showTab('feed')}
+$('fflt-x').onclick=()=>{$('fflt').value='';$('fflt').oninput()};$('fflt-ws').onclick=()=>feedView('guide');
+$('feed-seg').querySelectorAll('[data-fv]').forEach(b=>b.onclick=()=>feedView(b.dataset.fv));
+function setFeedFilter(f){$('fflt').value=f;$('fflt').oninput();FEEDV='live';showTab('feed')}
 $('fbad').onchange=renderFeed;
 
 function verdict(h,al){
@@ -2624,12 +2633,16 @@ function drawWs(){const el=$('t-ws'),en=window.I18N&&I18N.lang==='en',W=window.W
   const f=fold(wsQ),cats=W.SHEET,n=cats.reduce((a,c)=>a+c.items.length,0);
   let h=`<div class="card" style="white-space:normal"><div class="brow"><b style="color:var(--hi)">🦈 Wireshark — σημειώσεις τεχνικού</b><span class="sm">${n} φίλτρα & εντολές</span></div>
     <div class="sm" style="margin-top:3px">Τα <b>display filters</b> (πάνω μπάρα του Wireshark) κρύβουν πακέτα <i>αφού</i> τα πιάσεις· τα <b>capture filters</b> (BPF, tcpdump) αποφασίζουν τι θα πιαστεί. Όσα έχουν <b>▶ Στα πακέτα</b> τα τρέχει και το NetWatch πάνω στη ζωντανή κίνηση.</div>
-    <div class="frow" style="margin-top:8px"><input class="f" id="ws-q" value="${esc(wsQ)}" placeholder="🔎 αναζήτηση: dns, syn, retransmission, http, arp, mqtt…" spellcheck="false" autocomplete="off"></div>
+    <div class="frow" style="margin-top:8px"><input class="f" id="ws-q" value="${esc(wsQ)}" placeholder="🔎 αναζήτηση στον οδηγό: dns, syn, retransmission, http, arp, mqtt…" spellcheck="false" autocomplete="off"></div>
+    <div class="sm" style="margin-top:4px">Εδώ ψάχνεις <b>στον οδηγό</b>, όχι στα πακέτα. Για να δεις πακέτα πάτα <b>▶ Στα πακέτα</b> σε ένα φίλτρο, ή γύρνα στην καρτέλα <b>📦 Ζωντανά πακέτα</b>.</div>
     <div class="chips"><button data-cat="all" class="${wsCat==='all'?'on':''}">Όλα</button>${cats.map(c=>`<button data-cat="${c.id}" class="${wsCat===c.id?'on':''}"><span>${c.icon}</span> <span data-noi18n>${esc(en?c.en:c.el)}</span></button>`).join('')}</div></div>`;
   let shown=0;
   for(const c of cats){if(wsCat!=='all'&&wsCat!==c.id)continue;const its=c.items.filter(([code,a,b])=>!f||fold(code+' '+a+' '+b).includes(f));if(!its.length)continue;shown+=its.length;
     h+=`<h3>${c.icon} <span data-noi18n>${esc(en?c.en:c.el)}</span> <span class="sm">· ${its.length}</span></h3><div class="wsg">`+its.map(([code,a,b])=>{const lv=c.kind==='display'&&W.live(code);
       return`<div class="wsi"><code>${esc(code)}</code><div class="sm" data-noi18n>${esc(en?b:a)}</div><div class="row"><button class="b" data-wcopy="${esc(code)}" title="Αντιγραφή">📋</button>${lv?`<button class="b" data-wlive="${esc(code)}" title="Εφάρμοσε στα ζωντανά πακέτα">▶ Στα πακέτα</button>`:''}</div></div>`}).join('')+'</div>';}
+  // έγραψες IP ή έτοιμο φίλτρο στον οδηγό; μάλλον ήθελες να ψάξεις στα πακέτα — πρόσφερέ το με ένα κουμπί
+  const q0=wsQ.trim(),asF=/^\d{1,3}(\.\d{1,3}){3}(\/\d{1,2})?$/.test(q0)?'ip.addr == '+q0:(q0&&/[.=<>!&|]/.test(q0)&&W.live(q0)?q0:'');
+  if(asF)h+=`<div class="card" style="white-space:normal;border-color:var(--cyan)"><b>🔎 <span>Ψάχνεις πακέτα;</span></b> <span class="sm">Αυτό μοιάζει με φίλτρο, όχι με λέξη του οδηγού.</span> <button class="b" data-wlive="${esc(asF)}">▶ <span>Δείξε τα ζωντανά πακέτα για</span> <code data-noi18n>${esc(asF)}</code></button></div>`;
   if(!shown)h+=`<div class="empty">Τίποτα για «${esc(wsQ)}».</div>`;
   h+=`<h3>🧩 Τελεστές</h3><div class="card"><table><tbody>${W.OPS_HELP.map(([o,a,b])=>`<tr><td><code>${esc(o)}</code></td><td data-noi18n>${esc(en?b:a)}</td></tr>`).join('')}</tbody></table>
     <div class="sm" style="margin-top:6px;white-space:normal">Παράδειγμα: <code>ip.addr == 192.168.1.0/24 && tcp.port in {22 80 443} && !(tcp.flags.reset == 1)</code></div></div>`;

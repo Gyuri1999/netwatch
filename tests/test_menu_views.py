@@ -45,3 +45,18 @@ def test_every_menu_group_is_in_the_rail_order():
     for part in order.groups():
         idx = sorted(int(x) for x in re.findall(r"\b(\d+)\b", part))
         assert idx == list(range(n)), f"λείπει ή περισσεύει ομάδα: {idx} (υπάρχουν {n})"
+
+
+def test_wireshark_guide_lives_inside_packets():
+    """🦈 Wireshark δεν είναι πια ξεχωριστή οθόνη: είναι καρτέλα μέσα στα 📦 Πακέτα, και οι παλιοί σύνδεσμοι δουλεύουν."""
+    assert "ws" not in _tabs() and "feed" in _tabs()
+    feed = HTML[HTML.index('id="t-feed"'):HTML.index('id="t-det"')]
+    assert 'id="t-ws"' in feed and 'data-fv="live"' in feed and 'data-fv="guide"' in feed
+    assert "if(t==='ws'){FEEDV='guide';t='feed'" in HTML          # ?tab=ws, ⌘K και παλιά κουμπιά
+    assert "FEEDV='live';showTab('feed')" in HTML                 # «▶ Στα πακέτα» γυρνά στα ζωντανά
+
+
+def test_menu_view_has_its_own_storage_key():
+    """Το «nw-view» κρατά την τελευταία οθόνη· η προβολή μενού δεν πρέπει να το πατάει (χανόταν η επιλογή)."""
+    assert "getItem('nw-menuview')" in HTML and "setItem('nw-menuview',VIEWM)" in HTML
+    assert "setItem('nw-view',VIEWM)" not in HTML
