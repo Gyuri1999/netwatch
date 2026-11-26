@@ -11,7 +11,9 @@ const INIT = () => {
   };
   let FAV = LS.get('nw-fav', []), REC = LS.get('nw-recent', []), COL = LS.get('nw-railcol', {});
   const known = t => t === 'home' || (typeof SECT_NAME !== 'undefined' && SECT_NAME[t]);
-  FAV = FAV.filter(known); REC = REC.filter(known);
+  // οθόνες που ανήκουν σε ομάδα (π.χ. IPAM → Συσκευές) μετράνε ως η «κεφαλή» τους: μία γραμμή στα πρόσφατα, όχι πέντε
+  const head = t => (typeof GROUP_OF !== 'undefined' && GROUP_OF[t]) || t;
+  FAV = FAV.filter(known); REC = [...new Set(REC.filter(known).map(head))];
 
   const css = document.createElement('style');
   css.textContent = `
@@ -100,6 +102,7 @@ body.rail-mini #rail button.np-h{display:flex}
     window.showTab = function (t) {
       const r = origShow.apply(this, arguments);
       try {
+        t = head(t);
         if (t && t !== 'map' && t !== 'lan' && known(t) && REC[0] !== t) {
           const was = REC.slice(0, 5).join();
           REC = [t].concat(REC.filter(x => x !== t)).slice(0, 8); LS.set('nw-recent', REC);
