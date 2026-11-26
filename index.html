@@ -1113,7 +1113,12 @@ let VIEWM='';try{VIEWM=localStorage.getItem('nw-menuview')||''}catch(e){}  // (�
 if(!VIEW_NAME[VIEWM]){let m='';try{m=localStorage.getItem('nw-mode')||''}catch(e){}VIEWM=m==='tech'?'tech':'student'}
 // 🗂 Ομάδες οθονών: πολλές οθόνες για το ίδιο πράγμα γίνονται ΜΙΑ στο μενού, με καρτέλες στην κορυφή της σελίδας.
 // Η πρώτη είναι η «κεφαλή» (αυτή φαίνεται στο μενού)· οι υπόλοιπες ανοίγουν από τις καρτέλες, το ⌘K και τους παλιούς συνδέσμους.
-const TAB_GROUPS={devs:[['devs','📟 Συνδεδεμένες τώρα'],['fleet','🧩 Οι δικές μου'],['iot','🔌 Ασφάλεια IoT'],['iotinv','📦 Απογραφή IoT'],['ipam','🗂 Διευθύνσεις IP']]};
+const TAB_GROUPS={
+  devs:[['devs','📟 Συνδεδεμένες τώρα'],['fleet','🧩 Οι δικές μου'],['iot','🔌 Ασφάλεια IoT'],['iotinv','📦 Απογραφή IoT'],['ipam','🗂 Διευθύνσεις IP']],
+  wifi:[['wifi','☕ Είμαι ασφαλής;'],['speed','🚀 Ταχύτητα & κανάλι'],['radio','📻 Ασύρματα IoT']],
+  hist:[['hist','🕓 Παλιές ειδοποιήσεις'],['tm','⏱ Μηχανή του χρόνου'],['stats','📊 Στατιστικά']],
+  cams:[['cams','📹 Έλεγχος έκθεσης'],['camcheck','📷 Παράδοση καμερών']],
+  academy:[['academy','🎓 Μαθήματα'],['learn','📚 Πώς δουλεύουν οι επιθέσεις'],['tips','💡 Συμβουλές'],['quiz','❓ Κουίζ']]};
 const GROUP_OF={};Object.entries(TAB_GROUPS).forEach(([h,l])=>l.forEach(([t])=>GROUP_OF[t]=h));
 const inMenu=t=>!GROUP_OF[t]||GROUP_OF[t]===t;  // μέλη ομάδας (εκτός από την κεφαλή) δεν έχουν δική τους γραμμή στο μενού
 const ALL_TABS=SECTIONS.flatMap(([,l])=>l.map(([t])=>t)).filter(inMenu);

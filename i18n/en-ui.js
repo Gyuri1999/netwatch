@@ -3036,7 +3036,13 @@ I18N.add({
   "📟 Συνδεδεμένες τώρα": "📟 Connected now",
   "🧩 Οι δικές μου": "🧩 My own",
   "🔌 Ασφάλεια IoT": "🔌 IoT security",
-  "🗂 Διευθύνσεις IP": "🗂 IP addresses"
+  "🗂 Διευθύνσεις IP": "🗂 IP addresses",
+  "☕ Είμαι ασφαλής;": "☕ Am I safe?",
+  "🚀 Ταχύτητα & κανάλι": "🚀 Speed & channel",
+  "🕓 Παλιές ειδοποιήσεις": "🕓 Past alerts",
+  "📹 Έλεγχος έκθεσης": "📹 Exposure check",
+  "🎓 Μαθήματα": "🎓 Lessons",
+  "📚 Πώς δουλεύουν οι επιθέσεις": "📚 How attacks work"
  },
  "patterns": [
   [
