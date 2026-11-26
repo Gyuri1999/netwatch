@@ -208,7 +208,7 @@ def scan(path, sim=False, history=True):
         text = _read(fp)
         if not text:
             continue
-        rel = os.path.relpath(fp, root)
+        rel = os.path.relpath(fp, root).replace(os.sep, "/")  # ίδιο σε Windows: src/main.cpp
         for n, kind, label, sev, val in scan_text(text):
             f = fingerprint(val)
             if f in by_fp:  # το ίδιο κλειδί και αλλού: μία γραμμή, «+N σημεία»
