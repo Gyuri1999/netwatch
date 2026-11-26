@@ -62,13 +62,30 @@ def test_menu_view_has_its_own_storage_key():
     assert "setItem('nw-view',VIEWM)" not in HTML
 
 
-def test_device_lists_are_one_menu_entry_with_tabs():
-    """Οι 5 λίστες συσκευών είναι μία γραμμή στο μενού («Συσκευές») με καρτέλες· οι οθόνες μένουν και ανοίγουν από εκεί."""
-    grp = re.search(r"const TAB_GROUPS=\{devs:\[(.*?)\]\]\};", HTML).group(1)
-    ids = re.findall(r"\['([a-z0-9_]+)','", grp)
-    assert ids == ["devs", "fleet", "iot", "iotinv", "ipam"]
-    for t in ids:
-        assert t in _tabs() and f'id="t-{t}"' in HTML          # καμία οθόνη δεν χάθηκε
+def _groups():
+    blk = HTML[HTML.index("const TAB_GROUPS={"):HTML.index("const GROUP_OF")]
+    return {h: re.findall(r"\['([a-z0-9_]+)','", body) for h, body in re.findall(r"(\w+):\[(\[.*?\])\]", blk)}
+
+
+def test_screen_groups_are_one_menu_entry_with_tabs():
+    """Όμοιες οθόνες είναι μία γραμμή στο μενού με καρτέλες· οι οθόνες μένουν και ανοίγουν από εκεί."""
+    g = _groups()
+    assert g["devs"] == ["devs", "fleet", "iot", "iotinv", "ipam"]
+    assert g["wifi"] == ["wifi", "speed", "radio"] and g["hist"] == ["hist", "tm", "stats"]
+    assert g["cams"] == ["cams", "camcheck"] and g["academy"] == ["academy", "learn", "tips", "quiz"]
+    seen = []
+    for head, ids in g.items():
+        assert ids[0] == head                                      # η κεφαλή είναι πρώτη (αυτή φαίνεται στο μενού)
+        for t in ids:
+            assert t in _tabs() and f'id="t-{t}"' in HTML          # καμία οθόνη δεν χάθηκε
+            assert t not in seen, f"η οθόνη {t} είναι σε δύο ομάδες"
+            seen.append(t)
     rail = HTML[HTML.index("function railHTML"):HTML.index("function buildRail")]
     assert "inMenu(t)" in rail and 'id="ph-seg"' in HTML
     assert "#ph-seg[hidden]{display:none}" in HTML                # το .seg είναι flex: χωρίς αυτό δεν κρύβεται
+
+
+def test_every_view_can_reach_its_group_heads():
+    """Κάθε κεφαλή ομάδας ανήκει σε κάποια προβολή — αλλιώς η ομάδα θα φαινόταν μόνο στο «Όλα»."""
+    in_views = {t for ids in _views().values() for t in ids}
+    assert set(_groups()) <= in_views
