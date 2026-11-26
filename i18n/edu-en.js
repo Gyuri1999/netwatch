@@ -256,14 +256,14 @@ window.NW_EDU_EN = {
       what: "A device at home contacted a server in a country it had never talked to before, after 24 hours during which NetWatch was learning its habits.",
       how: "Usually: a firmware/app update, a new CDN. It is suspicious when it is an IoT device (ESP32, camera) that normally only talks to the broker or to one cloud server.",
       risk: "An infected device “phoning” its control server or sending data out.",
-      todo: ["Click the destination IP: who is it (WHOIS, AbuseIPDB)?", "If it is IoT and you didn't expect this: isolate it (🚫 Block) and re-flash the firmware", "IoT devices should reach the Internet only where needed (VLAN + ACL)"]
+      todo: ["Click the destination IP: who is it (WHOIS, AbuseIPDB)?", "If it is IoT and you didn't expect this: isolate it (🚫 Blocked IPs) and re-flash the firmware", "IoT devices should reach the Internet only where needed (VLAN + ACL)"]
     },
     'Καναρίνι ESP32': {
       t: "Someone touched the ESP32 “canary”", lvl: "Attack",
       what: "An ESP32 pretending to be a forgotten camera/IoT device (Telnet, admin page) received a connection. No legitimate person has any reason to touch it.",
       how: "Scanners (nmap, masscan) and Mirai-type botnets look for IoT devices with open Telnet/web and try default passwords. The canary lures them in and alerts you.",
       risk: "The device that touched it is scanning your network: either someone is using it, or it is infected.",
-      todo: ["Find which device the IP is (📟 Devices)", "If it wasn't your own test: block it (🚫 Block) and change the Wi‑Fi password", "If it is IoT: reset, new firmware, new passwords", "Keep IoT on its own VLAN (CCNA lesson)"]
+      todo: ["Find which device the IP is (📟 Devices)", "If it wasn't your own test: block it (🚫 Blocked IPs) and change the Wi‑Fi password", "If it is IoT: reset, new firmware, new passwords", "Keep IoT on its own VLAN (CCNA lesson)"]
     },
     'OTA απορρίφθηκε': {
       t: "An ESP32 refused a firmware update", lvl: "Attack",
@@ -284,14 +284,14 @@ window.NW_EDU_EN = {
       what: "A device on your network connected to a node of the Tor network (from the node list or on port 9001/9030).",
       how: "Tor hides who you are talking to. Tor Browser and privacy apps use it — but so do malware/botnets to hide their control server (C2).",
       risk: "On your own Mac with Tor Browser: none. On an ESP32, camera, smart plug or Pi that you didn't set up for Tor: infection is very likely.",
-      todo: ["Find which device it is (📟 Devices)", "If it is IoT: isolate it (🚫 Block), reset and flash new firmware", "If it is a Pi/server: ps aux | grep tor — who started it?", "Block IoT from the Internet with VLAN/firewall (VLAN for IoT lesson)"]
+      todo: ["Find which device it is (📟 Devices)", "If it is IoT: isolate it (🚫 Blocked IPs), reset and flash new firmware", "If it is a Pi/server: ps aux | grep tor — who started it?", "Block IoT from the Internet with VLAN/firewall (VLAN for IoT lesson)"]
     },
     'Κίνηση από κόμβο Tor': {
       t: "Incoming traffic from a Tor exit node", lvl: "Information",
       what: "Someone connected to you from a Tor exit node — meaning their real IP is hidden.",
       how: "Scanners, bots and attackers often use Tor so you can't see where they come from.",
       risk: "A problem only if the port they hit is open to the Internet.",
-      todo: ["Check what you have open to the outside (🛡 Audit → Shodan)", "Don't port-forward IoT; prefer a VPN or an onion service (lesson in the Academy)"]
+      todo: ["Check what you have open to the outside (🩺 Security audit → Shodan)", "Don't port-forward IoT; prefer a VPN or an onion service (lesson in the Academy)"]
     },
     'Διαρροή DNS εκτός VPN': {
       t: "DNS leak", lvl: "Privacy",

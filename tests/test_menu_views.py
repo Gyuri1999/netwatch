@@ -89,3 +89,21 @@ def test_every_view_can_reach_its_group_heads():
     """Κάθε κεφαλή ομάδας ανήκει σε κάποια προβολή — αλλιώς η ομάδα θα φαινόταν μόνο στο «Όλα»."""
     in_views = {t for ids in _views().values() for t in ids}
     assert set(_groups()) <= in_views
+
+
+def test_every_screen_has_its_own_emoji():
+    """Ένα εικονίδιο = μία οθόνη: το ίδιο emoji σε 3–4 οθόνες (π.χ. 🔌, 🛡, 🔎) μπέρδευε όποιον ψάχνει με το μάτι."""
+    blk = HTML[HTML.index("const SECTIONS=["):HTML.index("const SECT_NAME")]
+    names = re.findall(r"\['[a-z0-9_]+','([^']+)','", blk)
+    emoji = [n.split(" ")[0] for n in names]
+    dup = sorted({e for e in emoji if emoji.count(e) > 1})
+    assert not dup, f"emoji σε πάνω από μία οθόνη: {dup}"
+    assert all(" " in n and len(n.split(" ", 1)[1]) >= 3 for n in names)   # emoji + όνομα
+
+
+def test_group_tabs_use_the_same_emoji_as_their_screen():
+    blk = HTML[HTML.index("const SECTIONS=["):HTML.index("const SECT_NAME")]
+    screen = {t: n.split(" ")[0] for t, n in re.findall(r"\['([a-z0-9_]+)','([^']+)','", blk)}
+    grp = HTML[HTML.index("const TAB_GROUPS={"):HTML.index("const GROUP_OF")]
+    for t, label in re.findall(r"\['([a-z0-9_]+)','([^']+)'\]", grp):
+        assert label.split(" ")[0] == screen[t], f"η καρτέλα {t} έχει άλλο emoji από την οθόνη της"
