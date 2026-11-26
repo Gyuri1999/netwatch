@@ -53,7 +53,7 @@ PLACEHOLDER = re.compile(r"(?i)^(?:x+|\*+|\.+|-+|0+|1234\w*|password\d*|passwd|p
                          r"your[_-]?\w*|my[_-]?\w*|<[^>]*>|\$\{[^}]*\}|\$\w+|%\w+%|\{\{[^}]*\}\}|todo|fixme|none|null|"
                          r"test\w*|dummy\w*|placeholder|replace\w*|enter\w*|insert\w*|xxx\w*|abc\w*|foo\w*|bar)$")
 # …και «οδηγίες» αντί για τιμή: change-me-…, long-random-…, put-your-…, ή ελληνικά («μακρύς-τυχαίος-κωδικός»)
-PLACEHOLDER_PREFIX = re.compile(r"(?i)^(?:change[-_]?me|app[-_]?pass\w*|long|random|put|set|generate|replace|your|my|some|one|new|insert|enter)[-_ ]")
+PLACEHOLDER_PREFIX = re.compile(r"(?i)^(?:change[-_]?me|app[-_]?pass\w*|long|random|put|set|generate|replace|your|my|some|one|new|insert|enter)(?:[-_ ]|$)")
 GREEK = re.compile(r"[Ͱ-Ͽἀ-῿]")
 CODE_REF = re.compile(r"(?i)(?:os\.environ|getenv|process\.env|env\(|settings\.|config\[|\.get\()")
 
