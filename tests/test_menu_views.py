@@ -60,3 +60,15 @@ def test_menu_view_has_its_own_storage_key():
     """Το «nw-view» κρατά την τελευταία οθόνη· η προβολή μενού δεν πρέπει να το πατάει (χανόταν η επιλογή)."""
     assert "getItem('nw-menuview')" in HTML and "setItem('nw-menuview',VIEWM)" in HTML
     assert "setItem('nw-view',VIEWM)" not in HTML
+
+
+def test_device_lists_are_one_menu_entry_with_tabs():
+    """Οι 5 λίστες συσκευών είναι μία γραμμή στο μενού («Συσκευές») με καρτέλες· οι οθόνες μένουν και ανοίγουν από εκεί."""
+    grp = re.search(r"const TAB_GROUPS=\{devs:\[(.*?)\]\]\};", HTML).group(1)
+    ids = re.findall(r"\['([a-z0-9_]+)','", grp)
+    assert ids == ["devs", "fleet", "iot", "iotinv", "ipam"]
+    for t in ids:
+        assert t in _tabs() and f'id="t-{t}"' in HTML          # καμία οθόνη δεν χάθηκε
+    rail = HTML[HTML.index("function railHTML"):HTML.index("function buildRail")]
+    assert "inMenu(t)" in rail and 'id="ph-seg"' in HTML
+    assert "#ph-seg[hidden]{display:none}" in HTML                # το .seg είναι flex: χωρίς αυτό δεν κρύβεται

@@ -199,7 +199,7 @@ body.rail-mini #rail .rv{grid-template-columns:1fr}body.rail-mini #rail .rv-n{di
 body.rail-mini #rail{width:54px}body.rail-mini #rail .lb,body.rail-mini #rail .rg{display:none}
 body.rail-mini #rail .rg+button{margin-top:10px}body.rail-mini #rail .cnt{position:absolute;top:0;right:0;margin:0}
 .railbtn{display:none;background:none;border:1px solid var(--line);color:var(--txt);border-radius:6px;font-size:16px;padding:2px 8px;cursor:pointer}
-#pagehead{display:none}
+#pagehead{display:none}#ph-seg[hidden]{display:none}#pagehead #ph-seg{margin:0 auto 10px}
 body.v-page #viz{display:none}
 body.v-page aside{flex:1;width:auto;border-left:0;background:var(--bg)}
 body.v-page nav{display:none}
@@ -703,7 +703,7 @@ html.nomo .badge.live{animation:none!important}
       <button data-t="feed">📦 Πακέτα</button>
       <button id="map-btn" class="mapbtn" title="Απόκρυψη/εμφάνιση χάρτη">🗺</button>
     </nav>
-    <div id="pagehead"><h2 id="ph-t"></h2><div id="ph-d"></div></div>
+    <div id="pagehead"><h2 id="ph-t"></h2><div id="ph-d"></div><div class="seg" id="ph-seg" role="tablist" hidden></div></div>
     <div class="tab" id="t-alerts"><div class="empty">Καμία επίθεση ακόμα. Παρακολουθώ… 👀</div></div>
     <div class="tab" id="t-hosts">
       <input class="f" id="hf" placeholder="φίλτρο: IP, domain, χώρα, ISP…">
@@ -1111,8 +1111,13 @@ const VIEW_TIP={home:'Τα βασικά για το σπίτι: επιθέσει
 function viewSet(v){if(v==='all'||!VIEW_ADD[v])return null;const st=new Set();for(const k of VIEW_ORDER){if(k==='all')break;VIEW_ADD[k].forEach(t=>st.add(t));if(k===v)break}return st}
 let VIEWM='';try{VIEWM=localStorage.getItem('nw-menuview')||''}catch(e){}  // (όχι «nw-view»: εκεί η εφαρμογή θυμάται την τελευταία οθόνη)
 if(!VIEW_NAME[VIEWM]){let m='';try{m=localStorage.getItem('nw-mode')||''}catch(e){}VIEWM=m==='tech'?'tech':'student'}
-const ALL_TABS=SECTIONS.flatMap(([,l])=>l.map(([t])=>t));
-const inView=t=>{const st=viewSet(VIEWM);return!st||st.has(t)||t===tab};  // η οθόνη που έχεις ανοιχτή φαίνεται πάντα
+// 🗂 Ομάδες οθονών: πολλές οθόνες για το ίδιο πράγμα γίνονται ΜΙΑ στο μενού, με καρτέλες στην κορυφή της σελίδας.
+// Η πρώτη είναι η «κεφαλή» (αυτή φαίνεται στο μενού)· οι υπόλοιπες ανοίγουν από τις καρτέλες, το ⌘K και τους παλιούς συνδέσμους.
+const TAB_GROUPS={devs:[['devs','📟 Συνδεδεμένες τώρα'],['fleet','🧩 Οι δικές μου'],['iot','🔌 Ασφάλεια IoT'],['iotinv','📦 Απογραφή IoT'],['ipam','🗂 Διευθύνσεις IP']]};
+const GROUP_OF={};Object.entries(TAB_GROUPS).forEach(([h,l])=>l.forEach(([t])=>GROUP_OF[t]=h));
+const inMenu=t=>!GROUP_OF[t]||GROUP_OF[t]===t;  // μέλη ομάδας (εκτός από την κεφαλή) δεν έχουν δική τους γραμμή στο μενού
+const ALL_TABS=SECTIONS.flatMap(([,l])=>l.map(([t])=>t)).filter(inMenu);
+const inView=t=>{const st=viewSet(VIEWM);return!st||st.has(t)||t===(GROUP_OF[tab]||tab)};  // η οθόνη που έχεις ανοιχτή φαίνεται πάντα
 const viewHidden=()=>{const st=viewSet(VIEWM);return st?ALL_TABS.filter(t=>!st.has(t)).length:0};
 const RAIL_TOP=[['map','🗺','Ζωντανός χάρτης'],['lan','🏠','Δίκτυο σπιτιού'],['alerts','⚠','Επιθέσεις']];
 // Εικονίδια: SVG γραμμής 24×24 (στυλ Lucide), ίδια σε κάθε σύστημα — τα emoji μένουν μόνο στο περιεχόμενο
@@ -1218,7 +1223,7 @@ let MODE='';try{MODE=localStorage.getItem('nw-mode')||''}catch(e){}
 const RAIL_ORDER={tech:['live',2,1,3,4,0,5,6],learn:[6,'live',0,1,2,3,5,4]};
 function railHTML(){const it=(t,ic,lb)=>`<button data-r="${t}" title="${esc(lb)}"><span class="ic">${ico(t)||ic}</span><span class="lb">${esc(lb)}</span>${t==='alerts'?'<span class="cnt" id="rac" style="display:none"></span>':''}</button>`;
   const split=n=>{const m=n.match(/^(\S+)\s+(.+)$/);return m?[m[1],m[2]]:['•',n]};
-  const grp=([g,l])=>{const vis=l.filter(([t])=>t!=='alerts'&&t!=='det'&&inView(t));  // άδεια ομάδα: ούτε ο τίτλος της· τα 📦 Πακέτα φαίνονται πλέον στο μενού
+  const grp=([g,l])=>{const vis=l.filter(([t])=>t!=='alerts'&&t!=='det'&&inMenu(t)&&inView(t));  // άδεια ομάδα: ούτε ο τίτλος της· τα 📦 Πακέτα φαίνονται πλέον στο μενού
     return vis.length?`<div class="rg">${esc(g.replace(/^\S+\s+/,''))}</div>`+vis.map(([t,n])=>it(t,...split(n))).join(''):''};
   const hid=viewHidden();
   const chooser=`<div class="rg">Προβολή μενού</div><div class="rv" role="group" aria-label="Προβολή μενού">${VIEW_ORDER.map(v=>`<button data-view="${v}" class="${v===VIEWM?'on':''}" title="${esc(VIEW_TIP[v])}" aria-pressed="${v===VIEWM}"><span class="ic">${VIEW_NAME[v][0]}</span><span class="lb">${VIEW_NAME[v][1]}</span></button>`).join('')}</div>`+
@@ -1230,7 +1235,7 @@ function buildRail(){$('rail').innerHTML=railHTML();
   $('rail').querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>{VIEWM=b.dataset.view;try{localStorage.setItem('nw-menuview',VIEWM)}catch(e){}buildRail()});
   $('rail-mini').onclick=()=>{const m=document.body.classList.toggle('rail-mini');$('rail-mini').innerHTML=ico(m?'expand':'collapse');try{localStorage.setItem('nw-railmini',m?'1':'0')}catch(e){}};
   if(document.body.classList.contains('rail-mini'))$('rail-mini').innerHTML=ico('expand');
-  const rk=view==='page'?tab:view;$('rail').querySelectorAll('[data-r]').forEach(b=>b.classList.toggle('on',b.dataset.r===rk));setAC(S.unread||0)}
+  const rk=view==='page'?(GROUP_OF[tab]||tab):view;$('rail').querySelectorAll('[data-r]').forEach(b=>b.classList.toggle('on',b.dataset.r===rk));setAC(S.unread||0)}
 function setMode(m){MODE=m;try{localStorage.setItem('nw-mode',m)}catch(e){}
   document.body.classList.toggle('mode-tech',m==='tech');document.body.classList.toggle('mode-learn',m!=='tech');
   $('mode-btn').innerHTML=m==='tech'?ico('tech')+'<span class="ml">Τεχνικός</span>':ico('academy')+'<span class="ml">Μαθαίνω</span>';$('mode-btn').title=m==='tech'?'Λειτουργία τεχνικού: πυκνή εικόνα, γρήγορα εργαλεία. Πάτα για «Μαθαίνω».':'Λειτουργία μάθησης: εξηγήσεις και οδηγός. Πάτα για «Τεχνικός».';
@@ -1255,8 +1260,13 @@ function showTab(t){
   if(t==='map'||t==='lan'){setView(t);t=SIDE.includes(tab)?tab:'alerts'}
   else if(view!=='page'&&!SIDE.includes(t))setView('page');
   tab=t;document.querySelectorAll('nav [data-t]').forEach(b=>b.classList.toggle('on',b.dataset.t===t));
-  const rk=view==='page'?t:view;$('rail').querySelectorAll('[data-r]').forEach(b=>b.classList.toggle('on',b.dataset.r===rk));
-  $('ph-t').innerHTML=ico(t)+'<span>'+esc(noEmoji(t==='home'?'🧭 Αρχική':SECT_NAME[t]||''))+'</span>';$('ph-d').textContent=t==='home'&&MODE==='tech'?'η εικόνα του δικτύου με μια ματιά · γρήγορα εργαλεία · ⌘K για εντολές':SECT_DESC[t]||'';
+  const gh=GROUP_OF[t]||t;  // κεφαλή ομάδας (π.χ. IPAM → Συσκευές): αυτή φωτίζεται στο μενού και δίνει τον τίτλο
+  if(gh!==t&&view==='page'&&!$('rail').querySelector(`[data-r="${gh}"]`))buildRail();
+  const rk=view==='page'?gh:view;$('rail').querySelectorAll('[data-r]').forEach(b=>b.classList.toggle('on',b.dataset.r===rk));
+  const sg=$('ph-seg'),gl=TAB_GROUPS[gh];sg.hidden=!gl;
+  if(gl){sg.innerHTML=gl.map(([k,n])=>`<button data-gt="${k}" role="tab" aria-selected="${k===t}" class="${k===t?'on':''}">${esc(n)}</button>`).join('');
+    sg.querySelectorAll('[data-gt]').forEach(b=>b.onclick=()=>showTab(b.dataset.gt))}
+  $('ph-t').innerHTML=ico(gh)+'<span>'+esc(noEmoji(t==='home'?'🧭 Αρχική':SECT_NAME[gh]||''))+'</span>';$('ph-d').textContent=t==='home'&&MODE==='tech'?'η εικόνα του δικτύου με μια ματιά · γρήγορα εργαλεία · ⌘K για εντολές':SECT_DESC[t]||'';
   try{localStorage.setItem('nw-view',view+'|'+t)}catch(e){}
   const changed=!$('t-'+t).classList.contains('on');
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x.id==='t-'+t));

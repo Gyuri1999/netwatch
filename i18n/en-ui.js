@@ -3032,7 +3032,11 @@ I18N.add({
   "Εδώ ψάχνεις": "Here you search",
   "στον οδηγό": "the guide",
   ", όχι στα πακέτα. Για να δεις πακέτα πάτα": ", not the packets. To see packets press",
-  "σε ένα φίλτρο, ή γύρνα στην καρτέλα": "on a filter, or go back to the tab"
+  "σε ένα φίλτρο, ή γύρνα στην καρτέλα": "on a filter, or go back to the tab",
+  "📟 Συνδεδεμένες τώρα": "📟 Connected now",
+  "🧩 Οι δικές μου": "🧩 My own",
+  "🔌 Ασφάλεια IoT": "🔌 IoT security",
+  "🗂 Διευθύνσεις IP": "🗂 IP addresses"
  },
  "patterns": [
   [
