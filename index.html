@@ -215,6 +215,9 @@ body.rail-mini #rail .rv{grid-template-columns:1fr}body.rail-mini #rail .rv-n{di
 body.rail-mini #rail{width:54px}body.rail-mini #rail .lb,body.rail-mini #rail .rg{display:none}
 body.rail-mini #rail .rg+button{margin-top:10px}body.rail-mini #rail .cnt{position:absolute;top:0;right:0;margin:0}
 .railbtn{display:none;background:none;border:1px solid var(--line);color:var(--txt);border-radius:6px;font-size:16px;padding:2px 8px;cursor:pointer}
+/* 🔌 Χάθηκε η σύνδεση με τον server: μπάρα κάτω από την κεφαλίδα μέχρι να ξανασυνδεθεί */
+#conn-bar{position:fixed;top:52px;left:0;right:0;z-index:150;display:flex;gap:12px;align-items:center;justify-content:center;flex-wrap:wrap;padding:9px 16px;background:color-mix(in srgb,var(--orange) 24%,var(--bg2));border-bottom:1px solid var(--orange);color:var(--hi);font-size:13.5px;box-shadow:0 8px 24px -12px #000a}
+#conn-bar[hidden]{display:none}#conn-bar .cb-ic{font-size:18px}#conn-bar .cb-s{color:var(--txt)}body.noc #conn-bar{top:0}body.conn-down main{padding-top:42px}  /* η μπάρα δεν σκεπάζει τον τίτλο της σελίδας */
 #pagehead{display:none}#ph-seg[hidden]{display:none}
 /* 🎨 Χρώμα ανά ομάδα του μενού: βρίσκεις την ομάδα με το μάτι, πριν διαβάσεις (0 Προστασία · 1 Το δίκτυό μου · 2 Εργαλεία · 3 Υποδομή · 4 Τεχνικός πεδίου · 5 Ασφάλεια · 6 Μάθηση) */
 .gc-0{--gc:#ff6b81}.gc-1{--gc:#4cc9ff}.gc-2{--gc:#b794f6}.gc-3{--gc:#ffa94d}.gc-4{--gc:#ffd43b}.gc-5{--gc:#38d9a9}.gc-6{--gc:#69db7c}
@@ -1757,6 +1760,7 @@ function addAlert(a,quiet){S.alerts.unshift(a);if(quiet)return;
     $('flash').style.boxShadow='inset 0 0 80px 10px #ff3b5c88';setTimeout(()=>$('flash').style.boxShadow='inset 0 0 0 0 #ff3b5c',600)}
   bumpNum('na',S.alerts.length);updStatus()}
 function updStatus(){const now=Date.now()/1000,rec=S.alerts.filter(a=>now-a.t<300&&!a.lab&&!a.selftest),el=$('status');
+  if(typeof CONN!=='undefined'&&CONN&&CONN.down){el.className='st-warn';el.textContent=TT('⏸ Χωρίς σύνδεση','⏸ Offline');return}  // όχι «Όλα καλά» όταν δεν ξέρουμε
   if(rec.some(a=>a.sev==='high')){el.className='st-bad';el.textContent='⚠ ΕΝΕΡΓΗ ΑΠΕΙΛΗ'}
   else if(rec.length){el.className='st-warn';el.textContent='! Ύποπτη δραστηριότητα'}
   else{el.className='st-ok';el.textContent='✓ Όλα καλά'}}
@@ -2158,7 +2162,22 @@ setInterval(()=>{if(tab==='feed'&&!$('fpause').checked)renderFeed()},700);
 setInterval(()=>{if(tab==='audit')loadAudit()},3000);
 setInterval(()=>{if(tab==='hist')loadHist()},10000);
 setInterval(()=>{if(tabHover())return;if(tab==='hosts')renderHosts();else if(tab==='det')renderDet();else if(tab==='devs')renderDevs();else if(tab==='stats')renderStats();else if(tab==='tips')renderTips()},2000);
-function connect(){const es=new EventSource('/events');es.onmessage=e=>handle(JSON.parse(e.data));es.onerror=()=>{es.close();setTimeout(connect,2000)}}
+// 🔌 Σύνδεση με τον server. Αν χαθεί, το λέμε καθαρά: όχι «✓ Όλα καλά» πάνω από παγωμένα, παλιά δεδομένα.
+var CONN={down:false,since:0,tries:0,timer:null,es:null};
+function connBar(){let b=$('conn-bar');document.body.classList.toggle('conn-down',CONN.down);if(!CONN.down){if(b)b.hidden=true;return}
+  if(!b){b=document.createElement('div');b.id='conn-bar';b.setAttribute('role','alert');b.dataset.noi18n='';document.body.appendChild(b)}
+  const sec=Math.round((Date.now()-CONN.since)/1000);b.hidden=false;
+  b.innerHTML=`<span class="cb-ic">⚠</span><span><b>${TT('Χάθηκε η σύνδεση με το NetWatch','Lost connection to NetWatch')}</b> <span class="cb-s">${TT(`Όσα βλέπεις μπορεί να είναι παλιά. Ξαναδοκιμάζω μόνο μου… (${sec}″ χωρίς σύνδεση)`,`What you see may be out of date. Retrying automatically… (${sec}s offline)`)}</span></span><button class="b" id="conn-retry">${TT('Δοκίμασε τώρα','Retry now')}</button>`;
+  $('conn-retry').onclick=()=>{clearTimeout(CONN.timer);connect()}}
+function connDown(){if(!CONN.since)CONN.since=Date.now();CONN.tries++;connTick()}
+function connTick(){if(CONN.since&&!CONN.down&&Date.now()-CONN.since>=3000){CONN.down=true;updStatus()}  // 3″ ανοχή: όχι μπάρα για στιγμιαία διακοπή
+  if(CONN.down)connBar()}
+function connUp(){const was=CONN.down;CONN.down=false;CONN.since=0;CONN.tries=0;connBar();if(was){updStatus();toastMsg(TT('✓ Συνδέθηκε ξανά','✓ Reconnected'))}}
+function connect(){if(CONN.es)try{CONN.es.close()}catch(e){}
+  const es=CONN.es=new EventSource('/events');es.onopen=connUp;
+  es.onmessage=e=>{if(CONN.since)connUp();handle(JSON.parse(e.data))};
+  es.onerror=()=>{es.close();connDown();clearTimeout(CONN.timer);CONN.timer=setTimeout(connect,Math.min(10000,2000+CONN.tries*1000))}}  // 3″, 4″ … έως 10″
+setInterval(connTick,1000);
 connect();loadBlock().catch(()=>{});
 // 🏷 QR ετικέτας: …/#dev=192.168.1.30 ανοίγει την καρτέλα της συσκευής (μόνο διεύθυνση IP, τίποτα άλλο)
 function devFromHash(){const m=/^#dev=([0-9a-fA-F:.]{3,45})$/.exec(location.hash);if(m)setTimeout(()=>select(m[1]),600)}
