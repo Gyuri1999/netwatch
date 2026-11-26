@@ -10,7 +10,7 @@
 <script>/* θέμα πριν από το πρώτο καρέ (χωρίς «άσπρη λάμψη») */(()=>{const d=document.documentElement;let p={};try{p=JSON.parse(localStorage.getItem('nw-look')||'{}')}catch(e){}
 const q=new URLSearchParams(location.search);if(q.get('theme'))p.theme=q.get('theme');
 const th=p.theme==='light'||(p.theme==='auto'&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';d.dataset.theme=th;
-if(q.get('glass'))p.glass=q.get('glass')==='1';if(p.cb)d.classList.add('cb');if(p.glass)d.classList.add('glass');if(p.motion==='off')d.classList.add('nomo');window.__look=p})()</script>
+if(q.get('glass'))p.glass=q.get('glass')==='1';if(p.cb)d.classList.add('cb');if(p.glass)d.classList.add('glass');if(p.motion==='off')d.classList.add('nomo');if(p.read)d.classList.add('read');if(+p.size>1&&+p.size<=1.5){d.style.setProperty('--z',+p.size);d.classList.add('zoom')}window.__look=p})()</script>
 <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
 <script src="/i18n.js"></script>
@@ -47,6 +47,22 @@ if(q.get('glass'))p.glass=q.get('glass')==='1';if(p.cb)d.classList.add('cb');if(
 :root{--bg:#05080f;--panel:#0b111c;--panel2:#101828;--line:#1c2638;--txt:#cfe0f5;--dim:#6d7f99;
   --cyan:#3ec5ff;--green:#3ddc97;--yellow:#ffd23f;--orange:#ff9f43;--red:#ff3b5c;--purple:#b388ff;--pink:#ff6ad5}
 *{box-sizing:border-box}
+/* 🔠 Μέγεθος γραμμάτων (Εμφάνιση → Προσβασιμότητα): μεγαλώνει ΟΛΗ η διεπαφή μαζί, ώστε να μη σπάει η διάταξη */
+body{zoom:var(--z,1)}
+/* με μεγαλύτερα γράμματα η πάνω μπάρα στενεύει: κρύψε το πλαίσιο «interface / εγώ» για να χωράνε πάντα τα κουμπιά */
+html.zoom header .chip:has(#iface){display:none}
+/* ο πίνακας «Εμφάνιση» μεγάλωσε: ποτέ πιο ψηλός από την οθόνη (και με μεγέθυνση) — κάνει κύλιση */
+#ap{max-height:calc((100vh - 84px)/var(--z,1));overflow-y:auto}
+/* με μεγέθυνση η περιοχή περιεχομένου πρέπει να μπορεί να στενέψει (αλλιώς οι κάρτες βγαίνουν έξω από την οθόνη) */
+body.v-page aside{min-width:0}
+/* 📖 Λειτουργία ανάγνωσης: περισσότερος «αέρας» ανάμεσα σε γράμματα, λέξεις και γραμμές· χωρίς πλάγια· πιο έντονο το αχνό κείμενο */
+html.read body{letter-spacing:.03em;word-spacing:.12em}
+html.read .card,html.read .sm,html.read p,html.read li,html.read td,html.read .al,html.read #ph-d,html.read .learn,html.read .empty,html.read .wsi{line-height:1.8}
+html.read #rail button{padding-top:8px;padding-bottom:8px}
+html.read i,html.read em{font-style:normal;font-weight:600}
+html.read .sm,html.read #ph-d,html.read .mcard span{font-size:max(1em,12.5px)}
+html.read{--dim:#a3b1c8}html.read[data-theme=light]{--dim:#4a5568}
+html.read a{text-decoration:underline;text-underline-offset:2px}
 html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font:13px/1.45 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;overflow:hidden}
 header{height:52px;display:flex;align-items:center;gap:14px;padding:0 14px;border-bottom:1px solid var(--line);background:linear-gradient(180deg,var(--bg2),#070b14)}
 .logo{font-weight:800;letter-spacing:3px;color:var(--cyan);text-shadow:0 0 12px color-mix(in srgb,var(--cyan) 53.3%,transparent);white-space:nowrap}
@@ -1060,9 +1076,10 @@ function pick(e){const r=cv.getBoundingClientRect(),x=e.clientX-r.left,y=e.clien
 const inBtn=(x,y)=>S.showLan&&LP.btn&&x>=LP.btn[0]&&x<=LP.btn[0]+LP.btn[2]&&y>=LP.btn[1]&&y<=LP.btn[1]+LP.btn[3];
 function lanBig(on){LAN.big=on==null?!LAN.big:on;if(LAN.big)S.showLan=true;const lg=$('legend');if(lg)lg.style.display=LAN.big?'none':''}
 // το παράθυρο πληροφοριών ανοίγει όπου χωράει: κάτω-δεξιά, αλλιώς πάνω ή αριστερά από τον κέρσορα
+const ZF=()=>+getComputedStyle(document.body).zoom||1;  // 🔠 μέγεθος γραμμάτων: το body έχει zoom → συντεταγμένες οθόνης ÷ ZF = μονάδες μέσα στο body
 function placeTip(tip,x,y){tip.style.display='block';tip.style.left='0px';tip.style.top='0px';
-  const w=tip.offsetWidth,h=tip.offsetHeight;
-  let l=x+14,t=y+14;if(l+w>W-4)l=Math.max(4,x-14-w);if(t+h>H-4)t=Math.max(4,y-14-h);
+  const z=ZF(),Wz=W/z,Hz=H/z;x/=z;y/=z;const w=tip.offsetWidth,h=tip.offsetHeight;
+  let l=x+14,t=y+14;if(l+w>Wz-4)l=Math.max(4,x-14-w);if(t+h>Hz-4)t=Math.max(4,y-14-h);
   tip.style.left=l+'px';tip.style.top=t+'px'}
 cv.addEventListener('mousemove',e=>{const[n,x,y]=pick(e);const tip=$('tip');
   if(!n){tip.style.display='none';return}
@@ -2706,7 +2723,8 @@ function tourEnd(){tourI=-1;$('tour')?.remove();try{localStorage.setItem('nw-tou
 function tourDraw(){let el=$('tour');if(tourI<0||tourI>=TOUR.length)return tourEnd();
   const [sel,t,d]=TOUR[tourI],tg=document.querySelector(sel);if(!tg||!tg.offsetWidth){tourI++;return tourDraw()}
   if(!el){el=document.createElement('div');el.id='tour';el.innerHTML='<div class="tspot"></div><div class="tcard"></div>';document.body.appendChild(el)}
-  const r=tg.getBoundingClientRect(),sp=el.querySelector('.tspot'),cd=el.querySelector('.tcard'),m=6;
+  const z=ZF(),q=tg.getBoundingClientRect(),r={left:q.left/z,top:q.top/z,right:q.right/z,bottom:q.bottom/z,width:q.width/z,height:q.height/z},innerWidth=window.innerWidth/z,innerHeight=window.innerHeight/z;
+  const sp=el.querySelector('.tspot'),cd=el.querySelector('.tcard'),m=6;
   Object.assign(sp.style,{left:r.left-m+'px',top:r.top-m+'px',width:r.width+m*2+'px',height:Math.min(r.height,innerHeight-r.top-20)+m*2+'px'});
   cd.innerHTML=`<div class="sm">${tourI+1} / ${TOUR.length}</div><b>${esc(t)}</b><div style="margin:6px 0 10px">${esc(d)}</div><div class="brow"><button class="b" id="tour-x">Παράλειψη</button><button class="b" id="tour-n" style="border-color:var(--cyan)">${tourI===TOUR.length-1?'Τέλος ✓':'Επόμενο →'}</button></div>`;
   const cw=300,left=Math.min(innerWidth-cw-12,Math.max(12,r.left+(r.width>innerWidth/2?24:0))),below=r.bottom+14+170<innerHeight;
@@ -2744,11 +2762,12 @@ document.addEventListener('fullscreenchange',()=>setTimeout(resize,60));
 
 // ===== Εμφάνιση: θέμα, χρώμα έμφασης, αχρωματοψία, κίνηση (αποθηκεύεται στο nw-look) =====
 const ACCENTS=[['cyan','#3ec5ff','#0b84c4'],['violet','#b388ff','#7444d8'],['green','#3ddc97','#0a8f5c'],['amber','#ffb02e','#b26a00'],['pink','#ff6ad5','#c0267a'],['blue','#5b8cff','#2f5fe0']];
-const LOOK=Object.assign({theme:'dark',accent:'cyan',cb:false,motion:'auto',glass:false},window.__look||{});
+const LOOK=Object.assign({theme:'dark',accent:'cyan',cb:false,motion:'auto',glass:false,size:'1',read:false},window.__look||{});LOOK.size=String(LOOK.size||'1');
 const reduceMo=()=>LOOK.motion==='off'||matchMedia('(prefers-reduced-motion: reduce)').matches;
 function applyLook(save){const d=document.documentElement;
   const th=LOOK.theme==='light'||(LOOK.theme==='auto'&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';
-  const go=()=>{d.dataset.theme=th;d.classList.toggle('cb',!!LOOK.cb);d.classList.toggle('glass',!!LOOK.glass);d.classList.toggle('nomo',LOOK.motion==='off');
+  const go=()=>{d.dataset.theme=th;d.classList.toggle('cb',!!LOOK.cb);d.classList.toggle('glass',!!LOOK.glass);d.classList.toggle('nomo',LOOK.motion==='off');d.classList.toggle('read',!!LOOK.read);
+    const z=+LOOK.size||1;if(z>1&&z<=1.5)d.style.setProperty('--z',z);else d.style.removeProperty('--z');d.classList.toggle('zoom',z>1&&z<=1.5);
     const a=ACCENTS.find(x=>x[0]===LOOK.accent)||ACCENTS[0];
     if(a[0]==='cyan')d.style.removeProperty('--cyan');else d.style.setProperty('--cyan',th==='light'?a[2]:a[1]);
     const m=document.querySelector('meta[name=theme-color]');if(m)m.content=th==='light'?'#fbfcfe':'#060a12'};
@@ -2762,12 +2781,15 @@ function drawAp(){let el=$('ap');if(!el){el=document.createElement('div');el.id=
    <h4>Υλικό</h4>${seg('glass',[[false,'Συμπαγές'],[true,'💧 Liquid Glass (Tahoe)']])}
    <h4>Χρώμα έμφασης</h4><div class="sw">${ACCENTS.map(([n,c])=>`<button data-acc="${n}" class="${LOOK.accent===n?'on':''}" style="background:${c}" title="${n}" aria-label="${n}"></button>`).join('')}</div>
    <h4>Προσβασιμότητα</h4>
+   <div class="sm" style="margin-bottom:3px">Μέγεθος γραμμάτων</div>${seg('size',[['1','Α'],['1.15','Α+'],['1.3','Α++']])}
+   <label><input type="checkbox" id="ap-read" ${LOOK.read?'checked':''}> Λειτουργία ανάγνωσης</label><div class="sm">περισσότερο κενό ανάμεσα σε γράμματα και γραμμές, χωρίς πλάγια — πιο ξεκούραστο (και για δυσλεξία)</div>
    <label><input type="checkbox" id="ap-cb" ${LOOK.cb?'checked':''}> Χρώματα για αχρωματοψία</label><div class="sm">μπλε/πορτοκαλί αντί για πράσινο/κόκκινο και σχήματα ▲ ◆ ● στη σοβαρότητα</div>
    <label><input type="checkbox" id="ap-mo" ${LOOK.motion==='off'?'checked':''}> Λιγότερη κίνηση</label>
    <h4>Οθόνη τοίχου</h4><button class="b hbtn" id="ap-noc">${ico('map')||''}<span>Λειτουργία NOC (πλήρης οθόνη)</span></button>`;
   el.querySelectorAll('[data-k]').forEach(b=>b.onclick=()=>{const v=b.dataset.v;LOOK[b.dataset.k]=v==='true'?true:v==='false'?false:v;applyLook(true)});
   el.querySelectorAll('[data-acc]').forEach(b=>b.onclick=()=>{LOOK.accent=b.dataset.acc;applyLook(true)});
   $('ap-cb').onchange=e=>{LOOK.cb=e.target.checked;applyLook(true)};
+  $('ap-read').onchange=e=>{LOOK.read=e.target.checked;applyLook(true)};
   $('ap-mo').onchange=e=>{LOOK.motion=e.target.checked?'off':'auto';applyLook(true)};
   $('ap-noc').onclick=()=>{apClose();typeof nocToggle==='function'&&nocToggle(true)}}
 function apClose(){$('ap')?.classList.remove('open')}

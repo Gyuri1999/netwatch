@@ -3054,7 +3054,10 @@ I18N.add({
   "Διευθύνσεις IP": "IP addresses",
   "Διαθεσιμότητα": "Availability",
   "Ενημερώσεις": "Updates",
-  "Μεταφραστής εντολών": "Command translator"
+  "Μεταφραστής εντολών": "Command translator",
+  "Μέγεθος γραμμάτων": "Text size",
+  "Λειτουργία ανάγνωσης": "Reading mode",
+  "περισσότερο κενό ανάμεσα σε γράμματα και γραμμές, χωρίς πλάγια — πιο ξεκούραστο (και για δυσλεξία)": "more space between letters and lines, no italics — easier on the eyes (also for dyslexia)"
  },
  "patterns": [
   [

@@ -229,7 +229,10 @@
       if (!el) { if (i + 1 < TOUR.length) return tourShow(i + 1); return tourEnd(); }
       el.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
       setTimeout(() => {
-        const r = el.getBoundingClientRect(), pad = 6;
+        // 🔠 με «μέγεθος γραμμάτων» το body έχει zoom: οι συντεταγμένες οθόνης ÷ zoom = μονάδες μέσα στο body
+        const z = +getComputedStyle(document.body).zoom || 1, q = el.getBoundingClientRect(), pad = 6;
+        const r = { left: q.left / z, top: q.top / z, right: q.right / z, bottom: q.bottom / z, width: q.width / z, height: q.height / z };
+        const innerWidth = window.innerWidth / z, innerHeight = window.innerHeight / z;
         const ov = document.createElement('div'); ov.className = 'tour-ov'; ov.innerHTML = `<div class="tour-hole" style="left:${r.left - pad}px;top:${Math.max(0, r.top - pad)}px;width:${Math.min(innerWidth - r.left + pad, r.width + pad * 2)}px;height:${Math.min(innerHeight - Math.max(0, r.top - pad), r.height + pad * 2)}px"></div>`;
         const pop = document.createElement('div'); pop.className = 'tour-pop';
         pop.innerHTML = `<div class="tour-n">${i + 1} / ${TOUR.length}</div><b>${E(step.t)}</b><div class="tour-d">${E(step.d)}</div><div class="tour-b"><button class="b" data-tskip>Παράλειψη</button><span style="flex:1"></span>${i ? '<button class="b" data-tprev>←</button>' : ''}<button class="b tour-next" data-tnext>${i + 1 < TOUR.length ? 'Επόμενο →' : '✓ Τέλος'}</button></div>`;
