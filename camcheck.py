@@ -238,9 +238,8 @@ class RealNet:
     def arp_macs(self, ip):
         """Όλες οι MAC που απαντούν για αυτή την IP (None αν δεν επιτρέπεται — θέλει root)."""
         try:
-            from scapy.all import ARP, Ether, conf, srp  # noqa: PLC0415
-            conf.verb = 0
-            ans, _ = srp(Ether(dst="ff:ff:ff:ff:ff:ff") / ARP(pdst=ip), timeout=1.5, retry=1, multi=True)
+            from core import arp_request  # noqa: PLC0415
+            ans = arp_request(ip, timeout=1.5, retry=1, multi=True)
             return sorted({norm_mac(r.hwsrc) for _, r in ans if norm_mac(r.hwsrc)})
         except Exception:  # noqa: BLE001  (χωρίς δικαιώματα / χωρίς scapy)
             return None

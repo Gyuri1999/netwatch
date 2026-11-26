@@ -731,9 +731,11 @@ class Net:
     def dhcp(self, iface, timeout=DHCP_S):
         """Ένα DISCOVER (όπως l2guard.ScapyProber) + χρόνος μέχρι κάθε OFFER. Ποτέ REQUEST."""
         import random
-        from scapy.all import BOOTP, DHCP, IP, UDP, Ether, conf, get_if_hwaddr, srp
+        from scapy.all import BOOTP, DHCP, IP, UDP, Ether, conf, srp
+
+        from core import require_real_mac
         conf.checkIPaddr = False
-        mac = get_if_hwaddr(iface)
+        mac = require_real_mac(iface)
         xid = random.randint(1, 0xFFFFFFFF)
         pkt = (Ether(dst="ff:ff:ff:ff:ff:ff", src=mac) / IP(src="0.0.0.0", dst="255.255.255.255") / UDP(sport=68, dport=67)
                / BOOTP(chaddr=bytes.fromhex(mac.replace(":", "")) + b"\x00" * 10, xid=xid, flags=0x8000)
