@@ -160,7 +160,7 @@ class L2Guard:
                 o["name"] = names.get(o["server"]) or names.get(o["ip_src"]) or ""
                 o["is_gw"] = o["server"] == gw or o["ip_src"] == gw
             if not offers:
-                r["checks"].append({"id": "dhcp", "level": "warn", "el": "Κανένας DHCP server δεν απάντησε (μπορεί να είναι κλειστός, σε άλλο VLAN, ή το δίκτυο να έχει στατικές IP).",
+                r["checks"].append({"id": "dhcp", "level": "warn", "inconclusive": True, "el": "Κανένας DHCP server δεν απάντησε (μπορεί να είναι κλειστός, σε άλλο VLAN, ή το δίκτυο να έχει στατικές IP).",
                                     "en": "No DHCP server answered (it may be off, on another VLAN, or the network uses static IPs)."})
             elif len(servers) == 1 and (servers[0] == gw or offers[0]["router"] == gw):
                 r["checks"].append({"id": "dhcp", "level": "ok", "el": f"Ένας DHCP server ({servers[0]}) — αυτός που περιμένουμε.", "en": f"One DHCP server ({servers[0]}) — the expected one."})
@@ -182,7 +182,7 @@ class L2Guard:
         except ValueError:
             pass
         if not ok_gw:
-            r["checks"].append({"id": "arp", "level": "warn", "el": "Δεν ξέρω ιδιωτική IP router για να ελέγξω το ARP.", "en": "No private router IP known to check ARP."})
+            r["checks"].append({"id": "arp", "level": "warn", "inconclusive": True, "el": "Δεν ξέρω ιδιωτική IP router για να ελέγξω το ARP.", "en": "No private router IP known to check ARP."})
         else:
             try:
                 macs = self.prober.arp_who_has(iface, gw)
@@ -193,7 +193,7 @@ class L2Guard:
                     r["checks"].append({"id": "arp", "level": "bad", "el": f"Στο «ποιος είναι ο router {gw};» απάντησαν {len(macs)} MAC: {', '.join(macs)} — κλασικό σημάδι ARP spoofing (MITM).",
                                         "en": f"{len(macs)} MACs answered “who is router {gw}?”: {', '.join(macs)} — a classic sign of ARP spoofing (MITM)."})
                 elif not macs:
-                    r["checks"].append({"id": "arp", "level": "warn", "el": f"Ο router {gw} δεν απάντησε στο ARP.", "en": f"Router {gw} did not answer ARP."})
+                    r["checks"].append({"id": "arp", "level": "warn", "inconclusive": True, "el": f"Ο router {gw} δεν απάντησε στο ARP.", "en": f"Router {gw} did not answer ARP."})
                 elif trusted and macs[0] != trusted:
                     r["checks"].append({"id": "arp", "level": "bad", "el": f"Ο router {gw} απαντά τώρα με MAC {macs[0]}, ενώ στην αρχή ήταν {trusted}. Αν δεν άλλαξες router, κάποιος παριστάνει τον router.",
                                         "en": f"Router {gw} now answers with MAC {macs[0]}, but at first it was {trusted}. If you didn’t replace the router, someone is impersonating it."})

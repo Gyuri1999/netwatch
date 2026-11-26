@@ -200,3 +200,13 @@ def test_assess_history_in_memory_without_path():
     import assess
     a = assess.Assess(object(), clock=lambda: 1_700_000_000.0)
     assert a.record(90, "A") and a.history()[-1]["grade"] == "A" and a.path is None
+
+
+def test_inconclusive_arp_is_not_called_spoofing():
+    class L2Quiet:
+        def view(self):
+            return {"checks": [{"id": "arp", "level": "warn", "inconclusive": True, "el": "Ο router 192.168.1.1 δεν απάντησε στο ARP."}]}
+    st = _state()
+    st.l2guard = L2Quiet()
+    l2 = [f for f in assess.build(st, "el")["findings"] if f["area"] == "L2"]
+    assert len(l2) == 1 and l2[0]["sev"] == "low" and "spoofing" not in l2[0]["title"] and "δεν ολοκληρώθηκε" in l2[0]["title"]
