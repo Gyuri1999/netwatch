@@ -3013,7 +3013,15 @@ I18N.add({
   "Κωδικός γραμμένος στον κώδικα": "Password written in the code",
   "Δώσε τον φάκελο του project, π.χ. ~/smart-city-poles": "Give the project folder, e.g. ~/smart-city-poles",
   "Δεν βρέθηκε αυτός ο φάκελος": "Folder not found",
-  "Διάλεξε έναν φάκελο project μέσα στον φάκελο χρήστη σου (π.χ. ~/netwatch), όχι όλο το ~ ή αρχεία συστήματος": "Pick a project folder inside your home folder (e.g. ~/netwatch), not all of ~ or system files"
+  "Διάλεξε έναν φάκελο project μέσα στον φάκελο χρήστη σου (π.χ. ~/netwatch), όχι όλο το ~ ή αρχεία συστήματος": "Pick a project folder inside your home folder (e.g. ~/netwatch), not all of ~ or system files",
+  "Προβολή μενού": "Menu view",
+  "Σπίτι": "Home",
+  "Μαθητής": "Student",
+  "οθόνες κρυμμένες — βρες τες με ⌘K ή πάτα «Όλα»": "screens hidden — find them with ⌘K or press “All”",
+  "Τα βασικά για το σπίτι: επιθέσεις, συσκευές, Wi‑Fi, έλεγχοι": "Home basics: attacks, devices, Wi‑Fi, checks",
+  "Σπίτι + πακέτα, Ακαδημία, Cisco Lab, εργαστήρια (CCNA / IoT)": "Home + packets, Academy, Cisco Lab, labs (CCNA / IoT)",
+  "Μαθητής + υποδομή και εργαλεία τεχνικού πεδίου": "Student + infrastructure and field-technician tools",
+  "Όλες οι οθόνες": "All screens"
  },
  "patterns": [
   [
