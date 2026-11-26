@@ -35,9 +35,25 @@ def test_scan_ports_survives_devices_that_choke_on_bursts():
     r = pentest.scan_ports(["192.168.1.1", "192.168.1.100", "192.168.1.9"], ports, probe=probe)
     assert [p for p, _ in r["192.168.1.1"]] == [80, 443] and [p for p, _ in r["192.168.1.100"]] == [8000] and "192.168.1.9" not in r
     assert max(peak.values()) <= pentest.PER_HOST
-    # η συσκευή που δεν απαντά ποτέ (201 θύρες > RETRY_MAX) ΔΕΝ ξαναδοκιμάζεται — αλλιώς μια πλήρης σάρωση δεν θα τελείωνε
-    assert not [c for c in calls if c[0] == "192.168.1.9" and c[2] > 1]
+    # η συσκευή που δεν απαντά ποτέ (201 θύρες > RETRY_MAX) ξαναδοκιμάζεται ΜΟΝΟ στις γνωστές θύρες — όχι σε όλες
+    again9 = {c[1] for c in calls if c[0] == "192.168.1.9" and c[2] > 1}
+    assert again9 and again9 <= pentest.COMMON_RETRY
     assert [c for c in calls if c[0] == "192.168.1.100" and c[1] == 8000 and c[2] > 1]
+
+
+def test_firewalled_router_keeps_open_ports_that_answered_late():
+    """Πραγματικό DrayTek: «καταπίνει» 999 κλειστές θύρες (καμία απάντηση) και υπό φόρτο το SSH άργησε >0,6″.
+    Πριν: >RETRY_MAX σιωπηλές → καμία επανάληψη → το 22 χανόταν. Τώρα ξαναδοκιμάζονται οι γνωστές θύρες."""
+    import pentest
+    OPEN = {21, 22, 23, 443, 1723}
+
+    def probe(ip, p, timeout):
+        if p == 22 and timeout < 1:
+            return pentest.TIMED_OUT           # άργησε στο 1ο πέρασμα
+        return "x" if p in OPEN else pentest.TIMED_OUT
+
+    r = pentest.scan_ports(["192.168.1.1"], list(range(1, 1001)) + [1723], probe=probe)
+    assert [p for p, _ in r["192.168.1.1"]] == [21, 22, 23, 443, 1723]
 
 
 def test_grab_tells_timeout_from_refused(monkeypatch):
