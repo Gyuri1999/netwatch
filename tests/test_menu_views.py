@@ -107,3 +107,24 @@ def test_group_tabs_use_the_same_emoji_as_their_screen():
     grp = HTML[HTML.index("const TAB_GROUPS={"):HTML.index("const GROUP_OF")]
     for t, label in re.findall(r"\['([a-z0-9_]+)','([^']+)'\]", grp):
         assert label.split(" ")[0] == screen[t], f"η καρτέλα {t} έχει άλλο emoji από την οθόνη της"
+
+
+def test_every_menu_group_has_its_own_colour():
+    """🎨 Χρώμα ανά ομάδα: κάθε ομάδα του μενού έχει δικό της --gc, σε σκοτεινό και φωτεινό θέμα."""
+    n = len(re.findall(r"^  \['[^']+',\[\[", HTML[HTML.index("const SECTIONS=["):HTML.index("const SECT_NAME")], flags=re.M))
+    dark = dict(re.findall(r"(?<!\] )\.gc-(\d)\{--gc:(#[0-9a-f]{6})\}", HTML))
+    light = dict(re.findall(r"html\[data-theme=light\] \.gc-(\d)\{--gc:(#[0-9a-f]{6})\}", HTML))
+    for cols in (dark, light):
+        assert sorted(cols) == [str(i) for i in range(n)]
+        assert len(set(cols.values())) == n                      # κανένα χρώμα δύο φορές
+    rail = HTML[HTML.index("function railHTML"):HTML.index("function buildRail")]
+    assert 'class="rg gc-${gi}"' in rail and "grp(SECTIONS[o],o)" in rail
+    assert "TAB_GC[gh]" in HTML                                   # ο τίτλος της σελίδας παίρνει το χρώμα της ομάδας
+
+
+def test_page_tabs_have_their_own_style_not_the_generic_segment():
+    """🗂 Οι καρτέλες σελίδας είναι .ptabs (γραμμή κάτω από την ενεργή)· το emoji χωριστά από το κείμενο."""
+    assert 'class="ptabs" id="ph-seg"' in HTML and 'class="ptabs" id="feed-seg"' in HTML
+    assert ".ptabs button.on::after{transform:scaleX(1)}" in HTML
+    assert '<span class="te" aria-hidden="true">📦</span><span>Ζωντανά πακέτα</span>' in HTML
+    assert "html.nomo .ptabs button::after{transition:none}" in HTML   # «λιγότερη κίνηση»

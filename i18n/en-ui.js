@@ -3057,7 +3057,15 @@ I18N.add({
   "Μεταφραστής εντολών": "Command translator",
   "Μέγεθος γραμμάτων": "Text size",
   "Λειτουργία ανάγνωσης": "Reading mode",
-  "περισσότερο κενό ανάμεσα σε γράμματα και γραμμές, χωρίς πλάγια — πιο ξεκούραστο (και για δυσλεξία)": "more space between letters and lines, no italics — easier on the eyes (also for dyslexia)"
+  "περισσότερο κενό ανάμεσα σε γράμματα και γραμμές, χωρίς πλάγια — πιο ξεκούραστο (και για δυσλεξία)": "more space between letters and lines, no italics — easier on the eyes (also for dyslexia)",
+  "Συνδεδεμένες τώρα": "Connected now",
+  "Είμαι ασφαλής;": "Am I safe?",
+  "Ταχύτητα & κανάλι": "Speed & channel",
+  "Παλιές ειδοποιήσεις": "Past alerts",
+  "Έλεγχος έκθεσης": "Exposure check",
+  "Πώς δουλεύουν οι επιθέσεις": "How attacks work",
+  "Ζωντανά πακέτα": "Live packets",
+  "Οδηγός φίλτρων": "Filter guide"
  },
  "patterns": [
   [
