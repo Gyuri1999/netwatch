@@ -17,6 +17,11 @@ from capture import ctf_check_rule, ctf_exit, ctf_load
 from demo import DEMO_SHODAN
 
 
+# Τα μόνα αρχεία που σερβίρονται από το vendor/ (ακριβές όνομα → τύπος): ποτέ μονοπάτι από τον χρήστη
+VENDOR_FILES = {"d3.min.js": "text/javascript; charset=utf-8", "topojson-client.min.js": "text/javascript; charset=utf-8",
+                "countries-110m.json": "application/json", "countries-50m.json": "application/json"}
+
+
 # ---------------- web server ----------------
 def make_handler(state):
     class H(BaseHTTPRequestHandler):
@@ -809,6 +814,12 @@ def make_handler(state):
             if u.path in ("/edu.js", "/wireshark.js", "/infra.js", "/sectools.js", "/privtools.js", "/protocols.js", "/ciscolab.js", "/uiplus.js", "/pentestui.js", "/socui.js", "/worktools.js", "/opstools.js", "/cmdxlate.js", "/navplus.js", "/anontools.js", "/topomap.js", "/sshui.js", "/vlsm.js", "/updateui.js", "/presenceui.js", "/l2guardui.js", "/assessui.js", "/vulnui.js", "/upnpui.js", "/otui.js", "/acceptui.js", "/sitesui.js", "/labelsui.js", "/calcui.js", "/v6ui.js", "/nacui.js", "/iotinvui.js", "/radioui.js", "/fieldui.js", "/soakui.js", "/remoteui.js", "/camcheckui.js", "/probesui.js", "/watchui.js", "/acl.js", "/names.js", "/golive.js", "/alertwhy.js"):
                 with open(os.path.join(HERE, u.path[1:]), "rb") as f:
                     return self._send(200, f.read(), "text/javascript; charset=utf-8")
+            if u.path.startswith("/vendor/"):  # 📦 βιβλιοθήκες & χάρτης που ήταν σε CDN: τώρα μαζί με την εφαρμογή (δουλεύει χωρίς Internet)
+                name = u.path[len("/vendor/"):]
+                if name in VENDOR_FILES and os.path.isfile(os.path.join(HERE, "vendor", name)):
+                    with open(os.path.join(HERE, "vendor", name), "rb") as f:
+                        return self._send(200, f.read(), VENDOR_FILES[name])
+                return self._send(404, b"not found", "text/plain")
             if u.path == "/i18n.js" or (u.path.startswith("/i18n/") and u.path.endswith(".js")):
                 name = os.path.basename(u.path)
                 fp = os.path.join(HERE, "i18n.js") if u.path == "/i18n.js" else os.path.join(HERE, "i18n", name)

@@ -114,6 +114,7 @@ def main():
             json.dump({"files": sorted(x for x in os.listdir(en_src) if x.endswith(".js"))}, f)
     shutil.copy2(os.path.join(ROOT, "i18n.js"), out)
     shutil.copytree(os.path.join(ROOT, "i18n"), os.path.join(out, "i18n"))
+    shutil.copytree(os.path.join(ROOT, "vendor"), os.path.join(out, "vendor"))  # d3, topojson, χάρτες: όχι από CDN
     for name in ("academy.html", "manifest.webmanifest", "sw.js"):
         if os.path.isfile(os.path.join(ROOT, name)):
             shutil.copy2(os.path.join(ROOT, name), out)

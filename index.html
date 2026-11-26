@@ -11,8 +11,8 @@
 const q=new URLSearchParams(location.search);if(q.get('theme'))p.theme=q.get('theme');
 const th=p.theme==='light'||(p.theme==='auto'&&matchMedia('(prefers-color-scheme: light)').matches)?'light':'dark';d.dataset.theme=th;
 if(q.get('glass'))p.glass=q.get('glass')==='1';if(p.cb)d.classList.add('cb');if(p.glass)d.classList.add('glass');if(p.motion==='off')d.classList.add('nomo');if(p.read)d.classList.add('read');if(+p.size>1&&+p.size<=1.5){d.style.setProperty('--z',+p.size);d.classList.add('zoom')}window.__look=p})()</script>
-<script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+<script src="vendor/d3.min.js"></script>
+<script src="vendor/topojson-client.min.js"></script>
 <script src="/i18n.js"></script>
 <script src="/edu.js"></script>
 <script src="/wireshark.js"></script>
@@ -822,8 +822,8 @@ const randMac=m=>m&&/^.[26ae]/i.test(m);
 // ================= MAP + ZOOM =================
 const cv=$('c'),ctx=cv.getContext('2d');let W=0,H=0,DPR=1,proj,mapImg,world110=null,world50=null,loading50=false,ZT=d3.zoomIdentity,mapDirty=true;
 const featMeta=new WeakMap();
-fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json').then(r=>r.json()).then(t=>{world110=topojson.feature(t,t.objects.countries);mapDirty=true}).catch(()=>{});
-function load50(){if(world50||loading50)return;loading50=true;fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-50m.json').then(r=>r.json()).then(t=>{world50=topojson.feature(t,t.objects.countries);mapDirty=true}).catch(()=>{})}
+fetch('vendor/countries-110m.json').then(r=>r.json()).then(t=>{world110=topojson.feature(t,t.objects.countries);mapDirty=true}).catch(()=>{});
+function load50(){if(world50||loading50)return;loading50=true;fetch('vendor/countries-50m.json').then(r=>r.json()).then(t=>{world50=topojson.feature(t,t.objects.countries);mapDirty=true}).catch(()=>{})}
 const zoom=d3.zoom().scaleExtent([1,60]).on('zoom',e=>{ZT=e.transform;mapDirty=true;$('zl').textContent='×'+ZT.k.toFixed(1);if(ZT.k>=3)load50()});
 d3.select(cv).call(zoom);
 function resize(){
