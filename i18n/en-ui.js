@@ -3021,7 +3021,18 @@ I18N.add({
   "Τα βασικά για το σπίτι: επιθέσεις, συσκευές, Wi‑Fi, έλεγχοι": "Home basics: attacks, devices, Wi‑Fi, checks",
   "Σπίτι + πακέτα, Ακαδημία, Cisco Lab, εργαστήρια (CCNA / IoT)": "Home + packets, Academy, Cisco Lab, labs (CCNA / IoT)",
   "Μαθητής + υποδομή και εργαλεία τεχνικού πεδίου": "Student + infrastructure and field-technician tools",
-  "Όλες οι οθόνες": "All screens"
+  "Όλες οι οθόνες": "All screens",
+  "📦 Ζωντανά πακέτα": "📦 Live packets",
+  "🦈 Οδηγός φίλτρων": "🦈 Filter guide",
+  "ζωντανά πακέτα, φίλτρα Wireshark & οδηγός φίλτρων": "live packets, Wireshark filters & filter guide",
+  "Ψάχνεις πακέτα;": "Looking for packets?",
+  "Αυτό μοιάζει με φίλτρο, όχι με λέξη του οδηγού.": "That looks like a filter, not a word from the guide.",
+  "Δείξε τα ζωντανά πακέτα για": "Show live packets for",
+  "αναζήτηση στον οδηγό: dns, syn, retransmission, http, arp, mqtt…": "search the guide: dns, syn, retransmission, http, arp, mqtt…",
+  "Εδώ ψάχνεις": "Here you search",
+  "στον οδηγό": "the guide",
+  ", όχι στα πακέτα. Για να δεις πακέτα πάτα": ", not the packets. To see packets press",
+  "σε ένα φίλτρο, ή γύρνα στην καρτέλα": "on a filter, or go back to the tab"
  },
  "patterns": [
   [
