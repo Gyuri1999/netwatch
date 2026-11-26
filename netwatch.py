@@ -189,6 +189,7 @@ def main():
     state.scanner = pentest.LanScanner(sim=demo_scan if mode == "demo" else None,
                                        scan_dir=os.path.join(HERE, "data", "scans") if mode == "live" else None)
     state.scanner.on_save = chown_to_user
+    state.scanner.net_fn = state.net_id  # 🧭 κάθε δίκτυο (MAC router) κρατά δικές του σαρώσεις
     import netkit
 
     def scan_done(hosts):

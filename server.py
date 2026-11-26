@@ -193,7 +193,9 @@ def make_handler(state):
                 if u.path == "/api/scan":
                     target = str(body.get("target") or state.default_scan_target())
                     with state.lock:
-                        known = {ip: h["mac"] for ip, h in state.hosts.items() if h.get("mac") and h["kind"] == "local"}
+                        recent = time.time() - 900  # μόνο όσες είδαμε τα τελευταία 15′ — όχι συσκευές άλλου δικτύου/παλιές
+                        known = {ip: h["mac"] for ip, h in state.hosts.items()
+                                 if h.get("mac") and h["kind"] == "local" and (h.get("last") or 0) >= recent}
                     profile = str(body.get("profile") or "quick")
                     ports = str(body.get("ports") or "")[:4000] or None
                     state.scanner.start(target, known, profile=profile, ports=ports, udp=bool(body.get("udp")))

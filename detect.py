@@ -129,6 +129,13 @@ class NetState:
                 pass
 
     # ---------- hosts ----------
+    def net_id(self):
+        """Ποιο δίκτυο είναι αυτό: η MAC του router (12 hex), όχι η IP — σπίτι και εργαστήριο έχουν συχνά και τα δύο
+        192.168.1.1. Πρώτα ό,τι λέει τώρα ο πίνακας ARP, μετά η πρώτη MAC που είδαμε. None αν δεν την ξέρουμε."""
+        mac = (self.arp_table.get(self.gateway) or self.arp_first.get(self.gateway) or "") if self.gateway else ""
+        h = mac.lower().replace(":", "").replace("-", "")
+        return h if len(h) == 12 and h != "ffffffffffff" and h != "000000000000" else None
+
     def host(self, ip, t):
         if not ip or ip in ("0.0.0.0", "::"):
             return None
