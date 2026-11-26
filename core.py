@@ -34,7 +34,7 @@ SERVICES = {
     67: "DHCP", 68: "DHCP", 80: "HTTP", 110: "POP3", 123: "NTP", 137: "NetBIOS",
     138: "NetBIOS", 139: "NetBIOS", 143: "IMAP", 161: "SNMP", 443: "HTTPS",
     445: "SMB", 465: "SMTPS", 587: "SMTP", 853: "DoT", 993: "IMAPS", 995: "POP3S",
-    1194: "OpenVPN", 1433: "MSSQL", 1900: "SSDP", 3306: "MySQL", 3389: "RDP",
+    1194: "OpenVPN", 1433: "MSSQL", 1701: "L2TP", 1723: "PPTP", 1900: "SSDP", 3306: "MySQL", 3389: "RDP",
     5060: "SIP", 5222: "XMPP", 5353: "mDNS", 5355: "LLMNR", 5432: "Postgres",
     5900: "VNC", 8080: "HTTP-alt", 8443: "HTTPS-alt", 51820: "WireGuard",
 }
@@ -72,6 +72,7 @@ RISKY_SERVICES = {
     161: ("med", "SNMP: συχνά με default κωδικό «public»"),
     554: ("med", "RTSP: ροή βίντεο κάμερας"),
     1883: ("med", "MQTT: μηνύματα IoT χωρίς κρυπτογράφηση"),
+    1723: ("med", "PPTP VPN: παλιό και σπασμένο (MS-CHAPv2) — βάλε WireGuard/OpenVPN/IPsec"),
     80: ("low", "HTTP: σελίδα διαχείρισης χωρίς HTTPS"), 8080: ("low", "HTTP-alt: σελίδα διαχείρισης χωρίς HTTPS"),
     9100: ("low", "Εκτυπωτής (JetDirect): δέχεται εργασίες από οποιονδήποτε"),
     22: ("low", "SSH: ασφαλές αν έχει κλειδιά ή δυνατό κωδικό"),

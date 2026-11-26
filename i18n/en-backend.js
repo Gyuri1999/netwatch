@@ -222,6 +222,7 @@ I18N.add({
   "SNMP: συχνά με default κωδικό «public»": "SNMP: often with the default password “public”",
   "RTSP: ροή βίντεο κάμερας": "RTSP: camera video stream",
   "MQTT: μηνύματα IoT χωρίς κρυπτογράφηση": "MQTT: IoT messages unencrypted",
+  "PPTP VPN: παλιό και σπασμένο (MS-CHAPv2) — βάλε WireGuard/OpenVPN/IPsec": "PPTP VPN: old and broken (MS-CHAPv2) — use WireGuard/OpenVPN/IPsec",
   "HTTP: σελίδα διαχείρισης χωρίς HTTPS": "HTTP: admin page without HTTPS",
   "HTTP-alt: σελίδα διαχείρισης χωρίς HTTPS": "HTTP-alt: admin page without HTTPS",
   "Εκτυπωτής (JetDirect): δέχεται εργασίες από οποιονδήποτε": "Printer (JetDirect): accepts jobs from anyone",
