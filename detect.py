@@ -329,7 +329,9 @@ class NetState:
                 return self.own_tool["why"]
         return None
 
-    def alert(self, typ, sev, actor, target, detail, t, key=None, cooldown=None, mark=True, mitre=None, benign=None):
+    def alert(self, typ, sev, actor, target, detail, t, key=None, cooldown=None, mark=True, mitre=None, benign=None, origin=None):
+        # origin: ποιος ΞΕΚΙΝΗΣΕ την κίνηση, όταν δεν είναι ο «δράστης» της ειδοποίησης (π.χ. «ο υπολογιστής σου συνδέθηκε σε
+        # ύποπτη θύρα της Χ»: δράστης = η Χ, αλλά το πακέτο το έστειλες εσύ) — για να αναγνωρίζεται η δική σου σάρωση.
         det = detector_for(typ)
         if det and not self.cfg["detectors"].get(det, True):
             return
@@ -363,7 +365,7 @@ class NetState:
                  target=target, detail=detail, mitre=mitre or mitre_for(typ), lab=lab)
         if benign:  # γνωστή αθώα εξήγηση (π.χ. το δικό σου Tor): φαίνεται, αλλά δεν «χρωματίζει» τίποτα
             a["benign"], mark = benign, False
-        mine = None if lab else self._selftest(actor, t)
+        mine = None if lab else (self._selftest(actor, t) or (self._selftest(origin, t) if origin else None))
         if mine:  # η δική σου δοκιμή: φαίνεται (για να δεις τι πιάνει η άμυνα), αλλά δεν είναι συναγερμός
             a["selftest"], mark = mine, False
         self.alerts.appendleft(a)
@@ -679,7 +681,7 @@ class NetState:
                           "Tor σε αυτή τη θύρα. Αναμενόμενο — δεν χρειάζεται να κάνεις τίποτα.")
             self.alert("Ύποπτη εξερχόμενη θύρα", "low", dst, src,
                        f"Ο υπολογιστής σου συνδέθηκε στη θύρα {dp} ({SUSPECT_PORTS[dp]}) αυτής της IP", t,
-                       key=f"{dst}:{dp}" if benign else None, cooldown=3600 if benign else None, benign=benign)
+                       key=f"{dst}:{dp}" if benign else None, cooldown=3600 if benign else None, benign=benign, origin=src)
 
     # --- αλλαγή πηγής κίνησης (CTF) ---
     KEEP = ("lock", "subs", "intel", "notifier", "scanner", "lab", "wifi", "privacy", "apps", "honeypot", "blocker", "iot", "sensor", "mqtt", "agent", "hass", "baseline", "playbooks", "timeline", "hunt", "cases", "configbak", "changecheck", "triage", "handover", "whereis", "expiry", "segcheck", "sitecheck", "topomap", "ssh", "devnames", "updater", "l2guard", "presence", "app_ctl", "npcap", "hygiene", "assess", "vulns", "upnp", "ot", "accept", "sites", "labels", "v6", "nac", "iotinv", "radio", "field", "uplink", "soak", "remote", "camcheck", "probes", "watchers", "health", "vpn_iface", "_app_rdns", "geo_q", "rdns_pool", "demo_geo", "home",
