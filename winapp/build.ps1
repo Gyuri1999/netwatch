@@ -38,7 +38,7 @@ $app = Join-Path $out 'app'
 New-Item -ItemType Directory -Force $app | Out-Null
 $files = @(git ls-files) | Where-Object {
     ($_ -notmatch '/' -and $_ -match '\.(py|js|html|webmanifest|yaml|txt)$' -and $_ -notmatch '^(requirements-dev|docker-compose)') -or
-    ($_ -match '^(i18n|academy|rules|ctf|samples)/')
+    ($_ -match '^(i18n|vendor|academy|rules|ctf|samples)/')
 }
 foreach ($f in $files + @('VERSION', 'update_signers')) {
     if (-not (Test-Path $f)) { continue }

@@ -44,7 +44,7 @@ if [ "${GITHUB_ACTIONS:-}" != "true" ]; then
 fi
 plutil -replace CFBundleShortVersionString -string "$VER" "$OUT/Contents/Info.plist"
 rsync -a --exclude '__pycache__' --exclude '*.md' ./*.py \
-  index.html edu.js wireshark.js infra.js sectools.js privtools.js protocols.js ciscolab.js uiplus.js pentestui.js socui.js worktools.js opstools.js cmdxlate.js navplus.js anontools.js topomap.js sshui.js vlsm.js updateui.js presenceui.js l2guardui.js assessui.js vulnui.js upnpui.js otui.js acceptui.js sitesui.js labelsui.js calcui.js v6ui.js nacui.js iotinvui.js radioui.js fieldui.js soakui.js remoteui.js camcheckui.js probesui.js watchui.js acl.js names.js golive.js alertwhy.js i18n.js i18n academy academy.html manifest.webmanifest sw.js config.example.yaml requirements.txt VERSION update_signers rules ctf samples "$OUT/Contents/Resources/netwatch/"
+  index.html edu.js wireshark.js infra.js sectools.js privtools.js protocols.js ciscolab.js uiplus.js pentestui.js socui.js worktools.js opstools.js cmdxlate.js navplus.js anontools.js topomap.js sshui.js vlsm.js updateui.js presenceui.js l2guardui.js assessui.js vulnui.js upnpui.js otui.js acceptui.js sitesui.js labelsui.js calcui.js v6ui.js nacui.js iotinvui.js radioui.js fieldui.js soakui.js remoteui.js camcheckui.js probesui.js watchui.js acl.js names.js golive.js alertwhy.js i18n.js i18n vendor academy academy.html manifest.webmanifest sw.js config.example.yaml requirements.txt VERSION update_signers rules ctf samples "$OUT/Contents/Resources/netwatch/"
 rm -f "$OUT/Contents/Resources/netwatch/rules/local.yaml"
 if [ -n "$DEV" ]; then
   echo "$VER" > "$OUT/Contents/Resources/netwatch/VERSION"
