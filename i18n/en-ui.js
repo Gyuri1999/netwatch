@@ -439,7 +439,7 @@ I18N.add({
   "Βρίσκει συσκευές, ανοιχτές θύρες, τι λογισμικό και ποια έκδοση τρέχουν (banner grabbing) και ελέγχει το TLS — όπως το": "Finds devices, open ports, what software and version they run (banner grabbing) and checks TLS — like",
   "χωρίς banner": "no banner",
   "καμία ανοιχτή θύρα από τις συνηθισμένες": "none of the usual ports open",
-  "Τα αποτελέσματα μπήκαν και στην καρτέλα 🛡 Έλεγχος.": "The results were also added to the 🛡 Audit tab.",
+  "Τα αποτελέσματα μπήκαν και στην καρτέλα 🩺 Έλεγχος ασφάλειας.": "The results were also added to the 🩺 Security audit tab.",
   "ρωτάω το Shodan…": "asking Shodan…",
   "🌐 Έλεγχος έκθεσης": "🌐 Check exposure",
   "2 · Τι βλέπει το Internet για σένα": "2 · What the Internet sees about you",
@@ -3042,7 +3042,19 @@ I18N.add({
   "🕓 Παλιές ειδοποιήσεις": "🕓 Past alerts",
   "📹 Έλεγχος έκθεσης": "📹 Exposure check",
   "🎓 Μαθήματα": "🎓 Lessons",
-  "📚 Πώς δουλεύουν οι επιθέσεις": "📚 How attacks work"
+  "📚 Πώς δουλεύουν οι επιθέσεις": "📚 How attacks work",
+  "Έλεγχος ασφάλειας": "Security audit",
+  "Στοιχεία συσκευής": "Device details",
+  "Ρυθμίσεις & συντήρηση": "Settings & maintenance",
+  "Μπλοκαρισμένες IP": "Blocked IPs",
+  "Αυτόματες αντιδράσεις": "Automatic responses",
+  "Παγίδα (honeypot)": "Trap (honeypot)",
+  "Ασφάλεια IoT": "IoT security",
+  "Οι δικές μου": "My own",
+  "Διευθύνσεις IP": "IP addresses",
+  "Διαθεσιμότητα": "Availability",
+  "Ενημερώσεις": "Updates",
+  "Μεταφραστής εντολών": "Command translator"
  },
  "patterns": [
   [
