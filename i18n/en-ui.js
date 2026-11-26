@@ -3065,7 +3065,8 @@ I18N.add({
   "Έλεγχος έκθεσης": "Exposure check",
   "Πώς δουλεύουν οι επιθέσεις": "How attacks work",
   "Ζωντανά πακέτα": "Live packets",
-  "Οδηγός φίλτρων": "Filter guide"
+  "Οδηγός φίλτρων": "Filter guide",
+  "είναι όλα καλά; · τι να δω σήμερα · συνέχισε το μάθημα": "is everything OK? · what to look at today · continue the lesson"
  },
  "patterns": [
   [
