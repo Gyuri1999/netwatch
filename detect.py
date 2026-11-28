@@ -32,6 +32,13 @@ def host_info():
 SWEEPS = ("Network sweep (ARP)", "Network sweep (ping)")
 SWEEP_SUSPECT = ("camera", "iot", "esp", "tv", "speaker", "console")  # αυτές δεν έχουν λόγο να σαρώνουν το LAN
 
+# 🔁 P2P (torrent, Stremio…): πολλοί διαφορετικοί peers σε τυχαίες θύρες μέσα σε λίγα λεπτά
+P2P_WINDOW, P2P_MIN_PEERS = 300, 15
+P2P_NOISY = {"Σύνδεση σε κακόβουλη IP", "Κίνηση από κακόβουλη IP", "Ύποπτη εξερχόμενη θύρα", "Beaconing (πιθανό C2)"}
+P2P_NOISY_RULE = "Κανόνας: Συσκευή του LAN σε θύρα backdoor"
+P2P_DOWNGRADE = {"Σύνδεση σε κακόβουλη IP", "Κίνηση από κακόβουλη IP"}  # μόνο οι «med»: χτύπημα σε λίστα C2 μένει «high»
+
+
 class NetState:
     def __init__(self, mode, iface, me_ips, gateway, geo=True, rdns=True, cfg=None, history=None, intel=None):
         self.lock = threading.RLock()
@@ -101,6 +108,7 @@ class NetState:
         self.w_dnstun, self.w_dga = Window(th["dns_tunnel"]["window"]), Window(th["dga"]["window"])
         # επιθέσεις στο ίδιο το DNS: amplification, flood, NXDOMAIN flood / random subdomain, rebinding
         self.w_dnsamp = Window(th["dns_amplification"]["window"])
+        self.w_p2p = DistinctWindow(P2P_WINDOW)  # 🔁 τοπική συσκευή → διαφορετικοί «peers» στο Internet σε τυχαίες θύρες
         self.w_dnsflood = Window(th["dns_flood"]["window"])
         self.w_nxflood = Window(th["nxdomain_flood"]["window"])
         self.dns_qids = collections.OrderedDict()  # (πελάτης, server, txid) → t: ερωτήματα που είδαμε
@@ -366,10 +374,23 @@ class NetState:
                 benign = self._expected_sweep(actor)
             except Exception as e:
                 log("expected sweep:", e)
+        # 🔁 Η συσκευή κάνει P2P αυτή τη στιγμή; Τότε «μιλά με IP σε μαύρη λίστα / σε περίεργη θύρα» έχει αθώα εξήγηση:
+        # στο torrent μιλάς με τυχαίους υπολογιστές. Το λέμε (πεδίο p2p) και, αν δεν είναι λίστα C2, χαμηλώνουμε σε «low».
+        p2p = None
+        if typ in P2P_NOISY or typ.startswith(P2P_NOISY_RULE):
+            for ip in (target, actor, origin):
+                n = self.p2p_peers(ip, t)
+                if n >= P2P_MIN_PEERS:
+                    p2p = {"ip": ip, "peers": n}
+                    break
+        if p2p and typ in P2P_DOWNGRADE and sev == "med":
+            sev = "low"
         self.alert_seq += 1
         lab = actor in self.lab_ips
         a = dict(id=self.alert_seq, t=t, type=typ, sev=sev, actor=actor,
                  target=target, detail=detail, mitre=mitre or mitre_for(typ), lab=lab)
+        if p2p:
+            a["p2p"] = p2p
         if benign:  # γνωστή αθώα εξήγηση (π.χ. το δικό σου Tor): φαίνεται, αλλά δεν «χρωματίζει» τίποτα
             a["benign"], mark = benign, False
         mine = None if lab else (self._selftest(actor, t) or (self._selftest(origin, t) if origin else None))
@@ -557,12 +578,25 @@ class NetState:
     def _th(self, name):
         return self.cfg["thresholds"][name]
 
+    def p2p_peers(self, ip, t):
+        """Πόσους διαφορετικούς υπολογιστές του Internet «χτύπησε» η τοπική συσκευή σε τυχαίες θύρες τα τελευταία 5′.
+        Πολλοί (≥ P2P_MIN_PEERS) = τρέχει πρόγραμμα P2P (torrent, Stremio…): εξηγεί γιατί μιλά με IP σε μαύρες λίστες."""
+        dq = self.w_p2p.d.get(ip) if isinstance(ip, str) else None
+        if not dq or dq[-1][0] < t - P2P_WINDOW:
+            return 0
+        return len(self.w_p2p.c0.get(ip, ()))
+
     def detect(self, P, t):
         src, dst, proto = P["src"], P["dst"], P["proto"]
         sp, dp, fl = P.get("sp"), P.get("dp"), P.get("flags", "")
         from_me, to_me = src in self.me, dst in self.me
         if proto == "ARP":
             return self._arp(P, t)
+        # 🔁 P2P: νέα σύνδεση από τοπική συσκευή προς δημόσια IP, και οι δύο θύρες «τυχαίες» (όχι γνωστή υπηρεσία)
+        if (sp or 0) > 1024 and (dp or 0) > 1024 and dp not in SERVICES and sp not in SERVICES \
+                and (proto == "UDP" or (proto == "TCP" and fl == "S")) and ip_kind(src) == "local" and ip_kind(dst) == "public" \
+                and dst not in self.w_p2p.c0[src]:  # κάθε peer μία φορά ανά παράθυρο: μια βιντεοκλήση δεν γεμίζει τη μνήμη
+            self.w_p2p.add(src, (dst,), t)
         self._intel_check(src, dst, dp, t, proto, fl)
         techkit.observe(self, P, t)  # 🧰 Modbus/BACnet εγγραφές, ψεύτικο IPv6 RA
         ed = getattr(self, "encdns", None)
