@@ -134,7 +134,7 @@ The dashboard opens at <http://127.0.0.1:8765>. It is bound to localhost only.
 | `-f "not port 22"` | BPF capture filter |
 | `--pcap FILE --speed 10 --loop` | replay a capture 10× faster, in a loop (`--speed 0` = as fast as possible) |
 | `--me IP --gw IP` | override the auto-detected host and router in a PCAP |
-| `--no-geo` / `--no-rdns` | disable ip-api.com geolocation or reverse DNS |
+| `--no-geo` / `--no-rdns` | disable geolocation (done locally, no lookup service) or reverse DNS |
 | `--config FILE` | YAML config (defaults to `config.yaml`; see [`config.example.yaml`](config.example.yaml)) |
 | `--history FILE` | SQLite history (live: `data/netwatch.db`; demo/pcap: in memory) |
 | `--notify` / `--no-intel` | force notifications in demo/pcap, or skip downloading the blocklists |
@@ -195,7 +195,7 @@ flowchart LR
   D -->|alert + MITRE| AL[(Alerts)]
   AL --> DB[(SQLite history)]
   AL --> NT[macOS / Telegram]
-  H -. public IPs .-> G[ip-api.com batch<br/>reverse DNS]
+  H -. public IPs .-> G[local geo database<br/>reverse DNS]
   H & AL --> F[Flusher 5 Hz] -->|Server-Sent Events| UI[Browser<br/>d3-geo canvas · tabs · OSINT]
 ```
 
@@ -270,6 +270,11 @@ The sample capture is generated reproducibly by [`tools/make_sample_pcap.py`](to
 ## Ethics
 
 Only monitor and scan networks you own or are authorised to test. The monitor is passive and never sends packets to the hosts it observes. Only the 🔴 Pentest tab is active, and only when you press *Scan*. It refuses anything outside private address ranges. The web exposure check sends HEAD requests only to a fixed set of paths on a private literal IP; it never downloads response bodies or follows redirects. The SPF/DMARC check makes DNS lookups for the domain you enter and never sends email. The purple-team lab never touches the network: its attack packets are injected straight into the detection engine. The state-changing endpoints (`POST /api/scan`, `/api/lab`, `/api/exposure`) only accept JSON from the NetWatch page itself, which protects them against CSRF and DNS rebinding. Geolocation sends public destination IPs, never packet contents, to ip-api.com; turn this off with `--no-geo`. Blocklists are downloaded and no data about your traffic is sent. AbuseIPDB and Telegram are only contacted if you configure them. The exposure check sends your public IP to internetdb.shodan.io, and the CVE button sends a product name and version to the NVD. Both happen only when you click.
+
+## Credits
+
+* IP geolocation: [IP Geolocation by DB-IP](https://db-ip.com) (DB-IP Lite, CC BY 4.0), shipped with the app in `vendor/geo/`.
+* Map and charts: d3, topojson and world-atlas (ISC), in `vendor/`.
 
 ## Security and changes
 

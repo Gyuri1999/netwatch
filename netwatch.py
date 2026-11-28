@@ -119,7 +119,7 @@ def main():
     ap.add_argument("-f", "--filter", default="", help="BPF φίλτρο (π.χ. 'not port 22')")
     ap.add_argument("--port", type=int, default=8765)
     ap.add_argument("--no-open", action="store_true", help="να μην ανοίξει αυτόματα ο browser")
-    ap.add_argument("--no-geo", action="store_true", help="χωρίς γεωεντοπισμό μέσω ip-api.com")
+    ap.add_argument("--no-geo", action="store_true", help="χωρίς γεωεντοπισμό (γίνεται τοπικά, με τη βάση DB-IP Lite που έρχεται με την εφαρμογή)")
     ap.add_argument("--no-rdns", action="store_true", help="χωρίς reverse DNS")
     ap.add_argument("--pcap", help="αναπαραγωγή αρχείου .pcap/.pcapng αντί για live (χωρίς root)")
     ap.add_argument("--speed", type=float, default=1.0, help="ταχύτητα pcap (1 = πραγματική, 0 = μέγιστη)")

@@ -50,7 +50,10 @@ Out of scope:
 
 ## What NetWatch sends out
 
-NetWatch watches your traffic locally, but a few features do contact outside services, from the server side:
-IP geolocation (public destination addresses are sent to ip-api.com), threat-intelligence list downloads,
-the update check on GitHub, and lookups you start yourself (for example CVE or WHOIS). None of them send
-packet contents, passwords or private addresses. Geolocation and reverse DNS can be switched off.
+NetWatch watches your traffic locally. IP geolocation is also local: it uses the DB-IP Lite database shipped in
+`vendor/geo/`, so the addresses you talk to are not sent anywhere.
+
+A few features do contact outside services, from the server side: one HTTPS request that asks "what is my
+public IP?", threat-intelligence list downloads, the update check on GitHub, reverse DNS, and lookups you start
+yourself (for example CVE, WHOIS or the anonymity check). None of them send packet contents, passwords or private
+addresses. Geolocation and reverse DNS can be switched off.

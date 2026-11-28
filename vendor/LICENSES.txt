@@ -21,3 +21,12 @@ INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
 OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER
 TORTIOUS ACTION, ARISING OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF
 THIS SOFTWARE.
+
+
+----------------------------------------------------------------------
+
+geo/dbip-lite.zip — derived from DB-IP Lite (country and ASN), https://db-ip.com
+Licensed under the Creative Commons Attribution 4.0 International License (CC BY 4.0),
+https://creativecommons.org/licenses/by/4.0/ . Attribution: "IP Geolocation by DB-IP".
+The data was converted to a compact lookup format; no values were changed.
+Country names and coordinates in countries.json come from the IANA tz database (public domain).

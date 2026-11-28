@@ -1132,7 +1132,7 @@ cv.addEventListener('mousemove',e=>{const[n,x,y]=pick(e);const tip=$('tip');
   const hits=(h.hits||[]).slice(0,3).map(([p,c,s])=>`${p}${s?' '+s:''}`).join(', ');
   const al=aliasOf(h),dt=h.kind==='local'&&h.dlabel?`${h.dicon} ${esc(h.dlabel)}${h.vendor?' · <span style="color:var(--dim)">'+esc(h.vendor)+'</span>':''}<br>`:'';
   tip.innerHTML=`<b style="color:var(--hi)">${al?esc(al)+' · ':''}${esc(h.ip)}</b> ${h.threat>=2?'<span class="tag r">ΕΠΙΤΙΘΕΤΑΙ</span>':''}<br>${dt}${role?role+'<br>':''}${st?st+'<br>':''}${hname(h)?esc(hname(h))+'<br>':''}`+(v6.length?`<span style="color:var(--dim)">και IPv6: ${esc(v6.slice(0,2).join(', '))}</span><br>`:'')+
-   (g?`${flag(g.countryCode)} ${esc(g.city)}, ${esc(g.country)}<br><span style="color:var(--dim)">${esc(g.isp)} · ${esc(g.as||'')}</span><br>`:'')+
+   (g?`${flag(g.countryCode)} ${esc([g.city,g.country].filter(Boolean).join(', '))}<br><span style="color:var(--dim)">${esc(g.isp)} · ${esc(g.as||'')}</span><br>`:'')+
    (h.mac?`<span style="color:var(--dim)">MAC ${esc(h.mac)}</span><br>`:'')+
    `↑ ${fmtB(h.bytes_out)} &nbsp; ↓ ${fmtB(h.bytes_in)}`+(hits?`<br>🎯 ${esc(hits)}`:'')+'<br><span style="color:var(--dim)">κλικ για λεπτομέρειες</span>';
   placeTip(tip,x,y)});
@@ -1589,7 +1589,7 @@ function renderDet(){
    <span>Hostname</span><span>${esc(h.rdns||'—')}</span>
    <span>Domains</span><span>${(h.names||[]).map(esc).join('<br>')||'—'}</span>
    ${h.mac?`<span>MAC</span><span>${esc(h.mac)}${randMac(h.mac)?' <span class="sm">(τυχαία — iPhone/Android ιδιωτική διεύθυνση)</span>':''}</span>`:''}
-   ${g?`<span>Χώρα</span><span>${flag(g.countryCode)} ${esc(g.country)}</span><span>Πόλη</span><span>${esc(g.city)}${g.regionName?', '+esc(g.regionName):''}</span>
+   ${g?`<span>Χώρα</span><span>${flag(g.countryCode)} ${esc(g.country)}</span><span>Πόλη</span><span>${g.city?esc(g.city)+(g.regionName?', '+esc(g.regionName):''):`<span class="sm" title="${esc(TT('Ο γεωεντοπισμός γίνεται τοπικά, σε επίπεδο χώρας — καμία IP δεν φεύγει από τον υπολογιστή σου. Πηγή: DB-IP (db-ip.com)','Geolocation is done locally, at country level — no IP leaves your computer. Source: DB-IP (db-ip.com)'))}">${TT('μόνο χώρα · τοπική βάση DB-IP','country only · local DB-IP database')}</span>`}</span>
    <span>Συντεταγμένες</span><span>${g.lat}, ${g.lon}</span><span>ISP</span><span>${esc(g.isp)}</span><span>Οργανισμός</span><span>${esc(g.org||'—')}</span><span>ASN</span><span>${esc(g.as||'—')}</span>`:''}
    <span>Πρώτη φορά</span><span>${fmtT(h.first)}</span><span>Τελευταία</span><span>${fmtT(h.last)} (${fmtDur(Date.now()/1000-h.last)} πριν)</span>
    <span>Έστειλε</span><span>${fmtB(h.bytes_out)} (${h.pkts_out} πακ.)</span><span>Έλαβε</span><span>${fmtB(h.bytes_in)} (${h.pkts_in} πακ.)</span></div>
