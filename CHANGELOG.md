@@ -19,6 +19,11 @@ Nothing yet.
 - Alerts caused by a P2P program (torrent, Stremio) carry an explanation, and blocklist hits during P2P are low
   instead of medium. A hit on a botnet (C2) list stays high. (#70)
 
+### Fixed
+- **Windows app: no more silent failure at startup.** If files are missing (the app was run from inside the zip,
+  or an antivirus removed some of them) a message says what is missing, why, and what to do. Any other startup
+  error is shown and logged. The Windows build is now also tested from a folder with Greek letters and spaces. (#73)
+
 ## 1.17.2 — 2026-11-28
 
 Fixes found while testing every tool on a second real home network.
