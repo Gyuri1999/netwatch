@@ -931,3 +931,26 @@ def test_arp_spoofing_ignores_zero_mac_and_self(state):
     # ο router όμως που αλλάζει MAC χτυπά κανονικά (δεν χαλάσαμε την ανίχνευση)
     feed(state, c, src=GW, dst=ME, proto="ARP", arp=dict(op=2, psrc=GW, pdst=ME, hwsrc="de:ad:be:ef:00:66"), dt=5)
     assert len([a for a in state.alerts if a["type"].startswith("ARP spoofing")]) == 1
+
+
+# ---------------- τύπος συσκευής: μόνο από θύρες που είναι όντως ανοιχτές ----------------
+def test_being_scanned_does_not_turn_devices_into_printers_or_cameras(state):
+    """Βρέθηκε live: η σάρωση του NetWatch στέλνει SYN στις 631/9100/515/554 κάθε συσκευής και το δίκτυο
+    έβγαινε «12 εκτυπωτές, 2 κάμερες». Ένα πακέτο ΠΡΟΣ μια θύρα δεν σημαίνει ότι η θύρα είναι ανοιχτή."""
+    c, plug = Clock(), "192.168.1.72"
+    for port in (515, 631, 9100, 554, 62078, 8009):
+        feed(state, c, src=ME, dst=plug, proto="TCP", sp=50000 + port, dp=port, flags="S")
+    assert state._dtype(state.hosts[plug])["dtype"] == "unknown"
+
+
+def test_a_device_that_answers_on_the_printer_port_is_a_printer(state):
+    c, printer = Clock(), "192.168.1.205"
+    feed(state, c, src=ME, dst=printer, proto="TCP", sp=50001, dp=9100, flags="S")
+    feed(state, c, src=printer, dst=ME, proto="TCP", sp=9100, dp=50001, flags="SA")   # απάντησε: η θύρα είναι ανοιχτή
+    assert state._dtype(state.hosts[printer])["dtype"] == "printer"
+
+
+def test_mqtt_client_is_still_recognised_as_iot(state):
+    c, esp = Clock(), "192.168.1.90"
+    feed(state, c, src=esp, dst="192.168.1.17", proto="TCP", sp=51000, dp=1883, flags="S")   # μιλά σε broker
+    assert state._dtype(state.hosts[esp])["dtype"] == "iot"
