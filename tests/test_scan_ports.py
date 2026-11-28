@@ -63,3 +63,29 @@ def test_grab_tells_timeout_from_refused(monkeypatch):
     assert pentest.grab("192.168.1.1", 80) is None and pentest.grab("192.168.1.1", 80, tell_timeout=True) is pentest.TIMED_OUT
     monkeypatch.setattr(socket, "create_connection", lambda *a, **k: (_ for _ in ()).throw(ConnectionRefusedError()))
     assert pentest.grab("192.168.1.1", 80, tell_timeout=True) is None
+
+
+def test_same_mac_on_several_ips_is_a_repeater_not_a_phone():
+    """Βρέθηκε live: 4 διευθύνσεις με την ίδια MAC έβγαιναν όλες «τυχαία MAC (κινητό/laptop)».
+    Ήταν ένας αναμεταδότης Wi‑Fi (η IP με SSH/HTTP) και οι συσκευές πίσω του."""
+    import pentest
+    rand = "τυχαία MAC (κινητό/laptop με ιδιωτικότητα)"
+    hosts = [{"ip": "192.168.1.236", "mac": "4a:22:54:00:ae:08", "vendor": rand, "services": [{"port": 22}, {"port": 80}]},
+             {"ip": "192.168.1.181", "mac": "4A:22:54:00:AE:08", "vendor": rand, "services": []},
+             {"ip": "192.168.1.197", "mac": "4a:22:54:00:ae:08", "vendor": rand, "services": []},
+             {"ip": "192.168.1.250", "mac": "28:d1:27:1a:c9:6a", "vendor": "Xiaomi", "services": []},
+             {"ip": "192.168.1.254", "mac": "48:4c:29:2e:a7:b3", "vendor": "Huawei", "gw": True, "services": [{"port": 80}]}]
+    pentest.mark_shared_macs(hosts)
+    by = {h["ip"]: h for h in hosts}
+    assert by["192.168.1.236"]["shared_mac"]["role"] == "repeater" and "αναμεταδότης" in by["192.168.1.236"]["vendor"]
+    assert by["192.168.1.181"]["shared_mac"] == {"role": "behind", "ips": ["192.168.1.181", "192.168.1.197", "192.168.1.236"], "via": "192.168.1.236"}
+    assert "πίσω από τον αναμεταδότη 192.168.1.236" in by["192.168.1.197"]["vendor"]
+    assert "shared_mac" not in by["192.168.1.250"] and by["192.168.1.250"]["vendor"] == "Xiaomi"   # μοναδική MAC: ανέγγιχτη
+    assert "shared_mac" not in by["192.168.1.254"]                                                 # ο router δεν πειράζεται
+
+
+def test_shared_mac_without_a_clear_repeater_says_so():
+    import pentest
+    hosts = [{"ip": "10.0.0.5", "mac": "aa:aa:aa:00:00:01", "services": []}, {"ip": "10.0.0.6", "mac": "aa:aa:aa:00:00:01", "services": []}]
+    pentest.mark_shared_macs(hosts)
+    assert all(h["shared_mac"]["role"] == "unknown" and "ή συσκευή με πολλές IP" in h["vendor"] for h in hosts)
