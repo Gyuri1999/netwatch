@@ -5,7 +5,14 @@ What changed in each NetWatch release, newest first. Every release with its down
 
 ## Unreleased
 
-Nothing yet.
+### Changed
+
+- **Windows app no longer uses PyInstaller.** Antivirus programs often flag PyInstaller executables as
+  malware (a false positive), which stopped the app on a real Windows 11 PC. `NetWatch.exe` is now a tiny
+  launcher (about 80 lines of C#, source in `winapp/NetWatch.cs`) that only starts the bundled, PSF-signed
+  Python with `launcher.py`. Nothing is packed or hidden: all the code ships as readable `.py` files.
+  The app is still not code-signed, so Windows SmartScreen can still ask for confirmation the first time.
+- The "open capture file" window on Windows is now the standard Windows file dialog.
 
 ## 1.18.0 — 2026-11-28
 
