@@ -212,6 +212,22 @@ def test_inconclusive_arp_is_not_called_spoofing():
     assert len(l2) == 1 and l2[0]["sev"] == "low" and "spoofing" not in l2[0]["title"] and "δεν ολοκληρώθηκε" in l2[0]["title"]
 
 
+def test_jitter_without_loss_is_not_called_packet_loss():
+    """Βρέθηκε live (δύο δίκτυα): «Απώλειες/αστάθεια προς Google DNS — Απώλεια 0%, jitter 35 ms», μέτριο.
+    Με 0% απώλεια δεν γράφουμε «Απώλειες»· είναι χαμηλό εύρημα με δική του εξήγηση."""
+    class LatJit:
+        def status(self):
+            return {"targets": [{"name": "Google DNS", "host": "8.8.8.8", "last": {"loss": 0.0, "jitter": 35, "med": 30}},
+                                {"name": "Router", "host": "192.168.1.1", "role": "gateway", "last": {"loss": 0.2, "jitter": 3, "med": 2}}]}
+    st = _state()
+    st.l2guard = st.segcheck = None
+    st.latency = LatJit()
+    wan = {f["ips"][0]: f for f in assess.build(st, "el")["findings"] if f["area"] == "WAN"}
+    jit = wan["8.8.8.8"]
+    assert jit["sev"] == "low" and "Απώλειες" not in jit["title"] and "jitter" in jit["title"] and "Δεν χάνονται πακέτα" in jit["detail"]
+    assert wan["192.168.1.1"]["sev"] == "high" and "Απώλειες" in wan["192.168.1.1"]["title"]   # πραγματική απώλεια: όπως πριν
+
+
 def test_your_own_tests_do_not_count_as_attacks():
     """Βρέθηκε live: μετά από σάρωση LAN η αναφορά έγραφε «Συσκευή του LAN σε θύρα backdoor» και «Σύνδεση Telnet»
     από τον ίδιο τον υπολογιστή του χρήστη. Ό,τι είναι σημαδεμένο «δική σου δοκιμή» ή «lab» δεν είναι επίθεση."""
