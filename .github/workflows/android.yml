@@ -64,4 +64,10 @@ jobs:
         run: |
           # το Release το φτιάχνει το release.yml (macOS)· περιμένουμε να υπάρξει
           for i in $(seq 1 40); do gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && break; sleep 15; done
-          gh release upload "$GITHUB_REF_NAME" NetWatch-android.apk --clobber
+          # Το "view" μπορεί να δει το release μια στιγμή πριν είναι έτοιμο για ανέβασμα («release not found»,
+          # έγινε στο v1.18.1): ξαναδοκιμάζουμε αντί να αποτύχουμε
+          for i in $(seq 1 10); do
+            gh release upload "$GITHUB_REF_NAME" NetWatch-android.apk --clobber && exit 0
+            echo "upload failed (try $i) - retrying..."; sleep 15
+          done
+          exit 1
