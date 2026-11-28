@@ -33,10 +33,10 @@ SERVICES = {
     20: "FTP-data", 21: "FTP", 22: "SSH", 23: "Telnet", 25: "SMTP", 53: "DNS",
     67: "DHCP", 68: "DHCP", 80: "HTTP", 110: "POP3", 123: "NTP", 137: "NetBIOS",
     138: "NetBIOS", 139: "NetBIOS", 143: "IMAP", 161: "SNMP", 443: "HTTPS",
-    445: "SMB", 465: "SMTPS", 587: "SMTP", 853: "DoT", 993: "IMAPS", 995: "POP3S",
-    1194: "OpenVPN", 1433: "MSSQL", 1701: "L2TP", 1723: "PPTP", 1900: "SSDP", 3306: "MySQL", 3389: "RDP",
+    445: "SMB", 465: "SMTPS", 515: "LPD", 554: "RTSP", 587: "SMTP", 631: "IPP", 853: "DoT", 993: "IMAPS", 995: "POP3S",
+    1194: "OpenVPN", 1433: "MSSQL", 1701: "L2TP", 1723: "PPTP", 1883: "MQTT", 1900: "SSDP", 3306: "MySQL", 3389: "RDP",
     5060: "SIP", 5222: "XMPP", 5353: "mDNS", 5355: "LLMNR", 5432: "Postgres",
-    5900: "VNC", 8080: "HTTP-alt", 8443: "HTTPS-alt", 51820: "WireGuard",
+    5900: "VNC", 6668: "Tuya", 8080: "HTTP-alt", 8443: "HTTPS-alt", 8883: "MQTT/TLS", 9100: "JetDirect", 51820: "WireGuard",
 }
 BRUTE_PORTS = {21, 22, 23, 25, 110, 143, 445, 1433, 3306, 3389, 5432, 5900}
 SUSPECT_PORTS = {1337: "backdoor", 4444: "Metasploit", 5555: "ADB/backdoor",
@@ -75,6 +75,8 @@ RISKY_SERVICES = {
     1723: ("med", "PPTP VPN: παλιό και σπασμένο (MS-CHAPv2) — βάλε WireGuard/OpenVPN/IPsec"),
     80: ("low", "HTTP: σελίδα διαχείρισης χωρίς HTTPS"), 8080: ("low", "HTTP-alt: σελίδα διαχείρισης χωρίς HTTPS"),
     9100: ("low", "Εκτυπωτής (JetDirect): δέχεται εργασίες από οποιονδήποτε"),
+    515: ("low", "LPD: παλιό πρωτόκολλο εκτύπωσης, χωρίς κωδικό"),
+    6668: ("low", "Tuya: τοπικός έλεγχος έξυπνης συσκευής (πρίζα, λάμπα) — βάλ' τη σε ξεχωριστό δίκτυο IoT"),
     22: ("low", "SSH: ασφαλές αν έχει κλειδιά ή δυνατό κωδικό"),
 }
 # Πρωτόκολλα χωρίς κρυπτογράφηση (θύρα προορισμού → όνομα)
