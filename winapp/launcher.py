@@ -1,7 +1,8 @@
 """NetWatch για Windows — η «εφαρμογή»: εικονίδιο στο system tray + παράθυρο, όπως το NetWatch.app στο Mac.
 
 Ο φάκελος της εφαρμογής (φτιάχνεται από το winapp/build.ps1):
-    NetWatch.exe        αυτό το πρόγραμμα (PyInstaller)
+    NetWatch.exe        μικρός εκκινητής (winapp/NetWatch.cs): τρέχει το launcher.py με την python/pythonw.exe
+    launcher.py         αυτό το πρόγραμμα
     python/             ενσωματωμένη Python (embeddable) + scapy/pyyaml/paho
     app/                ο κώδικας του NetWatch
 
@@ -29,6 +30,8 @@ import webbrowser
 
 IS_WIN = os.name == "nt"
 FROZEN = getattr(sys, "frozen", False)
+# Τρέχουμε ως εγκατεστημένη εφαρμογή; (το NetWatch.exe δίνει τον φάκελό της στο NETWATCH_BUNDLE· παλιά: PyInstaller)
+PACKAGED = FROZEN or bool(os.environ.get("NETWATCH_BUNDLE"))
 BUNDLE = os.environ.get("NETWATCH_BUNDLE") or (os.path.dirname(sys.executable) if FROZEN else
                                                os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "dist", "NetWatch"))
 SRC = os.path.join(BUNDLE, "app")
@@ -52,7 +55,7 @@ def python_exe():
         p = os.path.join(BUNDLE, "python", name)
         if os.path.isfile(p):
             return p
-    return sys.executable if not FROZEN else None  # σε ανάπτυξη: η ίδια Python
+    return sys.executable if not PACKAGED else None  # σε ανάπτυξη: η ίδια Python
 
 
 # ---------------- ρυθμίσεις ----------------
@@ -349,6 +352,36 @@ def open_window(url):
         webbrowser.open(url)
 
 
+def open_file_dialog(title, filters, initialdir=None):
+    """Το κανονικό παράθυρο «Άνοιγμα αρχείου» των Windows (comdlg32) → διαδρομή ή None.
+    Χωρίς tkinter: η ενσωματωμένη Python δεν το έχει, και δεν χρειάζεται ολόκληρο Tcl/Tk για ένα παράθυρο."""
+    if not IS_WIN:
+        return None
+    from ctypes import wintypes
+
+    class OPENFILENAMEW(ctypes.Structure):
+        _fields_ = [("lStructSize", wintypes.DWORD), ("hwndOwner", wintypes.HWND), ("hInstance", wintypes.HINSTANCE),
+                    ("lpstrFilter", wintypes.LPCWSTR), ("lpstrCustomFilter", wintypes.LPWSTR), ("nMaxCustFilter", wintypes.DWORD),
+                    ("nFilterIndex", wintypes.DWORD), ("lpstrFile", wintypes.LPWSTR), ("nMaxFile", wintypes.DWORD),
+                    ("lpstrFileTitle", wintypes.LPWSTR), ("nMaxFileTitle", wintypes.DWORD), ("lpstrInitialDir", wintypes.LPCWSTR),
+                    ("lpstrTitle", wintypes.LPCWSTR), ("Flags", wintypes.DWORD), ("nFileOffset", wintypes.WORD),
+                    ("nFileExtension", wintypes.WORD), ("lpstrDefExt", wintypes.LPCWSTR), ("lCustData", wintypes.LPARAM),
+                    ("lpfnHook", ctypes.c_void_p), ("lpTemplateName", wintypes.LPCWSTR), ("pvReserved", ctypes.c_void_p),
+                    ("dwReserved", wintypes.DWORD), ("FlagsEx", wintypes.DWORD)]
+    buf = ctypes.create_unicode_buffer(4096)
+    ofn = OPENFILENAMEW()
+    ofn.lStructSize = ctypes.sizeof(OPENFILENAMEW)
+    ofn.lpstrFilter = "".join(f"{name}\0{pattern}\0" for name, pattern in filters) + "\0"
+    ofn.lpstrFile = ctypes.cast(buf, wintypes.LPWSTR)
+    ofn.nMaxFile = len(buf)
+    ofn.lpstrTitle = title
+    if initialdir and os.path.isdir(initialdir):
+        ofn.lpstrInitialDir = initialdir
+    ofn.Flags = 0x00080000 | 0x00001000 | 0x00000800 | 0x00000008  # EXPLORER | FILEMUSTEXIST | PATHMUSTEXIST | NOCHANGEDIR
+    ok = ctypes.windll.comdlg32.GetOpenFileNameW(ctypes.byref(ofn))
+    return os.path.normpath(buf.value) if ok and buf.value else None
+
+
 def message(text, title="NetWatch", yesno=False):
     if not IS_WIN:
         print(f"{title}: {text}")
@@ -368,7 +401,8 @@ def autostart(enable=None):
             except OSError:
                 return False
         if enable:
-            winreg.SetValueEx(k, "NetWatch", 0, winreg.REG_SZ, f'"{sys.executable}"')
+            exe = os.path.join(BUNDLE, "NetWatch.exe") if PACKAGED else sys.executable  # όχι η pythonw.exe: το NetWatch.exe
+            winreg.SetValueEx(k, "NetWatch", 0, winreg.REG_SZ, f'"{exe}"')
         else:
             try:
                 winreg.DeleteValue(k, "NetWatch")
@@ -544,14 +578,8 @@ class App:
 
     def pick_pcap(self, *_):
         def ask():
-            import tkinter
-            from tkinter import filedialog
-            root = tkinter.Tk()
-            root.withdraw()
-            root.attributes("-topmost", True)
-            p = filedialog.askopenfilename(title="Άνοιγμα καταγραφής", filetypes=[("Καταγραφές", "*.pcap *.pcapng *.cap"), ("Όλα", "*.*")],
-                                           initialdir=os.path.join(APPDIR, "samples"))
-            root.destroy()
+            p = open_file_dialog("Άνοιγμα καταγραφής", [("Καταγραφές", "*.pcap;*.pcapng;*.cap"), ("Όλα", "*.*")],
+                                 os.path.join(APPDIR, "samples"))
             if p:
                 self.launch("pcap", os.path.normpath(p))
         threading.Thread(target=ask, daemon=True).start()
@@ -683,7 +711,9 @@ def selftest():
 
 
 # Τι πρέπει να υπάρχει δίπλα στο NetWatch.exe για να ξεκινήσει (σχετικά με τον φάκελο της εφαρμογής)
-REQUIRED = (os.path.join("python", "python.exe"), os.path.join("python", "Lib", "site-packages", "scapy", "__init__.py"),
+REQUIRED = ("launcher.py", os.path.join("python", "python.exe"), os.path.join("python", "pythonw.exe"),
+            os.path.join("python", "Lib", "site-packages", "pystray", "__init__.py"),
+            os.path.join("python", "Lib", "site-packages", "scapy", "__init__.py"),
             os.path.join("app", "netwatch.py"), os.path.join("app", "server.py"), os.path.join("app", "index.html"))
 
 
@@ -719,7 +749,7 @@ def main():
         problem = preflight()
         print(problem or "OK")
         sys.exit(1 if problem else 0)
-    problem = preflight() if FROZEN else None
+    problem = preflight() if PACKAGED else None
     if problem:
         message(problem, "NetWatch — δεν ξεκινά")
         return

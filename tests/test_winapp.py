@@ -223,3 +223,46 @@ def test_main_reports_errors_instead_of_dying_silently(monkeypatch, tmp_path):
     launcher.main()
     assert shown and "σφάλμα" in shown[0][0] and "RuntimeError: boom" in shown[0][1] and "netwatch.log" in shown[0][1]
     assert "RuntimeError: boom" in _r(str(tmp_path / "netwatch.log"))
+
+
+# ---------------- χωρίς PyInstaller: μικρός εκκινητής + η ενσωματωμένη Python ----------------
+def _read(*parts):
+    with open(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), *parts), encoding="utf-8") as f:
+        return f.read()
+
+
+def test_build_does_not_use_pyinstaller():
+    """Το «κέλυφος» του PyInstaller το χρησιμοποιούν και κακόβουλα προγράμματα: τα antivirus έβγαζαν την εφαρμογή «ιό»
+    σε πραγματικά Windows 11. Το NetWatch.exe είναι πια ένας μικρός, αναγνώσιμος εκκινητής."""
+    ps1 = _read("winapp", "build.ps1")
+    assert "-m PyInstaller" not in ps1 and "pip install --disable-pip-version-check -q pyinstaller" not in ps1
+    assert "csc.exe" in ps1 and "winapp\\NetWatch.cs" in ps1 and "launcher.py" in ps1
+    assert "pystray pillow" in ps1                      # το εικονίδιο μπαίνει στην ενσωματωμένη Python
+
+
+def test_exe_launcher_only_starts_the_bundled_python():
+    cs = _read("winapp", "NetWatch.cs")
+    assert "pythonw.exe" in cs and "launcher.py" in cs and "NETWATCH_BUNDLE" in cs
+    assert "antivirus" in cs and "Εξαγωγή όλων" in cs   # αν λείπει η Python, το λέει ο ίδιος ο εκκινητής
+    for bad in ("WebClient", "HttpClient", "Assembly.Load", "VirtualAlloc", "FromBase64String", "Registry"):
+        assert bad not in cs, bad                       # τίποτα πέρα από «ξεκίνα την Python»
+
+
+def test_packaged_mode_comes_from_the_exe_launcher(tmp_path):
+    import subprocess
+    import sys
+    code = ("import sys; sys.path.insert(0, 'winapp'); import launcher as m; "
+            "print(m.PACKAGED, m.FROZEN, m.BUNDLE == sys.argv[1], m.python_exe())")
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    env = {**os.environ, "NETWATCH_BUNDLE": str(tmp_path)}
+    out = subprocess.run([sys.executable, "-c", code, str(tmp_path)], cwd=root, env=env, capture_output=True, text=True)
+    # εγκατεστημένη εφαρμογή χωρίς φάκελο python\: ποτέ η Python του συστήματος στη θέση της
+    assert out.stdout.split() == ["True", "False", "True", "None"], out.stderr
+    assert not launcher.PACKAGED
+
+
+def test_required_files_cover_the_new_layout():
+    for rel in ("launcher.py", os.path.join("python", "pythonw.exe")):
+        assert rel in launcher.REQUIRED
+    assert "tkinter" not in _read("winapp", "launcher.py").replace("Χωρίς tkinter", "")   # η ενσωματωμένη Python δεν το έχει
+    assert launcher.open_file_dialog("x", [("Όλα", "*.*")]) is None or launcher.IS_WIN

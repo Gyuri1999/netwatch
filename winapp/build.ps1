@@ -1,7 +1,7 @@
 ﻿# Φτιάχνει την εφαρμογή NetWatch για Windows (x64), σε Windows 10/11 με Python 3.12:
 #   powershell -ExecutionPolicy Bypass -File winapp\build.ps1
 # Αποτέλεσμα:
-#   dist\NetWatch\               NetWatch.exe + python\ (ενσωματωμένη) + app\ (ο κώδικας)
+#   dist\NetWatch\               NetWatch.exe (μικρός εκκινητής) + launcher.py + python\ (ενσωματωμένη) + app\ (ο κώδικας)
 #   dist\NetWatch-windows-x64.zip
 # Δεν χρειάζεται εγκατεστημένη Python στον υπολογιστή που θα το τρέξει — μόνο το Npcap για Live.
 param([string]$PyVersion = '3.12.8')
@@ -50,18 +50,41 @@ Remove-Item (Join-Path $app 'rules\local.yaml') -ErrorAction SilentlyContinue
 $sha = (git rev-parse --short HEAD)
 Set-Content (Join-Path $app '.build_id') "$sha $(Get-Date -Format o)" -Encoding ascii
 
-Write-Host '▸ NetWatch.exe (PyInstaller)'
-& python -m pip install --disable-pip-version-check -q pyinstaller pystray pillow
+Write-Host '▸ εικονίδιο στην περιοχή ειδοποιήσεων (pystray, pillow) μέσα στην ενσωματωμένη Python'
+& python -m pip install --disable-pip-version-check -q --only-binary=:all: --platform win_amd64 `
+    --python-version $want --implementation cp --target (Join-Path $py 'Lib\site-packages') pystray pillow
+if ($LASTEXITCODE) { throw 'pip install (pystray, pillow) απέτυχε' }
+Copy-Item winapp\launcher.py (Join-Path $out 'launcher.py')
+
+# Το NetWatch.exe είναι ένας μικρός εκκινητής (winapp\NetWatch.cs, ~80 γραμμές): ξεκινά την python\pythonw.exe με το
+# launcher.py. ΟΧΙ PyInstaller: το «κέλυφός» του το χρησιμοποιούν και κακόβουλα προγράμματα, και τα antivirus έβγαζαν
+# ψευδείς συναγερμούς. Εδώ δεν υπάρχει τίποτα συμπιεσμένο ή κρυμμένο — όλος ο κώδικας είναι αναγνώσιμα αρχεία .py.
+Write-Host '▸ NetWatch.exe (εκκινητής C#)'
+& python -m pip install --disable-pip-version-check -q pillow
 & python -c @"
 from PIL import Image
 im = Image.open(r'academy/icon-512.png').convert('RGBA')
 im.save(r'$build\NetWatch.ico', sizes=[(16,16),(24,24),(32,32),(48,48),(64,64),(128,128),(256,256)])
 "@
-& python -m PyInstaller --noconfirm --clean --windowed --name NetWatch --icon "$build\NetWatch.ico" `
-    --distpath $build\exe --workpath $build\work --specpath $build `
-    --hidden-import pystray._win32 winapp\launcher.py
-if ($LASTEXITCODE) { throw 'PyInstaller απέτυχε' }
-Copy-Item -Recurse "$build\exe\NetWatch\*" $out
+if ($LASTEXITCODE) { throw 'το εικονίδιο δεν φτιάχτηκε' }
+$ver = if (Test-Path VERSION) { (Get-Content VERSION -Raw).Trim() } else { '0.0.0' }
+if ($ver -notmatch '^\d+(\.\d+){1,3}$') { $ver = '0.0.0' }
+@"
+using System.Reflection;
+[assembly: AssemblyTitle("NetWatch")]
+[assembly: AssemblyProduct("NetWatch")]
+[assembly: AssemblyDescription("NetWatch - network monitor (launcher for the bundled Python)")]
+[assembly: AssemblyCompany("NetWatch (open source) - github.com/Gyuri1999/netwatch")]
+[assembly: AssemblyCopyright("NetWatch contributors")]
+[assembly: AssemblyVersion("$ver")]
+[assembly: AssemblyFileVersion("$ver")]
+"@ | Set-Content (Join-Path $build 'AssemblyInfo.cs') -Encoding utf8
+# Ο μεταγλωττιστής C# υπάρχει σε όλα τα Windows 10/11 (.NET Framework 4.x) — δεν κατεβάζουμε τίποτα
+$csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+if (-not (Test-Path $csc)) { throw "Δεν βρέθηκε ο csc.exe ($csc)" }
+& $csc /nologo /target:winexe /platform:x64 /optimize+ /codepage:65001 "/win32icon:$build\NetWatch.ico" `
+    "/out:$out\NetWatch.exe" winapp\NetWatch.cs (Join-Path $build 'AssemblyInfo.cs')
+if ($LASTEXITCODE) { throw 'η μεταγλώττιση του NetWatch.exe απέτυχε' }
 
 @"
 NetWatch για Windows 10/11
