@@ -6120,6 +6120,18 @@ I18N.add({
   [
    "^Η πολιτική ισχύει μόνο στο (\\d+)% των μηνυμάτων\\.$",
    "The policy applies to only $1% of messages."
+  ],
+  [
+   "^αναμεταδότης Wi‑Fi / mesh — η ίδια MAC σε (\\d+) διευθύνσεις$",
+   "Wi‑Fi repeater / mesh — the same MAC on $1 addresses"
+  ],
+  [
+   "^συσκευή πίσω από τον αναμεταδότη ([0-9.]+) — φαίνεται με τη δική του MAC$",
+   "device behind the repeater $1 — it shows up with the repeater's MAC"
+  ],
+  [
+   "^η ίδια MAC σε (\\d+) διευθύνσεις — αναμεταδότης Wi‑Fi ή συσκευή με πολλές IP$",
+   "the same MAC on $1 addresses — a Wi‑Fi repeater or a device with several IPs"
   ]
  ]
 });
