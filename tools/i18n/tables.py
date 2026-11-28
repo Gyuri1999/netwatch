@@ -261,6 +261,8 @@ RISKY = {
     "SNMP: συχνά με default κωδικό «public»": "SNMP: often with the default password “public”",
     "RTSP: ροή βίντεο κάμερας": "RTSP: camera video stream",
     "MQTT: μηνύματα IoT χωρίς κρυπτογράφηση": "MQTT: IoT messages unencrypted",
+    "LPD: παλιό πρωτόκολλο εκτύπωσης, χωρίς κωδικό": "LPD: old printing protocol, no password",
+    "Tuya: τοπικός έλεγχος έξυπνης συσκευής (πρίζα, λάμπα) — βάλ' τη σε ξεχωριστό δίκτυο IoT": "Tuya: local control of a smart device (plug, bulb) — put it on a separate IoT network",
     "PPTP VPN: παλιό και σπασμένο (MS-CHAPv2) — βάλε WireGuard/OpenVPN/IPsec": "PPTP VPN: old and broken (MS-CHAPv2) — use WireGuard/OpenVPN/IPsec",
     "HTTP: σελίδα διαχείρισης χωρίς HTTPS": "HTTP: admin page without HTTPS",
     "HTTP-alt: σελίδα διαχείρισης χωρίς HTTPS": "HTTP-alt: admin page without HTTPS",

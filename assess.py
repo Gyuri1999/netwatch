@@ -306,7 +306,10 @@ def _presence_findings(state, lg):
 
 def _alert_findings(state, lg, now):
     alerts = list(getattr(state, "alerts", None) or [])
-    recent = [a for a in alerts if (a.get("t") or 0) >= now - 86400 and a.get("sev") in ("high", "med") and not a.get("benign")]
+    # όχι οι αθώες, ούτε όσες προκάλεσες εσύ (σάρωση/εργαλείο του NetWatch = selftest) ή το εργαστήριο (lab):
+    # αλλιώς κάθε σάρωση LAN κατέβαζε τον βαθμό με «Telnet από τον υπολογιστή σου» και «θύρα backdoor»
+    recent = [a for a in alerts if (a.get("t") or 0) >= now - 86400 and a.get("sev") in ("high", "med")
+              and not a.get("benign") and not a.get("selftest") and not a.get("lab")]
     if not recent:
         return []
     by = {}
