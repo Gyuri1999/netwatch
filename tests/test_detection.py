@@ -938,7 +938,7 @@ def test_being_scanned_does_not_turn_devices_into_printers_or_cameras(state):
     """Βρέθηκε live: η σάρωση του NetWatch στέλνει SYN στις 631/9100/515/554 κάθε συσκευής και το δίκτυο
     έβγαινε «12 εκτυπωτές, 2 κάμερες». Ένα πακέτο ΠΡΟΣ μια θύρα δεν σημαίνει ότι η θύρα είναι ανοιχτή."""
     c, plug = Clock(), "192.168.1.72"
-    for port in (515, 631, 9100, 554, 62078, 8009):
+    for port in (515, 631, 9100, 554, 62078, 8009, 1883, 8883):   # και οι θύρες MQTT: η σάρωση τις ρωτά σε όλους
         feed(state, c, src=ME, dst=plug, proto="TCP", sp=50000 + port, dp=port, flags="S")
     assert state._dtype(state.hosts[plug])["dtype"] == "unknown"
 

@@ -242,8 +242,11 @@ class NetState:
         import devtype
         # Θύρες για την εκτίμηση τύπου: ΜΟΝΟ όσες ξέρουμε ότι είναι ανοιχτές στη συσκευή (απάντησε SYN-ACK ή τις βρήκε η
         # σάρωση). Το h["ports"] μετρά κάθε πακέτο ΠΡΟΣ τη συσκευή — και τα δικά μας SYN της σάρωσης προς 631/9100/554 —
-        # και έκανε όλο το δίκτυο «εκτυπωτές» και «κάμερες». Εξαίρεση: MQTT ως πελάτης (η συσκευή μιλά σε broker) = IoT.
-        open_ports = set(self.services.get(h["ip"], ())) | ({1883, 8883} & set(h["ports"]))
+        # και έκανε όλο το δίκτυο «εκτυπωτές» και «κάμερες». Εξαίρεση: MQTT ως ΠΕΛΑΤΗΣ = IoT — αλλά μόνο αν η ίδια η
+        # συσκευή άνοιξε σύνδεση προς broker (self.plain μετρά ό,τι ΕΣΤΕΙΛΕ η συσκευή), όχι αν τη ρωτήσαμε εμείς στη 1883.
+        open_ports = set(self.services.get(h["ip"], ()))
+        if self.plain.get((h["ip"], "MQTT")):
+            open_ports.add(1883)
         t, icon, label, v = devtype.classify(h["mac"], sorted(h["names"]) + ([h["rdns"]] if h.get("rdns") else []),
                                              sorted(open_ports), gw=h["gw"], me=h["me"])
         out = {"dtype": t, "dicon": icon, "dlabel": label, "vendor": v}
