@@ -210,3 +210,19 @@ def test_inconclusive_arp_is_not_called_spoofing():
     st.l2guard = L2Quiet()
     l2 = [f for f in assess.build(st, "el")["findings"] if f["area"] == "L2"]
     assert len(l2) == 1 and l2[0]["sev"] == "low" and "spoofing" not in l2[0]["title"] and "δεν ολοκληρώθηκε" in l2[0]["title"]
+
+
+def test_your_own_tests_do_not_count_as_attacks():
+    """Βρέθηκε live: μετά από σάρωση LAN η αναφορά έγραφε «Συσκευή του LAN σε θύρα backdoor» και «Σύνδεση Telnet»
+    από τον ίδιο τον υπολογιστή του χρήστη. Ό,τι είναι σημαδεμένο «δική σου δοκιμή» ή «lab» δεν είναι επίθεση."""
+    st = _state()
+    st.l2guard = st.segcheck = st.latency = None
+    st.alerts.clear()
+    t = time.time()
+    st.alerts.appendleft(dict(id=901, t=t, type="Κανόνας: Σύνδεση Telnet", sev="med", actor="192.168.1.23", target="192.168.1.1",
+                              detail="x", selftest="η σάρωση του NetWatch (🔴 Pentest)"))
+    st.alerts.appendleft(dict(id=902, t=t, type="Port scan", sev="high", actor="10.66.66.11", target="192.168.1.23", detail="x", lab=True))
+    assert [f for f in assess.build(st, "el")["findings"] if f["area"] == "Επιθέσεις"] == []
+    st.alerts.appendleft(dict(id=903, t=t, type="Brute force", sev="high", actor="192.168.1.66", target="192.168.1.23", detail="x"))
+    att = [f for f in assess.build(st, "el")["findings"] if f["area"] == "Επιθέσεις"]
+    assert len(att) == 1 and "Brute force" in att[0]["title"]       # μια πραγματική επίθεση μετρά κανονικά
