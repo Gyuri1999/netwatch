@@ -265,4 +265,6 @@ def test_required_files_cover_the_new_layout():
     for rel in ("launcher.py", os.path.join("python", "pythonw.exe")):
         assert rel in launcher.REQUIRED
     assert "tkinter" not in _read("winapp", "launcher.py").replace("Χωρίς tkinter", "")   # η ενσωματωμένη Python δεν το έχει
-    assert launcher.open_file_dialog("x", [("Όλα", "*.*")]) is None or launcher.IS_WIN
+    # ΠΡΟΣΟΧΗ: μην καλέσεις εδώ το open_file_dialog σε Windows — ανοίγει πραγματικό παράθυρο και το CI κολλάει για πάντα
+    if not launcher.IS_WIN:
+        assert launcher.open_file_dialog("x", [("Όλα", "*.*")]) is None
