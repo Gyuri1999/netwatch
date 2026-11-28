@@ -5,6 +5,10 @@ What changed in each NetWatch release, newest first. Every release with its down
 
 ## Unreleased
 
+Nothing yet.
+
+## 1.18.1 — 2026-11-28
+
 ### Changed
 
 - **Windows app no longer uses PyInstaller.** Antivirus programs often flag PyInstaller executables as
