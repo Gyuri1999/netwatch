@@ -12,7 +12,7 @@ def _read(name):
 def test_changelog_lists_releases_newest_first():
     log = _read("CHANGELOG.md")
     vers = re.findall(r"^## (\d+\.\d+\.\d+) — \d{4}-\d{2}-\d{2}$", log, flags=re.M)
-    assert vers[:4] == ["1.18.0", "1.17.2", "1.17.1", "1.17.0"]
+    assert {"1.18.1", "1.18.0", "1.17.2", "1.17.1", "1.17.0"} <= set(vers) and len(vers) == len(set(vers))  # όχι σταθερή κορυφή: έσπαγε σε κάθε έκδοση
     assert vers == sorted(vers, key=lambda v: tuple(map(int, v.split("."))), reverse=True)
     assert log.index("## Unreleased") < log.index("## 1.18.0") < log.index("## 1.17.2") and "Releases page" in log
 
