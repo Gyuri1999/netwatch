@@ -147,4 +147,10 @@ jobs:
           done
           cd dist
           FILES="NetWatch-windows-x64.zip SHA256SUMS-windows"; [ -f SHA256SUMS-windows.sig ] && FILES="$FILES SHA256SUMS-windows.sig"
-          gh release upload "$GITHUB_REF_NAME" $FILES --clobber
+          # Το "view" μπορεί να δει το release μια στιγμή πριν είναι έτοιμο για ανέβασμα («release not found»,
+          # έγινε στο v1.18.1): ξαναδοκιμάζουμε αντί να αποτύχουμε
+          for i in $(seq 1 10); do
+            gh release upload "$GITHUB_REF_NAME" $FILES --clobber && exit 0
+            echo "upload failed (try $i) - retrying..."; sleep 15
+          done
+          exit 1
