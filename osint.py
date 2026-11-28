@@ -10,52 +10,63 @@ import time
 import urllib.parse
 import urllib.request
 
-from core import GEO_FIELDS, ip_kind, log
+from core import ip_kind, log
 
 
 # ---------------- OSINT helpers ----------------
 def geo_worker(state):
+    """Γεωεντοπισμός των δημόσιων IP — ΤΟΠΙΚΑ (geodb: DB-IP Lite μέσα στην εφαρμογή). Καμία IP δεν φεύγει από τον
+    υπολογιστή· πριν στέλνονταν όλες, χωρίς κρυπτογράφηση, στο ip-api.com."""
+    import geodb
     while True:
-        ips = [state.geo_q.get()]
-        time.sleep(1.0)
-        while len(ips) < 100:
-            try:
-                ips.append(state.geo_q.get_nowait())
-            except queue.Empty:
-                break
+        ip = state.geo_q.get()
         try:
-            req = urllib.request.Request(
-                f"http://ip-api.com/batch?fields={GEO_FIELDS}", data=json.dumps(ips).encode(),
-                headers={"Content-Type": "application/json", "User-Agent": "netwatch/1.0"})
-            with urllib.request.urlopen(req, timeout=10) as r:
-                res = json.load(r)
-                rl, ttl = r.headers.get("X-Rl"), r.headers.get("X-Ttl")
-            with state.lock:
-                for g in res:
-                    if g.get("status") == "success":
-                        h = state.hosts.get(g["query"])
-                        if h is not None:
-                            h["geo"] = g
-                            state.dirty.add(g["query"])
-            if rl == "0" and ttl:
-                time.sleep(int(ttl) + 1)
-        except Exception as e:
+            g = geodb.lookup(ip)
+        except Exception as e:  # noqa: BLE001
             log("geo lookup error:", e)
-            for ip in ips:
-                state.geo_q.put(ip)
-            time.sleep(15)
-        time.sleep(4.2)  # free tier: 15 batch requests / λεπτό
+            g = None
+        if g:
+            with state.lock:
+                h = state.hosts.get(ip)
+                if h is not None:
+                    h["geo"] = g
+                    state.dirty.add(ip)
+
+
+# Η δική μας δημόσια IP δεν βρίσκεται τοπικά: ρωτάμε ΜΙΑ φορά, με HTTPS, «ποια είναι η IP μου;». Η απάντηση δεν λέει
+# σε κανέναν με ποιον μιλάμε. Χώρα/πάροχος βγαίνουν μετά από την τοπική βάση.
+PUBLIC_IP_URLS = ("https://1.1.1.1/cdn-cgi/trace", "https://api.ipify.org")
+
+
+def public_ip(timeout=6, opener=urllib.request.urlopen):
+    for url in PUBLIC_IP_URLS:
+        try:
+            req = urllib.request.Request(url, headers={"User-Agent": "netwatch"})
+            with opener(req, timeout=timeout) as r:
+                text = r.read(2048).decode("ascii", "replace")
+        except Exception:  # noqa: BLE001
+            continue
+        m = re.search(r"^ip=(\S+)$", text, flags=re.M)
+        cand = (m.group(1) if m else text).strip()
+        try:
+            if ipaddress.ip_address(cand).is_global:
+                return cand
+        except ValueError:
+            continue
+    return None
 
 
 def fetch_home(state):
     try:
-        with urllib.request.urlopen(f"http://ip-api.com/json/?fields={GEO_FIELDS}", timeout=10) as r:
-            g = json.load(r)
-        if g.get("status") == "success":
-            with state.lock:
-                state.home = g
-            state.publish({"type": "home", "home": g})
-            log(f"Δημόσια IP {g['query']} — {g.get('city')}, {g.get('country')} ({g.get('isp')})")
+        import geodb
+        ip = public_ip()
+        if not ip:
+            return
+        g = geodb.lookup(ip) or {"status": "success", "query": ip, "country": None, "countryCode": None, "city": None, "isp": None}
+        with state.lock:
+            state.home = g
+        state.publish({"type": "home", "home": g})
+        log(f"Δημόσια IP {g['query']} — {g.get('country') or '?'} ({g.get('isp') or '?'})")
     except Exception as e:
         log("home lookup error:", e)
 
@@ -109,13 +120,14 @@ def sys_trace(target, max_hops=20, timeout=60, v6=False):
 
 
 def geo_batch(ips):
-    ips = [i for i in dict.fromkeys(ips) if i and ip_kind(i) == "public"][:100]
-    if not ips:
-        return {}
-    req = urllib.request.Request(f"http://ip-api.com/batch?fields={GEO_FIELDS}", data=json.dumps(ips).encode(),
-                                 headers={"Content-Type": "application/json"})
-    with urllib.request.urlopen(req, timeout=10) as r:
-        return {g["query"]: g for g in json.load(r) if g.get("status") == "success"}
+    """{ip: γεωεντοπισμός} για δημόσιες IP — τοπικά (geodb), χωρίς αίτημα προς τα έξω."""
+    import geodb
+    out = {}
+    for ip in [i for i in dict.fromkeys(ips) if i and ip_kind(i) == "public"][:100]:
+        g = geodb.lookup(ip)
+        if g:
+            out[ip] = g
+    return out
 
 
 def traceroute(state, ip, max_hops=20):

@@ -30,7 +30,8 @@ def test_vendor_files_are_exactly_the_published_ones():
     for name, want in PINNED.items():
         data = open(os.path.join(ROOT, "vendor", name), "rb").read()
         assert base64.b64encode(hashlib.sha256(data).digest()).decode() == want, f"το vendor/{name} άλλαξε"
-    assert set(PINNED) == {f for f in os.listdir(os.path.join(ROOT, "vendor")) if not f.endswith((".md", ".txt"))}
+    vendor = os.path.join(ROOT, "vendor")   # (ο υποφάκελος geo/ ελέγχεται στο test_geodb.py)
+    assert set(PINNED) == {f for f in os.listdir(vendor) if os.path.isfile(os.path.join(vendor, f)) and not f.endswith((".md", ".txt"))}
     assert "ISC License" in _read("vendor", "LICENSES.txt")
 
 

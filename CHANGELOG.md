@@ -5,7 +5,15 @@ What changed in each NetWatch release, newest first. Every release with its down
 
 ## Unreleased
 
-Nothing yet.
+### Security
+- **IP geolocation is now local.** NetWatch used to send every public address your network talked to, unencrypted,
+  to ip-api.com. It now looks them up in the DB-IP Lite database shipped with the app, so none of them leave the
+  computer and the map works offline. It gives country and provider, not city. Your own public IP is found with
+  one HTTPS request. (IP Geolocation by DB-IP, https://db-ip.com)
+
+### Changed
+- Alerts caused by a P2P program (torrent, Stremio) carry an explanation, and blocklist hits during P2P are low
+  instead of medium. A hit on a botnet (C2) list stays high. (#70)
 
 ## 1.17.2 — 2026-11-28
 

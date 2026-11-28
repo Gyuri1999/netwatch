@@ -21,7 +21,7 @@ def test_security_policy_says_how_to_report_and_what_leaves_the_computer():
     sec = _read("SECURITY.md")
     assert "Report a vulnerability" in sec and "security/advisories/new" in sec
     assert "not** open a public issue" in sec                  # όχι λεπτομέρειες δημόσια
-    assert "## What NetWatch sends out" in sec and "ip-api.com" in sec   # ειλικρινής λίστα, όχι «τίποτα δεν φεύγει»
+    assert "## What NetWatch sends out" in sec and "geolocation is also local" in sec and "what is my" in sec   # ειλικρινής λίστα, όχι «τίποτα δεν φεύγει»
     assert "@" not in sec.replace("@Gyuri1999", "")            # καμία προσωπική διεύθυνση email στο δημόσιο αρχείο
 
 
@@ -35,4 +35,4 @@ def test_app_does_not_claim_that_nothing_leaves_the_computer():
     """Η εφαρμογή στέλνει δημόσιες IP για γεωεντοπισμό και ελέγχει για ενημέρωση: το λέμε, δεν γράφουμε «τίποτα δεν φεύγει»."""
     s = _read("golive.js")
     assert "Τίποτα δεν φεύγει από τον υπολογιστή σου" not in s and "Nothing leaves your computer" not in s
-    assert "γεωεντοπισμός" in s and "geolocation" in s and "ούτε κωδικούς" in s
+    assert "γεωεντοπισμός του χάρτη γίνεται τοπικά" in s and "Map geolocation is done locally" in s and "ούτε κωδικούς" in s

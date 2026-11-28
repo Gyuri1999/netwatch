@@ -13,4 +13,14 @@ with no Internet and nothing is requested from outside when you open NetWatch.
 The hashes are the ones published for these exact versions; `tests/test_vendor.py` fails if a file changes.
 Files are unmodified. Licences: see `LICENSES.txt`.
 
+## geo/dbip-lite.zip — local IP geolocation
+
+Built by `tools/geo/build_geodb.py` from the **DB-IP Lite** country and ASN databases
+([IP Geolocation by DB-IP](https://db-ip.com), CC BY 4.0), month given in `meta.json` inside the zip. Country names
+and positions come from the public-domain tz database. With this file NetWatch geolocates addresses locally and
+sends none of them to a lookup service.
+
+To refresh it: download the current `dbip-country-lite-YYYY-MM.csv.gz` and `dbip-asn-lite-YYYY-MM.csv.gz` from
+https://db-ip.com/db/lite.php and run the tool with both paths.
+
 To update a library: download the new version, replace the file, update the version and hash here and in the test.
