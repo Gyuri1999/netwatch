@@ -7,6 +7,22 @@ What changed in each NetWatch release, newest first. Every release with its down
 
 Nothing yet.
 
+## 1.17.2 — 2026-11-28
+
+Fixes found while testing every tool on a second real home network.
+
+### Fixed
+- Device types are guessed only from ports that are really open. A LAN scan no longer turns the whole
+  network into "12 printers" or "12 smart devices". (#63, #67)
+- The assessment no longer counts your own NetWatch scan as an attack. (#64)
+- Jitter with no packet loss is reported as "unsteady delay", low severity, instead of "packet loss". (#66)
+- The same MAC address on several IPs is shown as a Wi‑Fi repeater and the devices behind it, not as
+  phones with a random MAC. (#68)
+
+### Added
+- Port names for Tuya (6668), LPD (515), IPP (631), JetDirect (9100), RTSP (554) and MQTT (1883, 8883).
+  A device with the Tuya port open is recognised as a smart device. (#65)
+
 ## 1.17.1 — 2026-11-26
 
 Security and reliability. No new features.
