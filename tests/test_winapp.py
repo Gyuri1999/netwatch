@@ -182,3 +182,44 @@ def test_live_instance_detects_dead_and_alive(tmp_path, monkeypatch):
             return False
     monkeypatch.setattr(launcher.urllib.request, "urlopen", lambda *a, **k: R())
     assert launcher.live_instance(timeout=0.1) == 8765
+
+
+# ---------------- έλεγχος πριν από την εκκίνηση: ποτέ σιωπηλή αποτυχία ----------------
+def _bundle(tmp_path, skip=()):
+    b = str(tmp_path / "NetWatch")
+    for rel in launcher.REQUIRED:
+        if rel not in skip:
+            _w(os.path.join(b, rel), "x")
+    return b
+
+
+def test_preflight_passes_when_everything_is_there(tmp_path):
+    assert launcher.preflight(_bundle(tmp_path)) is None
+
+
+def test_preflight_explains_antivirus_removed_files(tmp_path):
+    """Βρέθηκε σε πραγματικά Windows 11: το antivirus έσβησε αρχεία, ο χρήστης το απενεργοποίησε, και η εφαρμογή
+    συνέχιζε να μην ανοίγει — χωρίς κανένα μήνυμα. Τα αρχεία μένουν σβησμένα· πρέπει να το πούμε."""
+    gone = os.path.join("python", "python.exe")
+    msg = launcher.preflight(_bundle(tmp_path, skip=(gone,)))
+    assert msg and "antivirus" in msg and "αποσυμπίεσε ξανά" in msg and gone in msg
+    assert "εξαίρεση" in msg and "μένουν σβησμένα" in msg
+
+
+def test_preflight_explains_running_from_inside_the_zip(tmp_path):
+    b = str(tmp_path / "NetWatch-windows-x64.zip" / "NetWatch")
+    os.makedirs(b)
+    msg = launcher.preflight(b)
+    assert msg and "Εξαγωγή όλων" in msg and "antivirus" not in msg
+
+
+def test_main_reports_errors_instead_of_dying_silently(monkeypatch, tmp_path):
+    shown = []
+    monkeypatch.setattr(launcher, "message", lambda text, title="NetWatch", yesno=False: shown.append((title, text)) or False)
+    monkeypatch.setattr(launcher, "SUPPORT", str(tmp_path))
+    monkeypatch.setattr(launcher, "LOG", str(tmp_path / "netwatch.log"))
+    monkeypatch.setattr(launcher, "_main", lambda: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(launcher.sys, "argv", ["NetWatch.exe"])
+    launcher.main()
+    assert shown and "σφάλμα" in shown[0][0] and "RuntimeError: boom" in shown[0][1] and "netwatch.log" in shown[0][1]
+    assert "RuntimeError: boom" in _r(str(tmp_path / "netwatch.log"))

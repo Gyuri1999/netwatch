@@ -36,6 +36,40 @@ jobs:
           $p = Start-Process dist\NetWatch\NetWatch.exe -ArgumentList '--selftest' -Wait -PassThru
           Get-Content "$env:LOCALAPPDATA\NetWatch\selftest.txt"
           if ($p.ExitCode -ne 0) { Get-Content "$env:LOCALAPPDATA\NetWatch\netwatch.log" -Tail 40; exit 1 }
+      - name: Preflight (all required files are in the built app)
+        shell: pwsh
+        run: |
+          $p = Start-Process dist\NetWatch\NetWatch.exe -ArgumentList '--preflight' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Write-Error 'preflight failed on a complete build'; exit 1 }
+      - name: Self-test from a folder with Greek letters and spaces (e.g. user "Γιώργος")
+        shell: pwsh
+        # Πολλά ελληνικά Windows έχουν όνομα χρήστη με ελληνικά: C:\Users\Γιώργος\Λήψεις\… — δεν είχε δοκιμαστεί ποτέ
+        run: |
+          $base = Join-Path $env:RUNNER_TEMP 'Χρήστης Γιώργος'
+          $dl = Join-Path $base 'Λήψεις\NetWatch εφαρμογή'
+          $local = Join-Path $base 'AppData\Local'
+          New-Item -ItemType Directory -Force $dl, $local | Out-Null
+          Copy-Item -Recurse dist\NetWatch\* $dl
+          $old = $env:LOCALAPPDATA
+          $env:LOCALAPPDATA = $local
+          $p = Start-Process (Join-Path $dl 'NetWatch.exe') -ArgumentList '--selftest' -Wait -PassThru
+          $env:LOCALAPPDATA = $old
+          $res = Join-Path $local 'NetWatch\selftest.txt'
+          if (Test-Path $res) { Get-Content $res -Encoding utf8 } else { Write-Host 'no selftest.txt' }
+          if ($p.ExitCode -ne 0) {
+            $log = Join-Path $local 'NetWatch\netwatch.log'
+            if (Test-Path $log) { Get-Content $log -Tail 60 -Encoding utf8 }
+            Write-Error 'self-test failed in a Greek-named folder'; exit 1
+          }
+      - name: A file removed by antivirus gives a clear failure, not silence
+        shell: pwsh
+        run: |
+          $t = Join-Path $env:RUNNER_TEMP 'av-removed'
+          New-Item -ItemType Directory -Force $t | Out-Null
+          Copy-Item -Recurse dist\NetWatch $t
+          Remove-Item (Join-Path $t 'NetWatch\python\python.exe')
+          $p = Start-Process (Join-Path $t 'NetWatch\NetWatch.exe') -ArgumentList '--preflight' -Wait -PassThru
+          if ($p.ExitCode -ne 1) { Write-Error "preflight should fail when python.exe is missing (exit $($p.ExitCode))"; exit 1 }
       - name: Agent mode certificate with the bundled Python (no openssl on PATH)
         shell: pwsh
         run: |
