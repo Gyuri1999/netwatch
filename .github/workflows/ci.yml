@@ -34,6 +34,7 @@ jobs:
   windows:
     # Windows 11 / Server 2022: tests, εκκίνηση σε demo και αναπαραγωγή pcap (χωρίς Npcap — δεν χρειάζεται εδώ)
     runs-on: windows-latest
+    timeout-minutes: 20   # ένα test που περιμένει παράθυρο δεν πρέπει να κρατά το CI ώρες
     env:
       PYTHONUTF8: "1"
     steps:
