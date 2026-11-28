@@ -682,9 +682,61 @@ def selftest():
     return 0 if ok else 1
 
 
+# Τι πρέπει να υπάρχει δίπλα στο NetWatch.exe για να ξεκινήσει (σχετικά με τον φάκελο της εφαρμογής)
+REQUIRED = (os.path.join("python", "python.exe"), os.path.join("python", "Lib", "site-packages", "scapy", "__init__.py"),
+            os.path.join("app", "netwatch.py"), os.path.join("app", "server.py"), os.path.join("app", "index.html"))
+
+
+def preflight(bundle=BUNDLE):
+    """→ None αν όλα είναι στη θέση τους, αλλιώς κείμενο για τον χρήστη (γιατί δεν ανοίγει και τι να κάνει).
+
+    Δύο συνηθισμένες αιτίες που η εφαρμογή «δεν κάνει τίποτα»: (α) έτρεξε μέσα από το zip, χωρίς αποσυμπίεση·
+    (β) ένα antivirus έσβησε ή έβαλε σε καραντίνα αρχεία της — και μένουν σβησμένα και αφού το απενεργοποιήσεις."""
+    missing = [r for r in REQUIRED if not os.path.isfile(os.path.join(bundle, r))]
+    if not missing:
+        return None
+    low = bundle.lower()
+    in_zip = ".zip" in low or ("\\temp\\" in low and not os.path.isdir(os.path.join(bundle, "app")))
+    lines = ["Το NetWatch δεν μπορεί να ξεκινήσει: λείπουν αρχεία του.", ""]
+    if in_zip:
+        lines += ["Φαίνεται ότι το άνοιξες μέσα από το αρχείο .zip.",
+                  "Κάνε πρώτα δεξί κλικ στο zip → «Εξαγωγή όλων…» και άνοιξε το NetWatch.exe από τον φάκελο που θα δημιουργηθεί."]
+    else:
+        lines += ["Συνήθως φταίει ένα antivirus που έσβησε ή έβαλε σε καραντίνα αρχεία της εφαρμογής.",
+                  "Τα αρχεία μένουν σβησμένα ακόμα κι αν μετά απενεργοποιήσεις το antivirus.", "",
+                  "Τι να κάνεις:",
+                  "1. Στο antivirus, βάλε εξαίρεση για αυτόν τον φάκελο.",
+                  "2. Σβήσε τον φάκελο και αποσυμπίεσε ξανά το zip.",
+                  "3. Άνοιξε ξανά το NetWatch.exe."]
+    lines += ["", "Λείπουν:"] + ["  • " + m for m in missing[:5]] + ["", "Φάκελος: " + bundle]
+    return "\n".join(lines)
+
+
 def main():
     if "--selftest" in sys.argv:
         sys.exit(selftest())
+    if "--preflight" in sys.argv:  # για το CI: τυπώνει τι λείπει και τελειώνει (χωρίς παράθυρο)
+        problem = preflight()
+        print(problem or "OK")
+        sys.exit(1 if problem else 0)
+    problem = preflight() if FROZEN else None
+    if problem:
+        message(problem, "NetWatch — δεν ξεκινά")
+        return
+    try:
+        _main()
+    except Exception as e:  # noqa: BLE001 — η εφαρμογή δεν έχει κονσόλα: χωρίς αυτό θα έκλεινε χωρίς να πει τίποτα
+        import traceback
+        try:
+            os.makedirs(SUPPORT, exist_ok=True)
+            with open(LOG, "a", encoding="utf-8") as f:
+                f.write("\n[launcher] " + traceback.format_exc())
+        except OSError:
+            pass
+        message(f"Το NetWatch σταμάτησε με σφάλμα:\n\n{type(e).__name__}: {e}\n\nΛεπτομέρειες στο αρχείο:\n{LOG}", "NetWatch — σφάλμα")
+
+
+def _main():
     os.makedirs(SUPPORT, exist_ok=True)
     if not single_instance():
         return
