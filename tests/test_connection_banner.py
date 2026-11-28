@@ -25,3 +25,9 @@ def test_reconnects_alone_with_backoff_and_says_so():
     assert re.search(r"setTimeout\(connect,Math\.min\(10000,2000\+CONN\.tries\*1000\)\)", CONN)   # 3″, 4″ … έως 10″
     assert "CONN.es.close()" in CONN and "clearTimeout(CONN.timer)" in CONN                       # ποτέ δύο συνδέσεις μαζί
     assert "if(CONN.since)connUp()" in CONN                   # και όταν έρθει δεδομένο χωρίς «open» (π.χ. online demo)
+
+
+def test_alert_card_explains_p2p():
+    """🔁 Όταν ο συναγερμός έχει πεδίο p2p, η κάρτα εξηγεί (ελληνικά + αγγλικά) και λέει τι να κάνεις αν δεν είναι δικό σου."""
+    assert "${a.p2p?" in HTML and "Πιθανότατα P2P" in HTML and "Probably P2P" in HTML
+    assert "συνήθως δεν είναι επίθεση" in HTML and "Αν δεν τρέχεις τέτοιο πρόγραμμα" in HTML

@@ -954,3 +954,52 @@ def test_mqtt_client_is_still_recognised_as_iot(state):
     c, esp = Clock(), "192.168.1.90"
     feed(state, c, src=esp, dst="192.168.1.17", proto="TCP", sp=51000, dp=1883, flags="S")   # μιλά σε broker
     assert state._dtype(state.hosts[esp])["dtype"] == "iot"
+
+
+# ---------------- 🔁 P2P (torrent, Stremio…): εξήγηση αντί για σκέτο «κακόβουλη IP» ----------------
+def _torrent(state, c, host, n):
+    for i in range(n):   # νέες συνδέσεις προς n διαφορετικούς υπολογιστές, τυχαίες θύρες και από τις δύο πλευρές
+        feed(state, c, src=host, dst=f"45.{10 + i // 200}.{i % 200}.7", proto="TCP", sp=50000 + i, dp=20000 + i * 7 % 40000, flags="S")
+
+
+def test_p2p_is_recognised_from_many_peers_on_random_ports(state):
+    c = Clock()
+    _torrent(state, c, ME, 30)
+    assert state.p2p_peers(ME, c()) >= 30
+    assert state.p2p_peers("192.168.1.77", c()) == 0                      # άλλη συσκευή: όχι
+
+
+def test_normal_browsing_is_not_p2p(state):
+    c = Clock()
+    for i in range(60):   # 60 διαφορετικοί web servers, αλλά σε γνωστή θύρα (443)
+        feed(state, c, src=ME, dst=f"93.184.{i}.34", proto="TCP", sp=51000 + i, dp=443, flags="S")
+    assert state.p2p_peers(ME, c()) == 0
+
+
+def test_blocklisted_peer_during_p2p_is_explained_and_low(state):
+    """Βρέθηκε live: το Stremio (torrent) έβγαζε «Σύνδεση σε κακόβουλη IP» (μέτριο) για peers που είναι σε λίστες."""
+    c = Clock()
+    _torrent(state, c, ME, 30)
+    state.alert("Σύνδεση σε κακόβουλη IP", "med", "85.203.46.28", ME, "x", c())
+    a = state.alerts[0]
+    assert a["sev"] == "low" and a["p2p"]["ip"] == ME and a["p2p"]["peers"] >= 30
+
+
+def test_c2_list_hit_stays_high_even_during_p2p(state):
+    c = Clock()
+    _torrent(state, c, ME, 30)
+    state.alert("Σύνδεση σε κακόβουλη IP", "high", "185.1.2.3", ME, "πιθανή μόλυνση από botnet!", c())
+    a = state.alerts[0]
+    assert a["sev"] == "high" and a["p2p"]["peers"] >= 30                # εξηγείται, αλλά ΔΕΝ χαμηλώνει
+
+
+def test_without_p2p_the_alert_is_unchanged(state):
+    state.alert("Σύνδεση σε κακόβουλη IP", "med", "85.203.46.28", ME, "x", Clock()())
+    a = state.alerts[0]
+    assert a["sev"] == "med" and "p2p" not in a
+
+
+def test_p2p_state_expires(state):
+    c = Clock()
+    _torrent(state, c, ME, 30)
+    assert state.p2p_peers(ME, c() + 301) == 0                            # 5′ χωρίς νέους peers: όχι πια P2P
