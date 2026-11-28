@@ -252,7 +252,16 @@ def _wan_findings(state, lg):
         if loss is None:
             continue
         gw = t.get("role") == "gateway"
-        if loss >= 0.05 or (jit or 0) > 30:
+        if loss < 0.05 and (jit or 0) > 30:
+            # μόνο ασταθής χρόνος, ΚΑΜΙΑ απώλεια: όχι «Απώλειες» και όχι μέτριο — σε Wi‑Fi είναι συνηθισμένο
+            out.append(_f("low", "WAN",
+                          _L(lg, f"Ασταθής καθυστέρηση (jitter) προς {t.get('name')} ({t.get('host')})", f"Unsteady delay (jitter) to {t.get('name')} ({t.get('host')})"),
+                          _L(lg, f"Δεν χάνονται πακέτα. Jitter {jit or 0:.0f} ms, διάμεσος {med or 0:.0f} ms.",
+                             f"No packets are lost. Jitter {jit or 0:.0f} ms, median {med or 0:.0f} ms."),
+                          _L(lg, "Συνηθισμένο σε Wi‑Fi. Ενοχλεί κυρίως βιντεοκλήσεις και παιχνίδια. Αν επιμένει: δοκίμασε καλώδιο ή άλλο κανάλι Wi‑Fi.",
+                             "Common on Wi‑Fi. It mostly affects video calls and games. If it persists: try a cable or another Wi‑Fi channel."),
+                          "latency", [t.get("host")]))
+        elif loss >= 0.05:
             out.append(_f("high" if gw and loss >= 0.05 else "med", "WAN",
                           _L(lg, f"Απώλειες/αστάθεια προς {t.get('name')} ({t.get('host')})", f"Loss/instability to {t.get('name')} ({t.get('host')})"),
                           _L(lg, f"Απώλεια {loss:.0%}, jitter {jit or 0:.0f} ms, διάμεσος {med or 0:.0f} ms.",
